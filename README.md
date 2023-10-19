@@ -1,4 +1,4 @@
-# Arbitrary Graph Attention Transformers
+# Arbitrary Graph-Attention Transformers
 
 Transformer models with arbitrary graph attention patterns.
 
