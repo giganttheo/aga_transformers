@@ -1,14 +1,10 @@
 from transformers import AutoTokenizer
 import jax.numpy as jnp
 
-from modeling_t5 import FlaxT5ForConditionalGeneration
+from .modeling_t5 import FlaxT5ForConditionalGeneration
 from ..utils import adapt_relative_pos_bias, add_graph_to_params
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
-tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
-graph_model = FlaxT5ForConditionalGeneration.from_pretrained(
-    "google/flan-t5-base",
-)
 
 #wrapper to load the model and preprocess the weights
 
@@ -32,7 +28,7 @@ def load_t5(repo_path="t5-base", dtype=jnp.dtype("float32"), attention_kwargs=No
     params_with_graph = add_graph_to_params(model.params, graph)
     return tokenizer, model, params_with_graph
 
-def preprocess_function(examples, max_length=512, prefix="Summarize: ", text_column="transcript", padding='longest'):
+def preprocess_function(examples, tokenizer, max_length=512, prefix="Summarize: ", text_column="transcript", padding='longest'):
     inputs = examples[text_column]
     inputs = [prefix + inp for inp in inputs]
     model_inputs = tokenizer(
