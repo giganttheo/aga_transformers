@@ -12,7 +12,7 @@ setup(name='aga_transformers',
       author='Théo Gigant',
       author_email='theo.gigant@l2s.centralesupelec.fr',
       url='https://github.com/giganttheo/aga_transformers',
-      packages=['attnptrns'],
+      packages=['aga_transformers'],
       install_requires=[
 		'numpy',
 	],
