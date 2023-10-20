@@ -1,7 +1,7 @@
 
 import jax
 
-def adapt_model_params(params):
+def adapt_relative_pos_bias(params):
   #copy the relative attention bias embeddings from the block 0 to other blocks
   first_block_relative_attention_bias = {k: params[k]['block']['0']['layer']['0']['SelfAttention']['relative_attention_bias'] for k in ['encoder', 'decoder']}
   def copy_relative_attention_bias_on_blocks(tree, path=[]):
