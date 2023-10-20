@@ -805,7 +805,8 @@ def main():
         "batch_size": training_args.per_device_train_batch_size,
         "autoregressive":False,
     }
-    graph = create_dense_attn_patterns(model, **attention_kwargs)
+    with jax.ensure_compile_time_eval:
+        graph = create_dense_attn_patterns(model, **attention_kwargs)
 
     ar_attention_kwargs = {
         "max_source_length": data_args.max_source_length,
