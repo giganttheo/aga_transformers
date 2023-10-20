@@ -1,3 +1,5 @@
+import jax
+
 from ..models.utils import add_graph_to_params
 
 def get_apply_fn(model):
