@@ -58,10 +58,10 @@ from transformers import (
 )
 from transformers.utils import get_full_repo_name, is_offline_mode, send_example_telemetry
 
-from aga_transformers.models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
-from aga_transformers.models.utils import adapt_relative_pos_bias, add_graph_to_params
-from aga_transformers.attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
-from aga_transformers.train.utils import get_apply_fn
+from .aga_transformers.models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
+from .aga_transformers.models.utils import adapt_relative_pos_bias, add_graph_to_params
+from .aga_transformers.attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
+from .aga_transformers.train.utils import get_apply_fn
 
 logger = logging.getLogger(__name__)
 
