@@ -821,7 +821,8 @@ def main():
         def compute_loss(params):
             labels = batch.pop("labels")
             # with jax.ensure_compile_time_eval:
-            graph = create_dense_attn_patterns(model, **attention_kwargs)
+            with jax.ensure_compile_time_eval():
+                graph = create_dense_attn_patterns(model, **attention_kwargs)
             logits = state.apply_fn(**batch, graph=graph, params=params, dropout_rng=dropout_rng, train=True)[0]
             loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
             return loss, num_labels
@@ -845,7 +846,8 @@ def main():
     # Define eval fn
     def eval_step(params, batch, label_smoothing_factor=0.0):
         labels = batch.pop("labels")
-        graph = create_dense_attn_patterns(model, **attention_kwargs)
+        with jax.ensure_compile_time_eval():
+            graph = create_dense_attn_patterns(model, **attention_kwargs)
         params_with_graph = add_graph_to_params(params, graph)
         logits = model(**batch, params=params_with_graph, train=False)[0]
 
@@ -867,7 +869,8 @@ def main():
     gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
 
     def generate_step(params, batch):
-        ar_graph = create_dense_attn_patterns(model, **ar_attention_kwargs)
+        with jax.ensure_compile_time_eval():
+            ar_graph = create_dense_attn_patterns(model, **ar_attention_kwargs)
         params_with_graph = add_graph_to_params(params, ar_graph)
         _ = batch.pop("labels") #added
         output_ids = model.generate(
