@@ -815,7 +815,9 @@ def main():
         "batch_size": training_args.per_device_eval_batch_size,
         "autoregressive":True,
     }
-    ar_graph = create_dense_attn_patterns(model, **ar_attention_kwargs)
+    
+    with jax.ensure_compile_time_eval:
+        ar_graph = create_dense_attn_patterns(model, **ar_attention_kwargs)
 
     # Define gradient update step fn
     def train_step(state, batch, label_smoothing_factor=0.0):
