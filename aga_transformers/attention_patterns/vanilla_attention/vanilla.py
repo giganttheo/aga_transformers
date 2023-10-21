@@ -1,4 +1,4 @@
-import jax.numpy as jnp
+import numpy as np
 
 from ..attention_pattern import AttentionPattern
 from ..utils import graph_from_path
@@ -22,9 +22,9 @@ class VanillaAttentionPattern(AttentionPattern):
       senders.append(layer_senders)
     receivers, senders = self._cleaning_duplicates(receivers, senders)
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
-    receivers = jnp.array([receivers]*batch_size, dtype=jnp.uint16)
-    senders = jnp.array([senders]*batch_size, dtype=jnp.uint16)
-    graph_mask = jnp.array([graph_mask]*batch_size, dtype=jnp.uint16)
+    receivers = np.array([receivers]*batch_size, dtype=np.uint16)
+    senders = np.array([senders]*batch_size, dtype=np.uint16)
+    graph_mask = np.array([graph_mask]*batch_size, dtype=np.uint16)
     self.receivers = receivers
     self.senders = senders
     self.graph_mask = graph_mask
