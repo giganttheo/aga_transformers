@@ -43,11 +43,13 @@ class AttentionPattern():
     r, s, m = [], [], []
     def pad_to(mat, padding):
       padded_mat = np.zeros((padding), dtype=np.uint16)
-      padded_mat = padded_mat.at[:mat.shape[0]].set(mat)
+      # padded_mat = padded_mat.at[:mat.shape[0]].set(mat)
+      padded_mat[:mat.shape[0]] = mat
       return padded_mat
     def get_mask(mat, padding):
       graph_mask = np.zeros((padding), dtype="i4")
-      graph_mask = graph_mask.at[:mat.shape[0]].set(np.ones_like(mat, dtype="i4"))
+      # graph_mask = graph_mask.at[:mat.shape[0]].set(np.ones_like(mat, dtype="i4"))
+      graph_mask[:mat.shape[0]] = np.ones_like(mat, dtype="i4")
       return graph_mask
     h = []
     m_h = []
