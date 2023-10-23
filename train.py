@@ -775,6 +775,24 @@ def main():
     
     state = TrainState.create(apply_fn=apply_fn_with_graph, params=model.params, tx=adamw, dropout_rng=dropout_rng) # previously params=model.params, apply_fn=model.__call__
 
+    attention_kwargs = {
+        "max_source_length": data_args.max_source_length,
+        "max_target_length": max_target_length,
+        "n_heads": model.config.num_heads,
+        "batch_size": training_args.per_device_train_batch_size,
+        "autoregressive":False,
+    }
+    graph = create_dense_attn_patterns(model, **attention_kwargs)
+
+    ar_attention_kwargs = {
+        "max_source_length": data_args.max_source_length,
+        "max_target_length": max_target_length,
+        "n_heads": model.config.num_heads,
+        "batch_size": training_args.per_device_eval_batch_size,
+        "autoregressive":True,
+    }
+    ar_graph = create_dense_attn_patterns(model, **ar_attention_kwargs)
+
     # label smoothed cross entropy
     def loss_fn(logits, labels, padding_mask, label_smoothing_factor=0.0):
         """
@@ -804,16 +822,7 @@ def main():
 
         def compute_loss(params):
             labels = batch.pop("labels")
-            # with jax.ensure_compile_time_eval():
-            #     attention_kwargs = {
-            #         "max_source_length": data_args.max_source_length,
-            #         "max_target_length": max_target_length,
-            #         "n_heads": model.config.num_heads,
-            #         "batch_size": training_args.per_device_train_batch_size,
-            #         "autoregressive":False,
-            #     }
-            #     graph = create_dense_attn_patterns(model, **attention_kwargs)
-            logits = state.apply_fn(**batch, graph=None, params=params, dropout_rng=dropout_rng, train=True)[0]
+            logits = state.apply_fn(**batch, graph=graph, params=params, dropout_rng=dropout_rng, train=True)[0]
             loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
             return loss, num_labels
 
@@ -836,16 +845,7 @@ def main():
     # Define eval fn
     def eval_step(params, batch, label_smoothing_factor=0.0):
         labels = batch.pop("labels")
-        # with jax.ensure_compile_time_eval():
-        #     attention_kwargs = {
-        #         "max_source_length": data_args.max_source_length,
-        #         "max_target_length": max_target_length,
-        #         "n_heads": model.config.num_heads,
-        #         "batch_size": training_args.per_device_train_batch_size,
-        #         "autoregressive":False,
-        #     }
-        #    graph = create_dense_attn_patterns(model, **attention_kwargs)
-        params_with_graph = params#add_graph_to_params(params, graph=None)
+        params_with_graph = add_graph_to_params(params, graph=graph)
         logits = model(**batch, params=params_with_graph, train=False)[0]
 
         loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
@@ -866,17 +866,7 @@ def main():
     gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
 
     def generate_step(params, batch):
-        # with jax.ensure_compile_time_eval():
-        #     ar_attention_kwargs = {
-        #         "max_source_length": data_args.max_source_length,
-        #         "max_target_length": max_target_length,
-        #         "n_heads": model.config.num_heads,
-        #         "batch_size": training_args.per_device_eval_batch_size,
-        #         "autoregressive":True,
-        #     }
-        #     ar_graph = create_dense_attn_patterns(model, **ar_attention_kwargs)
-        # params_with_graph = add_graph_to_params(params, ar_graph)
-        params_with_graph = params
+        params_with_graph = add_graph_to_params(params, ar_graph)
         _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
