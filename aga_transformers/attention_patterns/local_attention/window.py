@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..attention_pattern import AttentionPattern
-from ..vanilla_attention import VanillaAttentionPattern
+from ..vanilla_attention.vanilla import VanillaAttentionPattern
 from ..utils import graph_from_path
 
 class DilatedWindowAttentionPattern(AttentionPattern):
@@ -36,13 +36,13 @@ class DilatedWindowAttentionPattern(AttentionPattern):
     self.n_heads = n_heads
     self.size = (seq_len_kv, seq_len_q)  
 
-def create_dilated_window_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, autoregressive=True):
+def create_dilated_window_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_size=5, autoregressive=True):
 
     #Encoder self attention pattern
     enc_self_attn = DilatedWindowAttentionPattern(
                                     seq_len_q=max_source_length,
                                     seq_len_kv=max_source_length,
-                                    window_size=5,
+                                    window_size=window_size,
                                     n_heads=n_heads,
                                     batch_size=batch_size,
                                     ).get_attention_graph()
