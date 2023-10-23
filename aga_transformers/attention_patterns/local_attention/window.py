@@ -37,7 +37,6 @@ class DilatedWindowAttentionPattern(AttentionPattern):
     self.size = (seq_len_kv, seq_len_q)  
 
 def create_dilated_window_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_size=5, autoregressive=True):
-
     #Encoder self attention pattern
     enc_self_attn = DilatedWindowAttentionPattern(
                                     seq_len_q=max_source_length,
@@ -46,7 +45,6 @@ def create_dilated_window_attn_patterns(model, max_source_length, max_target_len
                                     n_heads=n_heads,
                                     batch_size=batch_size,
                                     ).get_attention_graph()
-    
     if autoregressive:
         #Decoder self attention pattern
         dec_self_attn = VanillaAttentionPattern(
@@ -81,6 +79,52 @@ def create_dilated_window_attn_patterns(model, max_source_length, max_target_len
                                         n_heads=n_heads,
                                         batch_size=batch_size,
                                         ).get_attention_graph()
+    graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn)
+    return graph
 
+def create_window_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_size=5, autoregressive=True):
+    #Encoder self attention pattern
+    enc_self_attn = DilatedWindowAttentionPattern(
+                                    seq_len_q=max_source_length,
+                                    seq_len_kv=max_source_length,
+                                    window_size=window_size,
+                                    dilation=False,
+                                    n_heads=n_heads,
+                                    batch_size=batch_size,
+                                    ).get_attention_graph()
+    if autoregressive:
+        #Decoder self attention pattern
+        dec_self_attn = VanillaAttentionPattern(
+                                        seq_len_q=1,
+                                        seq_len_kv=max_target_length,
+                                        n_heads=n_heads,
+                                        batch_size=batch_size,
+                                        ).get_attention_graph()    
+        #Encoder-Decoder cross attention pattern
+        #kv is the receivers and in cross attention the encoder
+        #q is the senders and in cross attention the decoder
+        encdec_attn = VanillaAttentionPattern(
+                                        seq_len_q=1,
+                                        seq_len_kv=max_source_length,
+                                        n_heads=n_heads,
+                                        batch_size=batch_size,
+                                        ).get_attention_graph()
+    else:
+        #Decoder self attention pattern
+        dec_self_attn = VanillaAttentionPattern(
+                                        seq_len_q=max_target_length,
+                                        seq_len_kv=max_target_length,
+                                        n_heads=n_heads,
+                                        batch_size=batch_size,
+                                        ).get_attention_graph()    
+        #Encoder-Decoder cross attention pattern
+        #kv is the receivers and in cross attention the encoder
+        #q is the senders and in cross attention the decoder
+        encdec_attn = VanillaAttentionPattern(
+                                        seq_len_q=max_source_length,
+                                        seq_len_kv=max_source_length,
+                                        n_heads=n_heads,
+                                        batch_size=batch_size,
+                                        ).get_attention_graph()
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn)
     return graph
