@@ -60,7 +60,7 @@ from transformers.utils import get_full_repo_name, is_offline_mode, send_example
 
 from aga_transformers.models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from aga_transformers.models.utils import adapt_relative_pos_bias, add_graph_to_params
-from aga_transformers.attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
+from aga_transformers.attention_patterns.sparse_attention.led import create_led_attn_patterns
 from aga_transformers.train.utils import get_apply_fn
 
 logger = logging.getLogger(__name__)
@@ -779,19 +779,23 @@ def main():
         "max_source_length": data_args.max_source_length,
         "max_target_length": max_target_length,
         "n_heads": model.config.num_heads,
+        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+        "block_size": 1,
         "batch_size": training_args.per_device_train_batch_size,
         "autoregressive":False,
     }
-    graph = create_dense_attn_patterns(model, **attention_kwargs)
+    graph = create_led_attn_patterns(model, **attention_kwargs)
 
     ar_attention_kwargs = {
         "max_source_length": data_args.max_source_length,
         "max_target_length": max_target_length,
         "n_heads": model.config.num_heads,
+        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+        "block_size": 1,
         "batch_size": training_args.per_device_eval_batch_size,
         "autoregressive":True,
     }
-    ar_graph = create_dense_attn_patterns(model, **ar_attention_kwargs)
+    ar_graph = create_led_attn_patterns(model, **ar_attention_kwargs)
 
     # label smoothed cross entropy
     def loss_fn(logits, labels, padding_mask, label_smoothing_factor=0.0):
