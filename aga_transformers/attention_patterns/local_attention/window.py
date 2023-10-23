@@ -20,7 +20,7 @@ class DilatedWindowAttentionPattern(AttentionPattern):
       layer_receivers = []
       layer_senders = []
       for i in seq_kv:
-        for j in [i + offset * dilation[head] for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q >= i + offset * dilation[head] >= 0]:
+        for j in [i + offset * dilation[head] for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * dilation[head] >= 0]:
           layer_receivers.append(i)
           layer_senders.append(j)
       receivers.append(layer_receivers)
