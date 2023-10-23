@@ -887,7 +887,7 @@ def main():
 
     # Create parallel version of the train and eval step
     p_train_step = jax.pmap(
-        partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch", donate_argnums=(0,)
+        partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch", # donate_argnums=(0,)
     )
     p_eval_step = jax.pmap(partial(eval_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch")
     p_generate_step = jax.pmap(generate_step, "batch")
