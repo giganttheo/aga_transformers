@@ -12,7 +12,7 @@ class LongformerAttentionPattern(AttentionPattern):
     # attention_window * 2 + 1 #effective window size
 
     #global attn
-    global_tokens = sentence_tokens
+    global_tokens = set(sentence_tokens)
 
     if dilation is None:
       dilation = range(1, 1 + n_heads)
@@ -22,19 +22,28 @@ class LongformerAttentionPattern(AttentionPattern):
     self.batch_size = batch_size
     receivers = []
     senders = []
-    seq_kv = range(seq_len_kv)
-    seq_q = range(seq_len_q)
+    seq_kv = set(range(seq_len_kv))
+    seq_q = set(range(seq_len_q))
     for head in range(n_heads):
       layer_receivers = []
       layer_senders = []
-      for i in seq_kv:
-        window = [i + offset * dilation[head] for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * dilation[head] >= 0]
+      # global attention
+      for i in global_tokens:
         for j in seq_q:
-           in_window = j in window
-           in_block = abs((i // block_size ) - (j // block_size )) <= window_size // 2
-           if i in global_tokens or j in global_tokens or (in_block or in_window):
-            layer_receivers.append(i)
-            layer_senders.append(j)
+          layer_receivers.append(i)
+          layer_senders.append(j)
+      for j in global_tokens:
+        for i in seq_kv:
+          layer_receivers.append(i)
+          layer_senders.append(j)
+      
+      #local window attention
+      for i in seq_kv - global_tokens:
+        window = set([i + offset * dilation[head] for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * dilation[head] >= 0])
+        for j in window - global_tokens:
+          layer_receivers.append(i)
+          layer_senders.append(j)
+      
       receivers.append(layer_receivers)
       senders.append(layer_senders)
     receivers, senders = self._cleaning_duplicates(receivers, senders)
@@ -47,6 +56,7 @@ class LongformerAttentionPattern(AttentionPattern):
     self.graph_mask = graph_mask
     self.n_heads = n_heads
     self.size = (seq_len_kv, seq_len_q)  
+
 
 
 """
