@@ -539,14 +539,13 @@ class FlaxT5Attention(nn.Module):
                     jnp.full(attention_mask.shape, mask_value).astype(self.dtype),
                 )
 
-            if position_bias is None:
-                # compute position bias (only for first layer)
-                position_bias = self._create_position_bias(
-                    key_states, query_states, attention_mask, init_cache, seq_length, 0
-                )
+            # compute position bias (only for first layer)
+            position_bias = self._create_position_bias(
+                key_states, query_states, attention_mask, init_cache, seq_length, 0
+            )
 
-                if attention_mask is not None:
-                    position_bias = position_bias + attention_mask
+            if attention_mask is not None:
+                position_bias = position_bias + attention_mask
 
             # create dropout rng
             dropout_rng = None
