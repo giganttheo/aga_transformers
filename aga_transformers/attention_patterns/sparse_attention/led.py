@@ -28,8 +28,8 @@ class LongformerAttentionPattern(AttentionPattern):
       layer_receivers = []
       layer_senders = []
       for i in seq_kv:
+        window = [i + offset * dilation[head] for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * dilation[head] >= 0]
         for j in seq_q:
-           window = [i + offset * dilation[head] for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * dilation[head] >= 0]
            in_window = j in window
            in_block = abs((i // block_size ) - (j // block_size )) <= window_size // 2
            if i in global_tokens or j in global_tokens or (in_block or in_window):
