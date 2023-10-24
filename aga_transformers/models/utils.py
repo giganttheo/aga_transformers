@@ -16,7 +16,7 @@ def adapt_relative_pos_bias(params):
 
 def is_leaf_attn(tree):
   #returns True if the tree is a leaf or at the level we want to merge the trees
-  if tree is None and ((not isinstance(tree, dict)) or ("k" in tree.keys()) or ("receivers" in tree.keys())):
+  if tree is None or ((not isinstance(tree, dict)) or ("k" in tree.keys()) or ("receivers" in tree.keys())):
     return True
   return False
 
