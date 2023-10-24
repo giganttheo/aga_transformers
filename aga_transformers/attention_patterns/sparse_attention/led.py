@@ -97,9 +97,9 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
                                         ).get_attention_graph()
     else:
         #Decoder self attention pattern
-        dec_self_attn = None   
+        dec_self_attn = {}
         #Encoder-Decoder cross attention pattern
-        encdec_attn = None
+        encdec_attn = {}
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn)
     return graph
 
