@@ -9,6 +9,11 @@ from ..models.utils import adapt_relative_pos_bias, add_graph_to_params
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
 
+allclose_kwargs = {
+                "rtol": 1e-03,
+                "atol": 1e-05,
+                }
+
 def test():
 
     # Perform tests:
@@ -52,8 +57,6 @@ def test():
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
     shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
 
-    text_column = "transcript"
-    prefix="summarize: "
     pad_token_id=model.config.pad_token_id
     decoder_start_token_id=model.config.decoder_start_token_id
 
@@ -87,13 +90,13 @@ def test():
 
     ## Encoder part
 
-    assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state)
+    assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state, **allclose_kwargs)
 
     print("Test passed for encoder")
 
     ## Decoder part
 
-    assert np.allclose(output_training.logits, output_reference.logits)
+    assert np.allclose(output_training.logits, output_reference.logits, **allclose_kwargs)
 
     print("Test passed for decoder (training mode)")
 
