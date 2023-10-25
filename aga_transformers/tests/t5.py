@@ -1,7 +1,12 @@
+import numpy as np
+
+import jax.numpy as jnp
+from jax import lax
+
+from transformers.generation import FlaxLogitsProcessorList
+from transformers.generation.flax_utils import GreedyState
 from transformers import AutoTokenizer
 from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
-import jax.numpy as jnp
-import numpy as np
 
 from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
@@ -62,7 +67,8 @@ def test():
 
     ARTICLE_TO_SUMMARIZE = ["Small store not well stocked. Rather long wait at checkout. I was there yesterday, Monday August 29, in the late afternoon. The products and prices are interesting despite inflation. Some of the customers and employees are very particular... I can see that in 1 year everything has gone downhill..."]
 
-    ar_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
+    def get_ar_inputs():
+        return preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
     training_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
@@ -100,9 +106,81 @@ def test():
 
     print("Test passed for decoder (training mode)")
 
-    ## Autoregressive decoding
+    ## Autoregressive decoding with greedy search
 
-    #
+    def greedy_search(model, params, input_ids, model_kwargs, n=10):
 
-    # print("Test passed for decoder (autoregressive mode)")
+        model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
+
+        input_ids = model._prepare_decoder_input_ids_for_generation(
+            1,
+            decoder_start_token_id=model.generation_config.decoder_start_token_id,
+            bos_token_id=model.generation_config.bos_token_id,
+            model_kwargs=model_kwargs,
+        )
+        model_kwargs = model.prepare_inputs_for_generation(input_ids, 512, **model_kwargs)
+
+        logits_processor = FlaxLogitsProcessorList()
+
+        batch_size, cur_len = input_ids.shape
+        sequences = jnp.full((batch_size, 512), pad_token_id, dtype=jnp.int32)
+        sequences = lax.dynamic_update_slice(sequences, input_ids, (0, 0))
+
+        state = GreedyState(
+                cur_len=cur_len,
+                sequences=sequences,
+                running_token=input_ids,
+                is_sent_finished=False,
+                model_kwargs=model_kwargs,
+            )
+
+        def greedy_search_body_fn(state):
+            """state update fn."""
+            # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cache_index"])
+            # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"].shape)
+            # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"][0, :5, :3, 0])
+            print(state.running_token)
+            z = state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"].copy()
+            model_outputs = model.decode(state.running_token, params=params, return_dict=True, **state.model_kwargs)
+            logits = model_outputs.logits[:, -1]
+
+            # apply min_length, ...
+            logits = logits_processor(state.sequences, logits, state.cur_len)
+
+            next_token = jnp.argmax(logits, axis=-1)
+            next_token = next_token[:, None]
+
+            next_sequences = lax.dynamic_update_slice(state.sequences, next_token, (0, state.cur_len))
+            next_model_kwargs = model.update_inputs_for_generation(model_outputs, state.model_kwargs.copy())
+
+            return GreedyState(
+                cur_len=state.cur_len + 1,
+                sequences=next_sequences,
+                running_token=next_token,
+                is_sent_finished=False,
+                model_kwargs=next_model_kwargs,
+            ), model_outputs, z
+        r = []
+        states = []
+        for rep in range(n):
+            states.append(state)
+            state, output, z = greedy_search_body_fn(states[rep])
+            # print(state.running_token)
+            r.append((output, state.running_token, z))
+        return r, states
+
+    n = 5
+
+    ar_inputs = get_ar_inputs()
+    input_ids = ar_inputs.pop("input_ids")
+    greedy_outputs_reference, _ = greedy_search(ref_model, ref_model.params, input_ids, ar_inputs, n=n)
+
+    ar_inputs = get_ar_inputs()
+    input_ids = ar_inputs.pop("input_ids")
+    greedy_outputs, _ = greedy_search(model, add_graph_to_params(model.params, graph_ar), input_ids, ar_inputs, n=n)
+
+    for i in range(n):
+        assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
+
+    print(f"Test passed for decoder ({n} tokens greedy search autoregressive)")
 
