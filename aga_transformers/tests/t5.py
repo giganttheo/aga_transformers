@@ -136,9 +136,6 @@ def test():
 
         def greedy_search_body_fn(state):
             """state update fn."""
-            # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cache_index"])
-            # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"].shape)
-            # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"][0, :5, :3, 0])
             z = state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"].copy()
             model_outputs = model.decode(state.running_token, params=params, return_dict=True, **state.model_kwargs)
             logits = model_outputs.logits[:, -1]
@@ -164,7 +161,6 @@ def test():
         for rep in range(n):
             states.append(state)
             state, output, z = greedy_search_body_fn(states[rep])
-            # print(state.running_token)
             r.append((output, state.running_token, z))
         return r, states
 
