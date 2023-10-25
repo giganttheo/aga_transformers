@@ -514,11 +514,21 @@ class FlaxT5Attention(nn.Module):
 
         else:
             # regular attention (for decoder during training)
-
+            # for fast decoding causal attention mask should be shifted
+            causal_attention_mask_shift = (
+                self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
+            )
             # create causal attention_mask; attention_mask has to be defined when model is causal
             if self.causal:
                 causal_attention_mask = make_causal_mask(attention_mask, dtype="bool")
-
+                # fast decoding for generate requires special attention_mask
+                if self.has_variable("cache", "cached_key"):
+                    max_decoder_length = self.variables["cache"]["cached_key"].shape[1]
+                    causal_attention_mask = jax.lax.dynamic_slice(
+                        causal_attention_mask,
+                        (0, 0, causal_attention_mask_shift, 0),
+                        (1, 1, seq_length, max_decoder_length),
+                    )
                 # broadcast causal attention mask & attention mask to fit for merge
                 causal_attention_mask = jnp.broadcast_to(
                     causal_attention_mask, (batch_size,) + causal_attention_mask.shape[1:]
@@ -530,6 +540,13 @@ class FlaxT5Attention(nn.Module):
             elif attention_mask is not None:
                 attention_mask = jnp.expand_dims(attention_mask, axis=(-3, -2))
 
+            # During fast autoregressive decoding, we feed one position at a time,
+            # and cache the keys and values step by step.
+            if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
+                key_states, value_states, attention_mask = self._concatenate_to_cache(
+                    key_states, value_states, query_states, attention_mask
+                )
+
             # replace masked positions with -10_000
             if attention_mask is not None:
                 mask_value = jnp.finfo(self.dtype).min
@@ -539,10 +556,10 @@ class FlaxT5Attention(nn.Module):
                     jnp.full(attention_mask.shape, mask_value).astype(self.dtype),
                 )
 
-            # compute position bias
-            if position_bias is not None:
+            if position_bias is None:
+                # compute position bias (only for first layer)
                 position_bias = self._create_position_bias(
-                    key_states, query_states, attention_mask, init_cache, seq_length, 0
+                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
                 )
 
                 if attention_mask is not None:
@@ -563,9 +580,9 @@ class FlaxT5Attention(nn.Module):
                 query_states,
                 key_states,
                 bias=position_bias,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
+                # dropout_rng=dropout_rng,
+                # dropout_rate=self.dropout,
+                # broadcast_dropout=True,
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
