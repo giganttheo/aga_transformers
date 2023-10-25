@@ -64,21 +64,9 @@ def create_dilated_window_attn_patterns(model, max_source_length, max_target_len
                                         ).get_attention_graph()
     else:
         #Decoder self attention pattern
-        dec_self_attn = VanillaAttentionPattern(
-                                        seq_len_q=max_target_length,
-                                        seq_len_kv=max_target_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
-                                        ).get_attention_graph()    
+        dec_self_attn = {}
         #Encoder-Decoder cross attention pattern
-        #kv is the receivers and in cross attention the encoder
-        #q is the senders and in cross attention the decoder
-        encdec_attn = VanillaAttentionPattern(
-                                        seq_len_q=max_source_length,
-                                        seq_len_kv=max_source_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
-                                        ).get_attention_graph()
+        encdec_attn = {}
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn)
     return graph
 
@@ -111,20 +99,8 @@ def create_window_attn_patterns(model, max_source_length, max_target_length, n_h
                                         ).get_attention_graph()
     else:
         #Decoder self attention pattern
-        dec_self_attn = VanillaAttentionPattern(
-                                        seq_len_q=max_target_length,
-                                        seq_len_kv=max_target_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
-                                        ).get_attention_graph()    
+        dec_self_attn = {}
         #Encoder-Decoder cross attention pattern
-        #kv is the receivers and in cross attention the encoder
-        #q is the senders and in cross attention the decoder
-        encdec_attn = VanillaAttentionPattern(
-                                        seq_len_q=max_source_length,
-                                        seq_len_kv=max_source_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
-                                        ).get_attention_graph()
+        encdec_attn = {}
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn)
     return graph
