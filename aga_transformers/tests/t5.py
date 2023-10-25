@@ -9,95 +9,97 @@ from ..model.utils import adapt_relative_pos_bias, add_graph_to_params
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
 
-# Perform tests:
+def test():
 
-repo_path = "t5-base"
+    # Perform tests:
 
-tokenizer = AutoTokenizer.from_pretrained(repo_path)
-model = FlaxT5ForConditionalGeneration.from_pretrained(
-    repo_path,
-)
+    repo_path = "t5-base"
 
-model.params = model.to_bf16(model.params)
-model.params = adapt_relative_pos_bias(model.params)
+    tokenizer = AutoTokenizer.from_pretrained(repo_path)
+    model = FlaxT5ForConditionalGeneration.from_pretrained(
+        repo_path,
+    )
 
-# Closeness with vanilla T5 model:
+    model.params = model.to_bf16(model.params)
+    model.params = adapt_relative_pos_bias(model.params)
 
-ref_model = ReferenceModel.from_pretrained(
-    repo_path,
-)
+    # Closeness with vanilla T5 model:
 
-ref_model.params = model.params
+    ref_model = ReferenceModel.from_pretrained(
+        repo_path,
+    )
 
-attention_kwargs = {
-    "max_source_length": 512,
-    "max_target_length": 256,
-    "n_heads": model.config.num_heads,
-    "batch_size": 1,
-    "autoregressive":False,
-}
-graph_training = create_dense_attn_patterns(model, **attention_kwargs)
+    ref_model.params = model.params
 
-attention_kwargs = {
-    "max_source_length": 512,
-    "max_target_length": 256,
-    "n_heads": model.config.num_heads,
-    "batch_size": 1,
-    "autoregressive":True,
-}
-graph_ar = create_dense_attn_patterns(model, **attention_kwargs)
+    attention_kwargs = {
+        "max_source_length": 512,
+        "max_target_length": 256,
+        "n_heads": model.config.num_heads,
+        "batch_size": 1,
+        "autoregressive":False,
+    }
+    graph_training = create_dense_attn_patterns(model, **attention_kwargs)
 
-model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
-shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
+    attention_kwargs = {
+        "max_source_length": 512,
+        "max_target_length": 256,
+        "n_heads": model.config.num_heads,
+        "batch_size": 1,
+        "autoregressive":True,
+    }
+    graph_ar = create_dense_attn_patterns(model, **attention_kwargs)
 
-text_column = "transcript"
-prefix="summarize: "
-pad_token_id=model.config.pad_token_id
-decoder_start_token_id=model.config.decoder_start_token_id
+    model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
+    shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
 
-ARTICLE_TO_SUMMARIZE = ["Small store not well stocked. Rather long wait at checkout. I was there yesterday, Monday August 29, in the late afternoon. The products and prices are interesting despite inflation. Some of the customers and employees are very particular... I can see that in 1 year everything has gone downhill..."]
+    text_column = "transcript"
+    prefix="summarize: "
+    pad_token_id=model.config.pad_token_id
+    decoder_start_token_id=model.config.decoder_start_token_id
 
-ar_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
+    ARTICLE_TO_SUMMARIZE = ["Small store not well stocked. Rather long wait at checkout. I was there yesterday, Monday August 29, in the late afternoon. The products and prices are interesting despite inflation. Some of the customers and employees are very particular... I can see that in 1 year everything has gone downhill..."]
 
-training_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
+    ar_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
-SUMMARY = ["This is a test summary."]
+    training_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
-# Setup the tokenizer for targets
-labels = tokenizer(
-    text_target=SUMMARY,
-    max_length=attention_kwargs["max_target_length"],
-    padding='max_length',
-    truncation=True,
-    return_tensors="np",
-)
+    SUMMARY = ["This is a test summary."]
 
-decoder_input_ids = shift_tokens_right_fn(
-    labels["input_ids"], pad_token_id, decoder_start_token_id
-)
-training_inputs["decoder_input_ids"] = jnp.asarray(decoder_input_ids)
+    # Setup the tokenizer for targets
+    labels = tokenizer(
+        text_target=SUMMARY,
+        max_length=attention_kwargs["max_target_length"],
+        padding='max_length',
+        truncation=True,
+        return_tensors="np",
+    )
 
-# We need decoder_attention_mask so we can ignore pad tokens from loss
-training_inputs["decoder_attention_mask"] = labels["attention_mask"]
+    decoder_input_ids = shift_tokens_right_fn(
+        labels["input_ids"], pad_token_id, decoder_start_token_id
+    )
+    training_inputs["decoder_input_ids"] = jnp.asarray(decoder_input_ids)
 
-output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
-output_reference = ref_model.__call__(params=ref_model.params, **training_inputs)
+    # We need decoder_attention_mask so we can ignore pad tokens from loss
+    training_inputs["decoder_attention_mask"] = labels["attention_mask"]
 
-## Encoder part
+    output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
+    output_reference = ref_model.__call__(params=ref_model.params, **training_inputs)
 
-assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state)
+    ## Encoder part
 
-print("Test passed for Encoder")
+    assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state)
 
-## Decoder part
+    print("Test passed for encoder")
 
-assert np.allclose(output_training.logits, output_reference.logits)
+    ## Decoder part
 
-print("Test passed for decoder (training mode)")
+    assert np.allclose(output_training.logits, output_reference.logits)
 
-## Autoregressive decoding
+    print("Test passed for decoder (training mode)")
 
-#
+    ## Autoregressive decoding
 
-# print("Test passed for decoder (autoregressive mode)")
+    #
+
+    # print("Test passed for decoder (autoregressive mode)")
 
