@@ -66,7 +66,7 @@ increasing dilation only on 2 heads. This gives the model the ability to directl
 to distant tokens without sacrificing local context.
 """
 
-def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], mode="autoregressive"):
+def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], autoregressive=False):
     #Encoder self attention pattern
     enc_self_attn = [LongformerAttentionPattern(
                                     seq_len_q=max_source_length,
@@ -78,7 +78,7 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
                                     n_heads=n_heads,
                                     batch_size=batch_size,
                                     ).get_attention_graph() for window_size in window_sizes]
-    if mode=="autoregressive":
+    if autoregressive:
         #Decoder self attention pattern
         dec_self_attn = VanillaAttentionPattern(
                                         seq_len_q=1,
@@ -91,23 +91,6 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
         #q is the senders and in cross attention the decoder
         encdec_attn = VanillaAttentionPattern(
                                         seq_len_q=1,
-                                        seq_len_kv=max_source_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
-                                        ).get_attention_graph()
-    elif mode == "fully connected":
-        #Decoder self attention pattern
-        dec_self_attn = VanillaAttentionPattern(
-                                        seq_len_q=max_target_length,
-                                        seq_len_kv=max_target_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
-                                        ).get_attention_graph()    
-        #Encoder-Decoder cross attention pattern
-        #kv is the receivers and in cross attention the encoder
-        #q is the senders and in cross attention the decoder
-        encdec_attn = VanillaAttentionPattern(
-                                        seq_len_q=max_target_length,
                                         seq_len_kv=max_source_length,
                                         n_heads=n_heads,
                                         batch_size=batch_size,
