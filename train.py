@@ -782,7 +782,7 @@ def main():
         "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
         "block_size": 1,
         "batch_size": training_args.per_device_train_batch_size,
-        "autoregressive":False,
+        "autoregressive": False,
     }
     graph = create_led_attn_patterns(model, **attention_kwargs)
 
@@ -793,7 +793,7 @@ def main():
         "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
         "block_size": 1,
         "batch_size": training_args.per_device_eval_batch_size,
-        "autoregressive":True,
+        "autoregressive": True,
     }
     ar_graph = create_led_attn_patterns(model, **ar_attention_kwargs)
 
