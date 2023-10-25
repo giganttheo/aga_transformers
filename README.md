@@ -12,3 +12,4 @@ TODO list:
    * [x] fully connected attn pattern
    * [x] window attn pattern
    * [x] longformer-style attn pattern
+ * [x] unit tests 
