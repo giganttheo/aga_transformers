@@ -5,7 +5,7 @@ import numpy as np
 
 from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
-from ..model.utils import adapt_relative_pos_bias, add_graph_to_params
+from ..models.utils import adapt_relative_pos_bias, add_graph_to_params
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
 
