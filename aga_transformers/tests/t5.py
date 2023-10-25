@@ -139,7 +139,6 @@ def test():
             # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cache_index"])
             # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"].shape)
             # print(state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"][0, :5, :3, 0])
-            print(state.running_token)
             z = state.model_kwargs["past_key_values"]["decoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]["cached_value"].copy()
             model_outputs = model.decode(state.running_token, params=params, return_dict=True, **state.model_kwargs)
             logits = model_outputs.logits[:, -1]
