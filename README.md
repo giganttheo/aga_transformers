@@ -5,8 +5,10 @@ Transformer models with arbitrary graph attention patterns.
 TODO list:
  * [ ] training code
    * [x] instantiate the model
-   * [ ] jit + evaluate the model
-   * [ ] training loop
- * [ ] add attention patterns
+   * [x] jit + evaluate the model
+   * [x] training loop
+   * [ ] training working with long inputs
+ * [x] add attention patterns
    * [x] fully connected attn pattern
-   * [ ] longformer-style attn pattern
+   * [x] window attn pattern
+   * [x] longformer-style attn pattern
