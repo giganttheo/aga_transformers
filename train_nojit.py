@@ -890,7 +890,7 @@ def main():
     # p_generate_step = jax.pmap(generate_step, "batch")
 
     # Replicate the train state on each device
-    state = state.replicate()
+    # state = state.replicate()
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
@@ -940,7 +940,7 @@ def main():
             batch = next(eval_loader)
             labels = batch["labels"]
 
-            metrics = pad_shard_unpad(eval_step, static_return=True)(
+            metrics = eval_step(
                 state.params, batch, min_device_batch=per_device_eval_batch_size
             )
             eval_metrics.append(metrics)
@@ -948,7 +948,7 @@ def main():
             # generation
             if data_args.predict_with_generate:
                 print("generate...")
-                generated_ids = pad_shard_unpad(generate_step)(state.params, batch)
+                generated_ids = generate_step(state.params, batch)
                 eval_preds.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
                 eval_labels.extend(labels)
 
@@ -998,14 +998,14 @@ def main():
             batch = next(pred_loader)
             labels = batch["labels"]
 
-            metrics = pad_shard_unpad(p_eval_step, static_return=True)(
+            metrics = eval_step(
                 state.params, batch, min_device_batch=per_device_eval_batch_size
             )
             pred_metrics.append(metrics)
 
             # generation
             if data_args.predict_with_generate:
-                generated_ids = pad_shard_unpad(p_generate_step)(state.params, batch)
+                generated_ids = generate_step(state.params, batch)
                 pred_generations.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
                 pred_labels.extend(labels)
 
