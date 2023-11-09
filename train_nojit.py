@@ -832,14 +832,14 @@ def main():
 
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
         (loss, num_labels), grad = grad_fn(state.params)
-        num_labels = jax.lax.psum(num_labels, "batch")
+        num_labels = jnp.sum(num_labels, axis=0)#jax.lax.psum(num_labels, "batch")
 
         # true loss = total loss / total samples
-        loss = jax.lax.psum(loss, "batch")
+        loss = jnp.sum(loss, axis=0)#jax.lax.psum(loss, "batch")
         loss = jax.tree_util.tree_map(lambda x: x / num_labels, loss)
 
         # true grad = total grad / total samples
-        grad = jax.lax.psum(grad, "batch")
+        grad = jnp.sum(grad, axis=0)#jax.lax.psum(grad, "batch")
         grad = jax.tree_util.tree_map(lambda x: x / num_labels, grad)
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
 
@@ -853,10 +853,10 @@ def main():
         logits = model(**batch, params=params_with_graph, train=False)[0]
 
         loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
-        num_labels = jax.lax.psum(num_labels, "batch")
+        num_labels = jnp.sum(num_labels, axis=0)#jax.lax.psum(num_labels, "batch")
 
         # true loss = total loss / total samples
-        loss = jax.lax.psum(loss, "batch")
+        loss = jnp.sum(loss, axis=0) #jax.lax.psum(loss, "batch")
         loss = jax.tree_util.tree_map(lambda x: x / num_labels, loss)
 
         metrics = {"loss": loss}
