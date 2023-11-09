@@ -883,7 +883,8 @@ def main():
     # p_train_step = jax.pmap(
     #     partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor) "batch", # donate_argnums=(0,)
     # )
-    train_step = partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor)
+
+    train_step = jax.experimental.maps.xmap(partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor), in_axes={0: 'batch'}, out_axes={0: 'batch'})
     p_eval_step = jax.pmap(partial(eval_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch")
     p_generate_step = jax.pmap(generate_step, "batch")
 
