@@ -880,9 +880,10 @@ def main():
         return output_ids.sequences
 
     # Create parallel version of the train and eval step
-    p_train_step = jax.pmap(
-        partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor), # "batch", # donate_argnums=(0,)
-    )
+    # p_train_step = jax.pmap(
+    #     partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor) "batch", # donate_argnums=(0,)
+    # )
+    train_step = partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor)
     p_eval_step = jax.pmap(partial(eval_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch")
     p_generate_step = jax.pmap(generate_step, "batch")
 
@@ -912,9 +913,9 @@ def main():
         # train
         for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            batch = shard(batch)
+            # batch = shard(batch)
             with jax.disable_jit():
-                state, train_metric = p_train_step(state, batch)
+                state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
 
         train_time += time.time() - train_start
