@@ -911,11 +911,11 @@ def main():
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
+            batch = next(train_loader)
+            batch = shard(batch)
             with jax.disable_jit():
-                batch = next(train_loader)
-                batch = shard(batch)
                 state, train_metric = p_train_step(state, batch)
-                train_metrics.append(train_metric)
+            train_metrics.append(train_metric)
 
         train_time += time.time() - train_start
 
