@@ -887,7 +887,7 @@ def main():
     p_generate_step = jax.pmap(generate_step, "batch")
 
     # Replicate the train state on each device
-    state = state.replicate()
+    # state = state.replicate()
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
@@ -912,7 +912,7 @@ def main():
         # train
         for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            batch = shard(batch)
+            # batch = shard(batch)
             with jax.disable_jit():
                 state, train_metric = p_train_step(state, batch)
             train_metrics.append(train_metric)
