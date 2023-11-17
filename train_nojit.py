@@ -779,7 +779,7 @@ def main():
         "max_source_length": data_args.max_source_length,
         "max_target_length": max_target_length,
         "n_heads": model.config.num_heads,
-        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+        "window_sizes": [1024]*12,#[16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
         "block_size": 1,
         "batch_size": training_args.per_device_train_batch_size,
         "autoregressive": False,
