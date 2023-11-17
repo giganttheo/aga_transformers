@@ -86,8 +86,12 @@ def segment_softmax(logits: jnp.ndarray,
 # @partial(jax.vmap, in_axes=(0,0,0,0,None,None,None)) #vectorize over batches
 # @partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over 
 
-@partial(jax.vmap, in_axes=(0,0,0,0,0,0,None)) #vectorize over batches
-@partial(jax.vmap, in_axes=(-2,-2,-2,0,0,0,None), out_axes=(-2))  #vectorize over heads
+# @partial(jax.vmap, in_axes=(0,0,0,0,0,0,None)) #vectorize over batches
+# @partial(jax.vmap, in_axes=(-2,-2,-2,0,0,0,None), out_axes=(-2))  #vectorize over heads
+
+
+@partial(jax.vmap, in_axes=(0,0,0,0,None,None,None)) #vectorize over batches
+@partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over 
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
   """
   Computes the dot product attention according to the attention pattern specified by the graph defined
@@ -455,14 +459,20 @@ class FlaxT5Attention(nn.Module):
 
         if "receivers" in self.variables["params"].keys():
             #Graph attention
-            receivers = einops.repeat(self.variables["params"]["receivers"], "e -> b h e", b=batch_size, h=self.n_heads)
-            senders = einops.repeat(self.variables["params"]["senders"], "e -> b h e", b=batch_size, h=self.n_heads)
-            graph_mask = einops.repeat(self.variables["params"]["graph_mask"], "e -> b h e", b=batch_size, h=self.n_heads)
+            # receivers = einops.repeat(self.variables["params"]["receivers"], "e -> b h e", b=batch_size, h=self.n_heads)
+            # senders = einops.repeat(self.variables["params"]["senders"], "e -> b h e", b=batch_size, h=self.n_heads)
+            # graph_mask = einops.repeat(self.variables["params"]["graph_mask"], "e -> b h e", b=batch_size, h=self.n_heads)
+            
+            receivers = self.variables["params"]["receivers"]
+            senders = self.variables["params"]["senders"]
+            graph_mask = self.variables["params"]["graph_mask"]
+
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                attn_mask_2_graph_mask = jax.vmap(jax.vmap(lambda mask, ids: mask[ids], in_axes=(None, 0)))
-                graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
+                # attn_mask_2_graph_mask = jax.vmap(jax.vmap(lambda mask, ids: mask[ids], in_axes=(None, 0)))
+                # graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
+                graph_mask = graph_mask * attention_mask[receivers]
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
