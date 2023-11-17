@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..attention_pattern import AttentionPattern
-from ..vanilla_attention.vanilla import VanillaAttentionPattern
+# from ..vanilla_attention.vanilla import VanillaAttentionPattern
 from ..utils import graph_from_path
 
 # class LongformerAttentionPattern(AttentionPattern):
@@ -101,6 +101,31 @@ class LongformerAttentionPattern(AttentionPattern):
     self.senders = senders
     self.graph_mask = graph_mask
     self.size = (seq_len_kv, seq_len_q)  
+
+class VanillaAttentionPattern(AttentionPattern):
+  def __init__(self, seq_len_q, seq_len_kv, **kwargs):
+    super().__init__()
+    receivers = []
+    senders = []
+    seq_kv = range(seq_len_kv)
+    seq_q = range(seq_len_q)
+    layer_receivers = []
+    layer_senders = []
+    for i in seq_kv:
+      for j in seq_q:
+        layer_receivers.append(i)
+        layer_senders.append(j)
+    receivers = layer_receivers
+    senders = layer_senders
+    # receivers, senders = self._cleaning_duplicates(receivers, senders)
+    receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
+    receivers = np.array(receivers, dtype=np.uint16)
+    senders = np.array(senders, dtype=np.uint16)
+    graph_mask = np.array(graph_mask, dtype=np.uint16)
+    self.receivers = receivers
+    self.senders = senders
+    self.graph_mask = graph_mask
+    self.size = (seq_len_kv, seq_len_q)
 
 
 """

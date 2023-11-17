@@ -39,8 +39,7 @@ class AttentionPattern():
     return clean_receivers_heads, clean_senders_heads
 
   def _padding_graphs(self, receivers_heads, senders_heads):
-    max_graph_len = max([receivers.shape[0] for receivers in receivers_heads])
-    r, s, m = [], [], []
+
     def pad_to(mat, padding):
       padded_mat = np.zeros((padding), dtype=np.uint16)
       # padded_mat = padded_mat.at[:mat.shape[0]].set(mat)
@@ -51,17 +50,26 @@ class AttentionPattern():
       # graph_mask = graph_mask.at[:mat.shape[0]].set(np.ones_like(mat, dtype="i4"))
       graph_mask[:mat.shape[0]] = np.ones_like(mat, dtype="i4")
       return graph_mask
-    h = []
-    m_h = []
-    for receivers in receivers_heads:
-      h.append(pad_to(receivers, max_graph_len))
-      m_h.append(get_mask(receivers, max_graph_len))
-    r = h
-    h = []
-    for senders in senders_heads:
-      h.append(pad_to(senders, max_graph_len))
-    m = m_h
-    s = h
+
+    if isinstance(receivers_heads, list):
+      max_graph_len = max([receivers.shape[0] for receivers in receivers_heads])
+      r, s, m = [], [], []
+      h = []
+      m_h = []
+      for receivers in receivers_heads:
+        h.append(pad_to(receivers, max_graph_len))
+        m_h.append(get_mask(receivers, max_graph_len))
+      r = h
+      h = []
+      for senders in senders_heads:
+        h.append(pad_to(senders, max_graph_len))
+      m = m_h
+      s = h
+    else: #no heads ==> no padding
+      max_graph_len = receivers_heads.shape[0]
+      r = receivers_heads
+      s = senders_heads
+      m = get_mask(r, max_graph_len)
     return np.array(r, dtype=np.uint16), np.array(s, dtype=np.uint16), np.array(m, dtype="i4")
 
   def mask(self, mask):
