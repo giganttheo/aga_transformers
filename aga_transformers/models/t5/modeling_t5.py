@@ -31,6 +31,8 @@ from flax.traverse_util import flatten_dict, unflatten_dict
 from jax.random import PRNGKey
 from functools import partial
 
+import einops
+
 ArrayTree = Union[jnp.ndarray, Iterable['ArrayTree'], Mapping[Any, 'ArrayTree']]
 
 
@@ -79,6 +81,10 @@ def segment_softmax(logits: jnp.ndarray,
   normalizers = normalizers[segment_ids]
   softmax = logits / normalizers
   return softmax
+
+# ==> to change for optimization, in this version the graph is the same for the batch & heads
+# @partial(jax.vmap, in_axes=(0,0,0,0,None,None,None)) #vectorize over batches
+# @partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over 
 
 @partial(jax.vmap, in_axes=(0,0,0,0,0,0,None)) #vectorize over batches
 @partial(jax.vmap, in_axes=(-2,-2,-2,0,0,0,None), out_axes=(-2))  #vectorize over heads
@@ -449,9 +455,9 @@ class FlaxT5Attention(nn.Module):
 
         if "receivers" in self.variables["params"].keys():
             #Graph attention
-            receivers = self.variables["params"]["receivers"]
-            senders = self.variables["params"]["senders"]
-            graph_mask = self.variables["params"]["graph_mask"]
+            receivers = einops.repeat(self.variables["params"]["receivers"], "e -> b h e", b=batch_size, h=self.n_heads)
+            senders = einops.repeat(self.variables["params"]["senders"], "e -> b h e", b=batch_size, h=self.n_heads)
+            graph_mask = einops.repeat(self.variables["params"]["graph_mask"], "e -> b h e", b=batch_size, h=self.n_heads)
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
