@@ -92,7 +92,7 @@ class LongformerAttentionPattern(AttentionPattern):
       
     receivers = layer_receivers
     senders = layer_senders
-    receivers, senders = self._cleaning_duplicates(receivers, senders)
+    # receivers, senders = self._cleaning_duplicates(receivers, senders)
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
     receivers = np.array(receivers, dtype=np.uint16)
     senders = np.array(senders, dtype=np.uint16)
