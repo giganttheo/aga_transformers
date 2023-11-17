@@ -336,7 +336,7 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
-        relative_position = memory_position[receivers] - context_position[senders]
+        relative_position = memory_position[..., receivers] - context_position[..., senders] #was [receivers]
         relative_position_bucket = self._relative_position_bucket(
             relative_position[..., None],
             bidirectional=(not self.causal),
