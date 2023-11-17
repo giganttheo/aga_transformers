@@ -90,8 +90,8 @@ class LongformerAttentionPattern(AttentionPattern):
         layer_receivers.append(i)
         layer_senders.append(j)
       
-    receivers = layer_receivers
-    senders = layer_senders
+    receivers = np.array(layer_receivers, dtype=np.uint16)
+    senders = np.array(layer_senders, dtype=np.uint16)
     # receivers, senders = self._cleaning_duplicates(receivers, senders)
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
     receivers = np.array(receivers, dtype=np.uint16)
@@ -115,8 +115,8 @@ class VanillaAttentionPattern(AttentionPattern):
       for j in seq_q:
         layer_receivers.append(i)
         layer_senders.append(j)
-    receivers = layer_receivers
-    senders = layer_senders
+    receivers = np.array(layer_receivers, dtype=np.uint16)
+    senders = np.array(layer_senders, dtype=np.uint16)
     # receivers, senders = self._cleaning_duplicates(receivers, senders)
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
     receivers = np.array(receivers, dtype=np.uint16)
