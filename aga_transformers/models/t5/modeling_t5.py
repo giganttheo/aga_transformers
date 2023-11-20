@@ -345,7 +345,6 @@ class FlaxT5Attention(nn.Module):
         )
 
         values = self.relative_attention_bias(relative_position_bucket)
-        print(f"relpos bucket shape {values.shape}")
         heads = jnp.arange(self.n_heads)
         return values[:, 0, heads]#values[0, :, 0]
         # return values[:, heads, :, 0, heads].transpose((1, 0, 2))
@@ -514,7 +513,7 @@ class FlaxT5Attention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask[..., None]
+                position_bias = position_bias + graph_mask[None, None]
 
             # TODO: add rng for dropout
             # # create dropout rng
