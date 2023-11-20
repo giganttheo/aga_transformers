@@ -12,4 +12,5 @@ TODO list:
    * [x] fully connected attn pattern
    * [x] window attn pattern
    * [x] longformer-style attn pattern
+ * [ ] add a more efficient global / local attention computation
  * [x] unit tests 
