@@ -1791,6 +1791,7 @@ class FlaxT5ForConditionalGeneration(FlaxT5PreTrainedModel):
         train: bool = False,
         params: dict = None,
         dropout_rng: PRNGKey = None,
+        graph: dict = None,
     ):
         r"""
         Returns:
@@ -1835,6 +1836,9 @@ class FlaxT5ForConditionalGeneration(FlaxT5PreTrainedModel):
             rngs["dropout"] = dropout_rng
 
         inputs = {"params": params or self.params}
+        
+        if graph is not None:
+            inputs["graph"] = graph
 
         # if past_key_values are passed then cache is already initialized a private flag init_cache has to be
         # passed down to ensure cache is used. It has to be made sure that cache is marked as mutable so that
