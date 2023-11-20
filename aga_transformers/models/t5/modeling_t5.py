@@ -349,7 +349,7 @@ class FlaxT5Attention(nn.Module):
         heads = jnp.arange(self.n_heads)
         return values[:, 0, heads]#values[0, :, 0]
         # return values[:, heads, :, 0, heads].transpose((1, 0, 2))
-        # values has shape [bs, heads, seq_len, ?, heads]
+        # output has shape [bs, heads, seq_len]
 
     def compute_bias(self, query_length, key_length):
         """Compute binned relative position bias"""
@@ -514,7 +514,7 @@ class FlaxT5Attention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask
+                position_bias = position_bias + graph_mask[..., None]
 
             # TODO: add rng for dropout
             # # create dropout rng
