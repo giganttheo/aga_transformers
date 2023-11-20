@@ -413,7 +413,7 @@ class FlaxT5Attention(nn.Module):
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
         else: #attention_mask is never None
             position_bias = jnp.zeros_like(attention_mask, dtype=self.dtype)
-        print(f"shape posbias: {position_bias.shape}")
+        jax.debug.print(f"shape posbias: {position_bias.shape}")
         return position_bias
 
     def _create_position_bias(
