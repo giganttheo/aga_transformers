@@ -84,14 +84,14 @@ def segment_softmax(logits: jnp.ndarray,
 
 # ==> to change for optimization, in this version the graph is the same for the batch & heads
 # @partial(jax.vmap, in_axes=(0,0,0,0,None,None,None)) #vectorize over batches
-# @partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over 
+# @partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over heads
 
 # @partial(jax.vmap, in_axes=(0,0,0,0,0,0,None)) #vectorize over batches
 # @partial(jax.vmap, in_axes=(-2,-2,-2,0,0,0,None), out_axes=(-2))  #vectorize over heads
 
 
-@partial(jax.vmap, in_axes=(0,0,0,0,None,None,None)) #vectorize over batches
-@partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over 
+@partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
+@partial(jax.vmap, in_axes=(-2,-2,-2,None,None,0,None), out_axes=(-2))  #vectorize over heads
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
   """
   Computes the dot product attention according to the attention pattern specified by the graph defined
