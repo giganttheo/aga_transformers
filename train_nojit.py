@@ -779,7 +779,7 @@ def main():
         "max_source_length": data_args.max_source_length,
         "max_target_length": max_target_length,
         "n_heads": model.config.num_heads,
-        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],#[1024]*12,#[16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+        "window_sizes": [1024]*12,#[16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
         "block_size": 1,
         "batch_size": training_args.per_device_train_batch_size,
         "autoregressive": False,
@@ -790,7 +790,7 @@ def main():
         "max_source_length": data_args.max_source_length,
         "max_target_length": max_target_length,
         "n_heads": model.config.num_heads,
-        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+        "window_sizes": [1024]*12,#[16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
         "block_size": 1,
         "batch_size": training_args.per_device_eval_batch_size,
         "autoregressive": True,
@@ -851,9 +851,9 @@ def main():
     # Define eval fn
     def eval_step(params, batch, label_smoothing_factor=0.0):
         labels = batch.pop("labels")
-        params_with_graph = add_graph_to_params(params, graph=graph)
-        logits = model(**batch, params=params_with_graph, train=False)[0]
-
+        # params_with_graph = add_graph_to_params(params, graph=graph)
+        logits = model(**batch, params=add_graph_to_params(params, graph=graph), train=False)[0]
+        # del params_with_graph
         loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
         num_labels = jax.lax.psum(num_labels, "batch")
 
@@ -872,13 +872,14 @@ def main():
     gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
 
     def generate_step(params, batch):
-        params_with_graph = add_graph_to_params(params, ar_graph)
+        # params_with_graph = add_graph_to_params(params, ar_graph)
         _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
-                                    params=params_with_graph,
+                                    params=add_graph_to_params(params, graph=ar_graph),
                                     attention_mask=batch["attention_mask"],
                                     **gen_kwargs)
+        # del params_with_graph
         return output_ids.sequences
 
     # Create parallel version of the train and eval step
