@@ -347,8 +347,9 @@ class FlaxT5Attention(nn.Module):
         values = self.relative_attention_bias(relative_position_bucket)
         print(f"relpos bucket shape {values.shape}")
         heads = jnp.arange(self.n_heads)
-        return values[:, :, 0]#values[0, :, 0]
+        return values[:, 0, heads]#values[0, :, 0]
         # return values[:, heads, :, 0, heads].transpose((1, 0, 2))
+        # values has shape [bs, heads, seq_len, ?, heads]
 
     def compute_bias(self, query_length, key_length):
         """Compute binned relative position bias"""
@@ -414,7 +415,6 @@ class FlaxT5Attention(nn.Module):
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
         else: #attention_mask is never None
             position_bias = jnp.zeros_like(attention_mask, dtype=self.dtype)
-        jax.debug.print(f"shape posbias: {position_bias.shape}")
         return position_bias
 
     def _create_position_bias(
