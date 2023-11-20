@@ -344,11 +344,10 @@ class FlaxT5Attention(nn.Module):
             max_distance=self.relative_attention_max_distance,
         )
 
-        print(f"relpos bucket shape {relative_position_bucket.shape}")
-
         values = self.relative_attention_bias(relative_position_bucket)
+        print(f"relpos bucket shape {values.shape}")
         heads = jnp.arange(self.n_heads)
-        return values[0, :, 0]
+        return values[:, :, 0]#values[0, :, 0]
         # return values[:, heads, :, 0, heads].transpose((1, 0, 2))
 
     def compute_bias(self, query_length, key_length):
