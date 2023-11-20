@@ -467,14 +467,14 @@ class FlaxT5Attention(nn.Module):
             
             receivers = self.variables["params"]["receivers"]
             senders = self.variables["params"]["senders"]
-            graph_mask = self.variables["params"]["graph_mask"]
+            graph_mask = self.variables["params"]["graph_mask"][None, None]
 
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
                 # attn_mask_2_graph_mask = jax.vmap(jax.vmap(lambda mask, ids: mask[ids], in_axes=(None, 0)))
                 # graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
-                graph_mask = graph_mask * attention_mask[0, receivers]
+                graph_mask = graph_mask * attention_mask[..., receivers]
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
@@ -513,7 +513,7 @@ class FlaxT5Attention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask[None, None]
+                position_bias = position_bias + graph_mask
 
             # TODO: add rng for dropout
             # # create dropout rng
