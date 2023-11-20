@@ -519,7 +519,7 @@ class FlaxT5Attention(nn.Module):
             # dropout_rng = None
             # if not deterministic and self.dropout > 0.0:
             #     dropout_rng = self.make_rng("dropout")
-
+            print("shape: ", position_bias.shape)
             attn_output, attn_weights = scaled_dot_product_attention_graph(
                 query_states,
                 key_states,

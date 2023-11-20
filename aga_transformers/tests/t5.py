@@ -178,4 +178,3 @@ def test():
         assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
 
     print(f"Test passed for decoder ({n} tokens greedy search autoregressive)")
-
