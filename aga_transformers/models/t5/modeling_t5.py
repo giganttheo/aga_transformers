@@ -346,7 +346,7 @@ class FlaxT5Attention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         heads = jnp.arange(self.n_heads)
-        return values[:, 0, heads]#values[0, :, 0]
+        return values[:, 0, heads].transpose((1, 0))[None] #values[0, :, 0]
         # return values[:, heads, :, 0, heads].transpose((1, 0, 2))
         # output has shape [bs, heads, seq_len]
 
