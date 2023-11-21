@@ -803,6 +803,7 @@ def main():
 
     # Wrap the optimizer so it will freeze parameters not marked as trainable by the spec
     optimizer = lorax.wrap_optimizer(adamw, lora_spec)
+    del adamw
 
     # Setup train state
     
