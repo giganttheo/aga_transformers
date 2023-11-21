@@ -573,6 +573,8 @@ def main():
     # Initialize a set of LoRA factors for each parameter
     lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype="bfloat16")
 
+    del model.params
+
     # The transformed model has the same call signature, but it can now handle parameters
     # of type lorax.LoraWeight
     lora_model = lorax.lora(model)
@@ -826,7 +828,7 @@ def main():
         "batch_size": training_args.per_device_eval_batch_size,
         "autoregressive": True,
     }
-    ar_graph = create_led_attn_patterns(model, **ar_attention_kwargs)
+    # ar_graph = create_led_attn_patterns(model, **ar_attention_kwargs)
 
     # label smoothed cross entropy
     def loss_fn(logits, labels, padding_mask, label_smoothing_factor=0.0):
