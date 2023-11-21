@@ -748,7 +748,7 @@ def main():
             "Please run pip install tensorboard to enable."
         )
     
-    apply_fn_with_graph = get_apply_fn(model)
+    apply_fn_with_graph = get_apply_fn(lora_model)
 
     # Initialize our training
     rng = jax.random.PRNGKey(training_args.seed)
