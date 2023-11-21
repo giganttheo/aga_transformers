@@ -88,10 +88,11 @@ LORA_FULL = -1
 
 # This function defines a spec which tells lorax how each parameter should be handled
 def decision_fn(path, param):
-    if 'embedding' in path:
-        print(f'Fully finetuning param {path}')
-        return LORA_FULL
-    dim = 32
+    keys = [p.key() for p in param]
+    if 'embedding' in keys or 'shared' in keys or 'lm_head' in keys:
+        print(f'Freezing param {path}')
+        return LORA_FREEZE
+    dim = 16
     print(f'Using LoRA with dim={dim} for param {path}')
     return dim
 
