@@ -573,12 +573,6 @@ def main():
     # Initialize a set of LoRA factors for each parameter
     lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype="bfloat16")
 
-    del model.params
-
-    # The transformed model has the same call signature, but it can now handle parameters
-    # of type lorax.LoraWeight
-    lora_model = lorax.lora(model)
-
     if training_args.gradient_checkpointing:
         model.enable_gradient_checkpointing()
 
@@ -751,6 +745,10 @@ def main():
             "Please run pip install tensorboard to enable."
         )
     
+    # The transformed model has the same call signature, but it can now handle parameters
+    # of type lorax.LoraWeight
+    lora_model = lorax.lora(model)
+
     apply_fn_with_graph = get_apply_fn(lora_model)
 
     # Initialize our training
@@ -936,6 +934,9 @@ def main():
     logger.info(f"  Total optimization steps = {total_train_steps}")
 
     train_time = 0
+
+    del model
+
     epochs = tqdm(range(num_epochs), desc=f"Epoch ... (1/{num_epochs})", position=0)
     for epoch in epochs:
         # ======================== Training ================================
