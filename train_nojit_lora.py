@@ -92,7 +92,7 @@ def decision_fn(path, param):
     if 'embedding' in keys or 'shared' in keys or 'lm_head' in keys:
         print(f'Freezing param {path}')
         return LORA_FREEZE
-    dim = 16
+    dim = 4
     print(f'Using LoRA with dim={dim} for param {path}')
     return dim
 
@@ -568,7 +568,7 @@ def main():
     # model ==> lora version
 
     # Tell LoRA what to use as the small dimension of B and A
-    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=True)
+    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=False)
 
     # Initialize a set of LoRA factors for each parameter
     lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype="bfloat16")
