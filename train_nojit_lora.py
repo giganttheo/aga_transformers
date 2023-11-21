@@ -88,7 +88,7 @@ LORA_FULL = -1
 
 # This function defines a spec which tells lorax how each parameter should be handled
 def decision_fn(path, param):
-    keys = [p.key() for p in param]
+    keys = [str(p) for p in param]
     if 'embedding' in keys or 'shared' in keys or 'lm_head' in keys:
         print(f'Freezing param {path}')
         return LORA_FREEZE
