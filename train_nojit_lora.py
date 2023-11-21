@@ -570,7 +570,7 @@ def main():
     lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=True)
 
     # Initialize a set of LoRA factors for each parameter
-    lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0))
+    lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype="bfloat16")
 
     # The transformed model has the same call signature, but it can now handle parameters
     # of type lorax.LoraWeight
