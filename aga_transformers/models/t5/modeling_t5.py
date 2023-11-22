@@ -460,7 +460,8 @@ class FlaxT5Attention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1]).astype(self.dtype)
 
-        if "receivers" in self.variables["params"].keys():
+        # if "receivers" in self.variables["params"].keys():
+        if self.has_variable("graph", "receivers"):
             #Graph attention
             # receivers = einops.repeat(self.variables["params"]["receivers"], "e -> b h e", b=batch_size, h=self.n_heads)
             # senders = einops.repeat(self.variables["params"]["senders"], "e -> b h e", b=batch_size, h=self.n_heads)
@@ -473,7 +474,7 @@ class FlaxT5Attention(nn.Module):
             receivers = self.variables["graph"]["receivers"]
             senders = self.variables["graph"]["senders"]
             graph_mask = self.variables["graph"]["graph_mask"][None, None]
-
+            
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
                 # attn_mask_2_graph_mask = jax.vmap(jax.vmap(lambda mask, ids: mask[ids], in_axes=(None, 0)))
