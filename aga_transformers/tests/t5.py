@@ -23,7 +23,7 @@ def test():
 
     # Perform tests:
 
-    repo_path = "t5-base"
+    repo_path = "t5-small"
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     model = FlaxT5ForConditionalGeneration.from_pretrained(
