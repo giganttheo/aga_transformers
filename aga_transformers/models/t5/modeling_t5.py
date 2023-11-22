@@ -1285,7 +1285,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
             return encode_module(input_ids, attention_mask, **kwargs)
 
         return self.module.apply(
-            {"params": params or self.params},
+            params or {"params": self.params},
             input_ids=jnp.array(input_ids, dtype="i4"),
             attention_mask=jnp.array(attention_mask, dtype="i4"),
             output_attentions=output_attentions,
