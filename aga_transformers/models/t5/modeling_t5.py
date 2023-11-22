@@ -99,7 +99,7 @@ def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, d
   """
   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype)
   dtype = q.dtype
-  bucket_size=1000
+  bucket_size=100
   seq_len, depth = q.shape
   #compute attention logits: <Q,K> / sqrt(d_q)
   attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
@@ -536,6 +536,7 @@ class FlaxT5Attention(nn.Module):
                 self.dtype)
             del receivers
             del senders
+            del graph_mask
 
         else:
             # regular attention (for decoder during training)
