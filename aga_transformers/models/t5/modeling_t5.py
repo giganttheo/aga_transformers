@@ -100,7 +100,7 @@ def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, d
   """
   #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
   dtype = q.dtype
-  bucket_size=100
+  bucket_size=10
   seq_len, depth = q.shape
   #compute attention logits: <Q,K> / sqrt(d_q)
   attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
