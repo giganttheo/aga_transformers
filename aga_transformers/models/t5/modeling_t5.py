@@ -346,9 +346,8 @@ class FlaxT5Attention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         heads = jnp.arange(self.n_heads)
-        print('shape:', values.shape)
-        return values[:, 0, heads].transpose((1, 0))[None] #values[0, :, 0]
-        # return values[:, heads, :, 0, heads].transpose((1, 0, 2))
+        # return values[:, 0, heads].transpose((1, 0))[None] #values[0, :, 0]
+        return values[:, heads, :, 0, heads].transpose((1, 0, 2))
         # output has shape [bs, heads, seq_len]
 
     def compute_bias(self, query_length, key_length):
@@ -410,9 +409,9 @@ class FlaxT5Attention(nn.Module):
             #this is reproducing the dynamic_slice + broadcast_to combo
             #works for 1 token at a time decoding only (ie seq_length==1)
             current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender)
+            position_bias = self.compute_bias_sparse(query_length, key_length, receivers[None, None], current_token_sender[None, None])
         elif self.has_relative_attention_bias:
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
+            position_bias = self.compute_bias_sparse(query_length, key_length, receivers[None, None], senders[None, None])
         else: #attention_mask is never None
             bs, _, seq_len = attention_mask.shape
             position_bias = jnp.zeros((bs, self.n_heads, seq_len), dtype=self.dtype)
