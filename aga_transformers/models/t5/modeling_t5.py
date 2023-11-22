@@ -1187,7 +1187,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         rngs = {"dropout": dropout_rng} if dropout_rng is not None else {}
 
         return self.module.apply(
-            {"params": params or self.params},
+            params or {"params": self.params},
             input_ids=jnp.array(input_ids, dtype="i4"),
             attention_mask=jnp.array(attention_mask, dtype="i4"),
             decoder_input_ids=jnp.array(decoder_input_ids, dtype="i4"),
@@ -1832,7 +1832,7 @@ class FlaxT5ForConditionalGeneration(FlaxT5PreTrainedModel):
         if dropout_rng is not None:
             rngs["dropout"] = dropout_rng
 
-        inputs = {"params": params or self.params}
+        inputs = params or {"params": self.params}
 
         # if past_key_values are passed then cache is already initialized a private flag init_cache has to be
         # passed down to ensure cache is used. It has to be made sure that cache is marked as mutable so that
