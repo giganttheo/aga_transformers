@@ -1648,7 +1648,7 @@ class FlaxT5EncoderModel(FlaxT5PreTrainedModel):
         rngs = {"dropout": dropout_rng} if dropout_rng is not None else {}
 
         return self.module.apply(
-            {"params": params or self.params},
+            params or {"params": self.params},
             input_ids=jnp.array(input_ids, dtype="i4"),
             attention_mask=jnp.array(attention_mask, dtype="i4"),
             output_attentions=output_attentions,
