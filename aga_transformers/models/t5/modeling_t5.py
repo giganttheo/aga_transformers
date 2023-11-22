@@ -97,7 +97,7 @@ def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, d
   Computes the dot product attention according to the attention pattern specified by the graph defined
   by the adjacency list (senders, receivers)
   """
-  q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype)
+  #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
   dtype = q.dtype
   bucket_size=100
   seq_len, depth = q.shape

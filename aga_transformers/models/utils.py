@@ -22,4 +22,5 @@ def is_leaf_attn(tree):
 
 def add_graph_to_params(params, graph):
   #merge the graph and parameter trees
-  return jax.tree_util.tree_map(lambda t, g: t if not isinstance(t, dict) else {**g, **t}, params, graph, is_leaf=is_leaf_attn)
+  return {"params": params, "graph": graph}
+  # return jax.tree_util.tree_map(lambda t, g: t if not isinstance(t, dict) else {**g, **t}, params, graph, is_leaf=is_leaf_attn)
