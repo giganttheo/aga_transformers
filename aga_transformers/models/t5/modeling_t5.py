@@ -466,9 +466,13 @@ class FlaxT5Attention(nn.Module):
             # senders = einops.repeat(self.variables["params"]["senders"], "e -> b h e", b=batch_size, h=self.n_heads)
             # graph_mask = einops.repeat(self.variables["params"]["graph_mask"], "e -> b h e", b=batch_size, h=self.n_heads)
             
-            receivers = self.variables["params"]["receivers"]
-            senders = self.variables["params"]["senders"]
-            graph_mask = self.variables["params"]["graph_mask"][None, None]
+            # receivers = self.variables["params"]["receivers"]
+            # senders = self.variables["params"]["senders"]
+            # graph_mask = self.variables["params"]["graph_mask"][None, None]
+
+            receivers = self.variables["graph"]["receivers"]
+            senders = self.variables["graph"]["senders"]
+            graph_mask = self.variables["graph"]["graph_mask"][None, None]
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
@@ -520,7 +524,7 @@ class FlaxT5Attention(nn.Module):
             # dropout_rng = None
             # if not deterministic and self.dropout > 0.0:
             #     dropout_rng = self.make_rng("dropout")
-            
+
             attn_output, attn_weights = scaled_dot_product_attention_graph(
                 query_states,
                 key_states,
