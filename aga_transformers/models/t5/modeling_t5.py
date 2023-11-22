@@ -535,9 +535,9 @@ class FlaxT5Attention(nn.Module):
                 senders,
                 position_bias,
                 self.dtype)
-            del receivers
-            del senders
-            del graph_mask
+            # del receivers
+            # del senders
+            # del graph_mask
 
         else:
             # regular attention (for decoder during training)
