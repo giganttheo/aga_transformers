@@ -60,7 +60,7 @@ def tie_relative_pos_bias(Model):
   first_block_relative_attention_bias = {k: (k,'block','0','layer','0','SelfAttention','relative_attention_bias') for k in ['encoder', 'decoder']}
   other_blocks_relative_attention_bias = {k: [(k,'block', str(b),'layer','0','SelfAttention','relative_attention_bias') for b in range(n_blocks)] for k in ['encoder', 'decoder']}
   rules = {source:
-          target for k, source in first_block_relative_attention_bias for target in other_blocks_relative_attention_bias[k]}
+          target for k, source in first_block_relative_attention_bias.items() for target in other_blocks_relative_attention_bias[k]}
   return tie(Model, rules, transpose=False)
 
 def tie_graph_layers(Model, n_blocks, autoregressive=False):
@@ -72,7 +72,7 @@ def tie_graph_layers(Model, n_blocks, autoregressive=False):
   first_block_relative_attention_bias = {k: (k,'block','0','layer','0','SelfAttention') for k in modules}
   other_blocks_relative_attention_bias = {k: [(k,'block', str(b),'layer','0','SelfAttention') for b in range(1, n_blocks)] for k in modules}
   rules = {source:
-          target for k, source in first_block_relative_attention_bias for target in other_blocks_relative_attention_bias[k]}
+          target for k, source in first_block_relative_attention_bias.items() for target in other_blocks_relative_attention_bias[k]}
   if not autoregressive:
     #adds the same thing to the cross attention
     #TOTEST
