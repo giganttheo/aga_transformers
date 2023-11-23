@@ -9,11 +9,12 @@ from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
 #wrapper to load the model and preprocess the weights
 
-def load_t5(repo_path="t5-base", dtype=jnp.dtype("float32"), attention_mode="led", attention_kwargs=None, **model_kwargs):
+def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     model = FlaxT5ForConditionalGeneration.from_pretrained(
         repo_path,
         **model_kwargs,
+        dtype=dtype,
     )
     if attention_kwargs is None:
         attention_kwargs = {
