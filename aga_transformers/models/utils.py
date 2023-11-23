@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import flax.linen as nn
 from flax.traverse_util import flatten_dict, unflatten_dict
 
+#copied from https://github.com/google/flax/discussions/1264#discussioncomment-5748491
 def tie(target, mappings, collections='params', transpose=True):
     """Tie weights of `target` module` enumerated in `mappings` from
     `collections`.
@@ -60,7 +61,7 @@ def tie_relative_pos_bias(Model):
   other_blocks_relative_attention_bias = {k: [(k,'block', str(b),'layer','0','SelfAttention','relative_attention_bias') for b in range(n_blocks)] for k in ['encoder', 'decoder']}
   rules = {source:
           target for k, source in first_block_relative_attention_bias for target in other_blocks_relative_attention_bias[k]}
-  return tie(Model, rules)
+  return tie(Model, rules, transpose=False)
 
 def tie_graph_layers(Model, n_blocks, autoregressive=False):
   """
@@ -78,7 +79,7 @@ def tie_graph_layers(Model, n_blocks, autoregressive=False):
     source = ('decoder', '0', 'layer', '1', 'CrossAttention')
     for target in [('decoder', str(b), 'layer', '1', 'CrossAttention') for b in range(1, n_blocks)]
       rules[source] = target
-  return tie(Model, rules)
+  return tie(Model, rules, collections='graph', transpose=False)
 
 
 def adpat_relative_pos_bias(params):
