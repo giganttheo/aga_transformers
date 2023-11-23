@@ -528,10 +528,10 @@ class FlaxT5Attention(nn.Module):
             # if not deterministic and self.dropout > 0.0:
             #     dropout_rng = self.make_rng("dropout")
 
-            @partial(jax.jit, static_argnames=['dtype'])
-            @partial(jax.vmap, in_axes=(-2,-2,-2,1,None), out_axes=(-2))  #vectorize over heads
-            @partial(jax.vmap, in_axes=(0,0,0,0,None)) #vectorize over batches
-            def _scaled_dot_product_attention_graph(q, k, v, bias=None, dtype=None):
+            @partial(jax.jit)
+            @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
+            @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
+            def _scaled_dot_product_attention_graph(q, k, v, bias=None):
                 """
                 Computes the dot product attention according to the attention pattern specified by the graph defined
                 by the adjacency list (senders, receivers)
