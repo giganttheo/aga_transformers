@@ -523,7 +523,6 @@ class FlaxT5Attention(nn.Module):
             @partial(jax.jit)
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
-            @staticmethod
             def _scaled_dot_product_attention_graph(q, k, v, bias=None):
                 """
                 Computes the dot product attention according to the attention pattern specified by the graph defined
