@@ -53,6 +53,7 @@ def tie(target, mappings, collections='params', transpose=True):
 
 def tie_relative_pos_bias(Model):
   """
+  #TODO: fix this. It does not work on a Transformer Model, but it should work on FlaxModules
   tie the relative position bias in consecutive layer to the first one
   (without copying the weights)
   """
@@ -65,6 +66,7 @@ def tie_relative_pos_bias(Model):
 
 def tie_graph_layers(Model, n_blocks, autoregressive=False):
   """
+  #TODO: fix this. It does not work on a Transformer Model, but it should work on FlaxModules
   tie the relative position bias in consecutive layer to the first one
   (without copying the weights)
   """
