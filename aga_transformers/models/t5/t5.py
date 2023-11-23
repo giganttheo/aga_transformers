@@ -12,7 +12,7 @@ from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     TiedModel = tie_graph_layers(FlaxT5ForConditionalGeneration, n_blocks=attention_kwargs["n_layers"] if attention_kwargs is not None else 12, autoregressive=attention_kwargs["autoregressive"] if attention_kwargs is not None else True)
-    model = TiedModel.from_pretrained(
+    model = TiedModel().from_pretrained(
         repo_path,
         **model_kwargs,
         dtype=dtype,

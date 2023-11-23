@@ -32,7 +32,7 @@ def test():
     #     repo_path,
     # )
     TiedModel = tie_graph_layers(FlaxT5ForConditionalGeneration, n_blocks=6, autoregressive=True)
-    model = TiedModel.from_pretrained(
+    model = TiedModel().from_pretrained(
         repo_path,
     )
 
