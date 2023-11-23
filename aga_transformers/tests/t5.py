@@ -45,6 +45,7 @@ def test():
         "max_source_length": 512,
         "max_target_length": 256,
         "n_heads": model.config.num_heads,
+        "n_layers": model.config.num_layers,
         "batch_size": 1,
         "autoregressive":False,
     }
@@ -54,6 +55,7 @@ def test():
         "max_source_length": 512,
         "max_target_length": 256,
         "n_heads": model.config.num_heads,
+        "n_layers": model.config.num_layers,
         "batch_size": 1,
         "autoregressive":True,
     }

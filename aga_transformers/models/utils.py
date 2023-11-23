@@ -82,7 +82,7 @@ def tie_graph_layers(Model, n_blocks, autoregressive=False):
   return tie(Model, rules, collections='graph', transpose=False)
 
 
-def adpat_relative_pos_bias(params):
+def adapt_relative_pos_bias(params):
   #copy the relative attention bias embeddings from the block 0 to other blocks
   first_block_relative_attention_bias = {k: params[k]['block']['0']['layer']['0']['SelfAttention']['relative_attention_bias'] for k in ['encoder', 'decoder']}
   def copy_relative_attention_bias_on_blocks(tree, path=[]):
