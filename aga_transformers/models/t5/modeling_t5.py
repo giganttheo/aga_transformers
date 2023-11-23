@@ -32,6 +32,7 @@ from jax.random import PRNGKey
 from functools import partial
 
 import einops
+import netket
 
 ArrayTree = Union[jnp.ndarray, Iterable['ArrayTree'], Mapping[Any, 'ArrayTree']]
 
@@ -91,8 +92,9 @@ def segment_softmax(logits: jnp.ndarray,
 
 #the order is important, otherwise the RAM usage explodes for some reason?
 #mb check if netket.jax.vmap_chunked works better?
-@partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
+# @partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
 @partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
+@partial(netket.jax.vmap_chunked, in_axes=(0,0,0,None,None,0,None), chunk_size=1)
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
   """
   Computes the dot product attention according to the attention pattern specified by the graph defined
@@ -527,13 +529,15 @@ class FlaxT5Attention(nn.Module):
             #     dropout_rng = self.make_rng("dropout")
 
             attn_output, attn_weights = scaled_dot_product_attention_graph(
-                query_states,
-                key_states,
-                value_states,
+                jnp.swapaxes(query_states, -2, 0),
+                jnp.swapaxes(key_states, -2, 0),
+                jnp.swapaxes(value_states, -2, 0),
                 receivers,
                 senders,
                 position_bias,
                 self.dtype)
+            attn_output = jnp.swapaxes(attn_output, -2, 0)
+            attn_weights = jnp.swapaxes(attn_weights, -2, 0)
             #we don't need this in memory anymore...
             del receivers
             del senders
