@@ -137,7 +137,7 @@ increasing dilation only on 2 heads. This gives the model the ability to directl
 to distant tokens without sacrificing local context.
 """
 
-def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], autoregressive=False):
+def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], autoregressive=False, **kwargs):
     #Encoder self attention pattern
     enc_self_attn = [LongformerAttentionPattern(
                                     seq_len_q=max_source_length,
