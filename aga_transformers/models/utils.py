@@ -77,7 +77,7 @@ def tie_graph_layers(Model, n_blocks, autoregressive=False):
     #adds the same thing to the cross attention
     #TOTEST
     source = ('decoder', '0', 'layer', '1', 'CrossAttention')
-    for target in [('decoder', str(b), 'layer', '1', 'CrossAttention') for b in range(1, n_blocks)]
+    for target in [('decoder', str(b), 'layer', '1', 'CrossAttention') for b in range(1, n_blocks)]:
       rules[source] = target
   return tie(Model, rules, collections='graph', transpose=False)
 
