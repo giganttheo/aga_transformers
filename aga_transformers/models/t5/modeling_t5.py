@@ -91,7 +91,8 @@ def segment_softmax(logits: jnp.ndarray,
 
 #the order is important, otherwise the RAM usage explodes for some reason?
 #mb check if netket.jax.vmap_chunked works better?
-@partial(jax.jit, static_argnames=['receivers', 'senders', 'dtype'])
+
+@partial(jax.jit, static_argnames=['dtype'])
 @partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
 @partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
@@ -527,12 +528,42 @@ class FlaxT5Attention(nn.Module):
             # if not deterministic and self.dropout > 0.0:
             #     dropout_rng = self.make_rng("dropout")
 
-            attn_output, attn_weights = scaled_dot_product_attention_graph(
+            @partial(jax.jit, static_argnames=['dtype'])
+            @partial(jax.vmap, in_axes=(-2,-2,-2,1,None), out_axes=(-2))  #vectorize over heads
+            @partial(jax.vmap, in_axes=(0,0,0,0,None)) #vectorize over batches
+            def _scaled_dot_product_attention_graph(q, k, v, bias=None, dtype=None):
+                """
+                Computes the dot product attention according to the attention pattern specified by the graph defined
+                by the adjacency list (senders, receivers)
+                """
+                #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
+                dtype = q.dtype
+                bucket_size=10000
+                seq_len, depth = q.shape
+                #compute attention logits: <Q,K> / sqrt(d_q)
+                attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
+                if bias is not None:
+                    attn_logits = attn_logits + bias
+                #softmax over receiver nodes
+                w = segment_softmax(attn_logits,
+                                    segment_ids=senders,
+                                    num_segments = seq_len,
+                                    bucket_size=bucket_size).astype(dtype) #(num_edges,)
+                #attention weights applied to the values for every edge:
+                values = jnp.einsum('e,ed->ed', w, v[receivers]) #(num_edges, d_v)
+                #summing over the nodes
+                values = jax.ops.segment_sum(values,
+                                    segment_ids=senders,
+                                    num_segments=seq_len,
+                                    unique_indices=False,
+                                    indices_are_sorted=False,
+                                    bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
+                return values, w
+
+            attn_output, attn_weights = _scaled_dot_product_attention_graph(
                 query_states,
                 key_states,
                 value_states,
-                receivers,
-                senders,
                 position_bias,
                 self.dtype)
             #we don't need this in memory anymore...
