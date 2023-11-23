@@ -91,6 +91,7 @@ def segment_softmax(logits: jnp.ndarray,
 
 #the order is important, otherwise the RAM usage explodes for some reason?
 #mb check if netket.jax.vmap_chunked works better?
+@jax.jit
 @partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
 @partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
