@@ -2,7 +2,7 @@ from transformers import AutoTokenizer
 import jax.numpy as jnp
 
 from .modeling_t5 import FlaxT5ForConditionalGeneration
-from ..utils import adapt_relative_pos_bias, add_graph_to_params
+from ..utils import adapt_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
@@ -11,7 +11,8 @@ from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
 def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
-    model = FlaxT5ForConditionalGeneration.from_pretrained(
+    TiedModel = tie_graph_layers(FlaxT5ForConditionalGeneration, n_blocks=attention_kwargs["n_layers"] if attention_kwargs is not None else 12, autoregressive=attention_kwargs["autoregressive"] if attention_kwargs is not None else True)
+    model = TiedModel.from_pretrained(
         repo_path,
         **model_kwargs,
         dtype=dtype,
@@ -32,7 +33,7 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
         graph = create_dense_attn_patterns(model, **attention_kwargs)
     if dtype == "bfloat16":
         model.params = model.to_bf16(model.params)
-    model.params = adapt_relative_pos_bias(model.params)
+    # model.params = adapt_relative_pos_bias(model.params)
     return tokenizer, model, graph
 
 def preprocess_function(examples, tokenizer, max_length=512, prefix="summarize: ", text_column="transcript", padding='longest'):

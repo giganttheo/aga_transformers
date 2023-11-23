@@ -1,5 +1,4 @@
 
-
 def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[]):
   if not isinstance(tree, dict):
     return None
