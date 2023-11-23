@@ -61,12 +61,13 @@ _CONFIG_FOR_DOC = "T5Config"
 
 remat = nn_partitioning.remat
 
+@partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
 def segment_softmax(logits: jnp.ndarray,
                     segment_ids: jnp.ndarray,
                     num_segments: Optional[int] = None,
                     indices_are_sorted: bool = False,
                     unique_indices: bool = False,
-                    bucket_size=None) -> ArrayTree:
+                    bucket_size: Optional[int] =None) -> ArrayTree:
   """
   segment_softmax inspired by jraph's implementation, but fixed to give the same results as jax.nn.softmax by using jax.ops segment functions
   """
