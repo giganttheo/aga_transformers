@@ -29,7 +29,7 @@ def load_t5(repo_path="t5-base", dtype=jnp.dtype("float32"), attention_mode="led
         graph = create_led_attn_patterns(model, **attention_kwargs)
     else:
         graph = create_dense_attn_patterns(model, **attention_kwargs)
-    if dtype == jnp.dtype("bfloat16"):
+    if dtype == "bfloat16":
         model.params = model.to_bf16(model.params)
     model.params = adapt_relative_pos_bias(model.params)
     return tokenizer, model, graph
