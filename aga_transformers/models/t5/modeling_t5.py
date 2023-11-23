@@ -462,17 +462,8 @@ class FlaxT5Attention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1]).astype(self.dtype)
 
-        # if "receivers" in self.variables["params"].keys():
         if self.has_variable("graph", "receivers"):
             #Graph attention
-            # receivers = einops.repeat(self.variables["params"]["receivers"], "e -> b h e", b=batch_size, h=self.n_heads)
-            # senders = einops.repeat(self.variables["params"]["senders"], "e -> b h e", b=batch_size, h=self.n_heads)
-            # graph_mask = einops.repeat(self.variables["params"]["graph_mask"], "e -> b h e", b=batch_size, h=self.n_heads)
-            
-            # receivers = self.variables["params"]["receivers"]
-            # senders = self.variables["params"]["senders"]
-            # graph_mask = self.variables["params"]["graph_mask"][None, None]
-
             receivers = self.variables["graph"]["receivers"]
             senders = self.variables["graph"]["senders"]
             graph_mask = self.variables["graph"]["graph_mask"][None, None]
@@ -531,6 +522,7 @@ class FlaxT5Attention(nn.Module):
             @partial(jax.jit)
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
+            @staticmethod
             def _scaled_dot_product_attention_graph(q, k, v, bias=None):
                 """
                 Computes the dot product attention according to the attention pattern specified by the graph defined
@@ -547,7 +539,7 @@ class FlaxT5Attention(nn.Module):
                 #softmax over receiver nodes
                 w = segment_softmax(attn_logits,
                                     segment_ids=senders,
-                                    num_segments = seq_len,
+                                    num_segments=seq_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
                 #attention weights applied to the values for every edge:
                 values = jnp.einsum('e,ed->ed', w, v[receivers]) #(num_edges, d_v)
