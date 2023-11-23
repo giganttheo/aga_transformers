@@ -28,7 +28,7 @@ class VanillaAttentionPattern(AttentionPattern):
     self.graph_mask = graph_mask
     self.size = (seq_len_kv, seq_len_q)
 
-def create_dense_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, autoregressive=True, **kwargs):
+def create_dense_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, autoregressive=True, layer_wise=True, **kwargs):
     #Encoder self attention pattern
     enc_self_attn = VanillaAttentionPattern(
                                     seq_len_q=max_source_length,
@@ -59,5 +59,5 @@ def create_dense_attn_patterns(model, max_source_length, max_target_length, n_he
         dec_self_attn = {}
         #Encoder-Decoder cross attention pattern
         encdec_attn = {}
-    graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn)
+    graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph

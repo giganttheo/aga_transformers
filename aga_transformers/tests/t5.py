@@ -10,7 +10,7 @@ from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 
 from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
-from ..models.utils import adapt_relative_pos_bias, add_graph_to_params
+from ..models.utils import adapt_relative_pos_bias, add_graph_to_params, tie_graph_layers
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
 
@@ -21,17 +21,23 @@ allclose_kwargs = {
 
 def test():
 
+    layer_wise=True
+
     # Perform tests:
 
     repo_path = "t5-small"
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
-    model = FlaxT5ForConditionalGeneration.from_pretrained(
+    # model = FlaxT5ForConditionalGeneration.from_pretrained(
+    #     repo_path,
+    # )
+    TiedModel = tie_graph_layers(FlaxT5ForConditionalGeneration, n_blocks=6, autoregressive=True)
+    model = TiedModel.from_pretrained(
         repo_path,
     )
 
     model.params = model.to_bf16(model.params)
-    model.params = adapt_relative_pos_bias(model.params)
+    # model.params = adapt_relative_pos_bias(model.params)
 
     # Closeness with vanilla T5 model:
 
@@ -49,7 +55,9 @@ def test():
         "batch_size": 1,
         "autoregressive":False,
     }
-    graph_training = create_dense_attn_patterns(model, **attention_kwargs)
+    graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
+
+    print(graph_training)
 
     attention_kwargs = {
         "max_source_length": 512,
@@ -59,7 +67,7 @@ def test():
         "batch_size": 1,
         "autoregressive":True,
     }
-    graph_ar = create_dense_attn_patterns(model, **attention_kwargs)
+    graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
 
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
     shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
