@@ -31,9 +31,9 @@ def test():
     # model = FlaxT5ForConditionalGeneration.from_pretrained(
     #     repo_path,
     # )
-    TiedModel = tie_graph_layers(FlaxT5ForConditionalGeneration, n_blocks=6, autoregressive=True)
+    TiedModel = tie_graph_layers(FlaxT5ForConditionalGeneration.from_pretrained, n_blocks=6, autoregressive=True)
     print(TiedModel)
-    model = TiedModel.from_pretrained(
+    model = TiedModel(
         repo_path,
     )
 
