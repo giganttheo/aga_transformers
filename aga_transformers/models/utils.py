@@ -89,11 +89,11 @@ def tie_graph_layers(Model, n_blocks, autoregressive=False):
 def repeat_relative_pos_bias(params):
   #copy the relative attention bias embeddings from the block 0 to other blocks
   #this is not ideal for finetuning because the embeddings will no longer be the same
-  first_block_relative_attention_bias = {k: params[k]['block']['0']['layer']['0']['SelfAttention']['relative_attention_bias'] for k in ['encoder', 'decoder']}
+  first_block_relative_attention_bias = {k: params[k]['block']['0']['layer']['0']['SelfAttention']['relative_attention_bias']['embedding'] for k in ['encoder', 'decoder']}
   def copy_relative_attention_bias_on_blocks(tree, path=[]):
     if not isinstance(tree, dict):
       return tree
-    if 'relative_attention_bias' in path:
+    if 'embedding' in path:
       return first_block_relative_attention_bias[path[0]]
     return {k: copy_relative_attention_bias_on_blocks(t, path=path+[k]) for (k, t) in tree.items()}
   
