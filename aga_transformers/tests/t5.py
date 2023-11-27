@@ -10,7 +10,7 @@ from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 
 from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
-from ..models.utils import adapt_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias
+from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
 
@@ -173,7 +173,7 @@ def test():
 
     ar_inputs = get_ar_inputs()
     input_ids = ar_inputs.pop("input_ids")
-    greedy_outputs, _ = greedy_search(model, add_graph_to_params(model.params, graph_ar), input_ids, ar_inputs, n=n)
+    greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(model.params), graph_ar), input_ids, ar_inputs, n=n)
 
     for i in range(n):
         assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
