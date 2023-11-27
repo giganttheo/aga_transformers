@@ -162,7 +162,7 @@ def test():
         for rep in range(n):
             states.append(state)
             state, output = greedy_search_body_fn(states[rep])
-            r.append((output, state.running_token, z))
+            r.append((output, state.running_token))
         return r, states
 
     n = 5
