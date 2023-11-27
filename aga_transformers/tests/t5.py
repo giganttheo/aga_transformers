@@ -111,7 +111,7 @@ def test():
     ## Autoregressive decoding with greedy search
 
     def greedy_search(model, params, input_ids, model_kwargs, n=10):
-
+        print(params)
         model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
 
         input_ids = model._prepare_decoder_input_ids_for_generation(
