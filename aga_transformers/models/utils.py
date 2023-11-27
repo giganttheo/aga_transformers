@@ -53,19 +53,19 @@ def tie(target, mappings, collections='params', transpose=False):
 
     return nn.map_variables(target, collections, tie_in, tie_out, init=True)
 
-def tie_relative_pos_bias(model_class):
+def tie_relative_pos_bias(module_class, repo_path):
   """
   tie the relative position bias in consecutive layer to the first one
   (without copying the weights)
   """
-  module_class = model_class.module_class
-  n_blocks = AutoConfig.from_pretrained("google/flan-t5-base").num_layers
+  module_class = module_class
+  n_blocks = AutoConfig.from_pretrained(repo_path).num_layers
   first_block_relative_attention_bias = {k: (k,'block','0','layer','0','SelfAttention','relative_attention_bias') for k in ['encoder', 'decoder']}
   other_blocks_relative_attention_bias = {k: [(k,'block', str(b),'layer','0','SelfAttention','relative_attention_bias') for b in range(1, n_blocks)] for k in ['encoder', 'decoder']}
   rules = {source:
           target for k, source in first_block_relative_attention_bias.items() for target in other_blocks_relative_attention_bias[k]}
-  model_class.module_class = tie(module_class, rules, transpose=False)
-  return model_class
+  module_class = tie(module_class, rules, transpose=False)
+  return module_class
 
 def tie_graph_layers(Model, n_blocks, autoregressive=False):
   """

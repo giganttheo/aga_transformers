@@ -26,10 +26,8 @@ def test():
     repo_path = "t5-small"
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
-    # model = FlaxT5ForConditionalGeneration.from_pretrained(
-    #     repo_path,
-    # )
-    FlaxT5ForConditionalGeneration = tie_relative_pos_bias(FlaxT5ForConditionalGeneration)
+    module_class = FlaxT5ForConditionalGeneration.module_class
+    FlaxT5ForConditionalGeneration.module_class = tie_relative_pos_bias(module_class, repo_path)
     model = FlaxT5ForConditionalGeneration.from_pretrained(
         repo_path,
     )
