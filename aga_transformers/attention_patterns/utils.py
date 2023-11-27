@@ -20,9 +20,12 @@ def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], la
       return None
   elif 'EncDecAttention' in path:
     layer_ = int(path[2])
-    #encoder / decoder cross attention
-    if isinstance(encdec_attn, list):
-      return encdec_attn[layer_]
+    if layer_wise or layer_ == 0:
+      #encoder / decoder cross attention
+      if isinstance(encdec_attn, list):
+        return encdec_attn[layer_]
+      else:
+        return encdec_attn
     else:
-      return encdec_attn
+      return None
   return {k: graph_from_path(t, enc_self_attn=enc_self_attn, dec_self_attn=dec_self_attn, encdec_attn=encdec_attn, path=path+[k]) for (k, t) in tree.items()}

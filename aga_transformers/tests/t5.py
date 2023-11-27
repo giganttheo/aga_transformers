@@ -10,7 +10,7 @@ from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 
 from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
-from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias
+from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
 
@@ -27,13 +27,11 @@ def test():
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     module_class = FlaxT5ForConditionalGeneration.module_class
-    FlaxT5ForConditionalGeneration.module_class = tie_relative_pos_bias(module_class, repo_path)
+    FlaxT5ForConditionalGeneration.module_class = tie_graph_layers(tie_relative_pos_bias(module_class, repo_path), repo_path, autoregressive=False)
     model = FlaxT5ForConditionalGeneration.from_pretrained(
         repo_path,
     )
-
     model.params = model.to_bf16(model.params)
-    # model.params = adapt_relative_pos_bias(model.params)
 
     # Closeness with vanilla T5 model:
 
@@ -50,7 +48,7 @@ def test():
         "batch_size": 1,
         "autoregressive":False,
     }
-    graph_training = create_dense_attn_patterns(model, **attention_kwargs)
+    graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     attention_kwargs = {
         "max_source_length": 512,
@@ -59,7 +57,7 @@ def test():
         "batch_size": 1,
         "autoregressive":True,
     }
-    graph_ar = create_dense_attn_patterns(model, **attention_kwargs)
+    graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
     shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
@@ -111,8 +109,6 @@ def test():
     ## Autoregressive decoding with greedy search
 
     def greedy_search(model, params, input_ids, model_kwargs, n=10):
-        if "params" in params.keys():
-            print(params["params"]["encoder"]["block"]["1"]["layer"]["0"]["SelfAttention"].keys())
         model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
 
         input_ids = model._prepare_decoder_input_ids_for_generation(

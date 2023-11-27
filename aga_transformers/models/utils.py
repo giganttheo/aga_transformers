@@ -58,33 +58,30 @@ def tie_relative_pos_bias(module_class, repo_path):
   tie the relative position bias in consecutive layer to the first one
   (without copying the weights)
   """
-  module_class = module_class
   n_blocks = AutoConfig.from_pretrained(repo_path).num_layers
   first_block_relative_attention_bias = {k: ('params', k,'block','0','layer','0','SelfAttention','relative_attention_bias', 'embedding') for k in ['encoder', 'decoder']}
   other_blocks_relative_attention_bias = {k: [('params', k,'block', str(b),'layer','0','SelfAttention','relative_attention_bias', 'embedding') for b in range(1, n_blocks)] for k in ['encoder', 'decoder']}
   rules = [(source,
           target) for k, source in first_block_relative_attention_bias.items() for target in other_blocks_relative_attention_bias[k]]
-  module_class = tie(module_class, rules, transpose=False)
-  return module_class
+  return tie(module_class, rules, transpose=False)
 
-def tie_graph_layers(Model, n_blocks, autoregressive=False):
+def tie_graph_layers(module_class, repo_path, autoregressive=False):
   """
-  #TODO: fix this. It does not work on a Transformer Model, but it should work on FlaxModules
   tie the relative position bias in consecutive layer to the first one
   (without copying the weights)
   """
+  n_blocks = AutoConfig.from_pretrained(repo_path).num_layers
   modules = ['encoder'] if autoregressive else ['encoder', 'decoder']
-  first_block_relative_attention_bias = {k: (k,'block','0','layer','0','SelfAttention') for k in modules}
-  other_blocks_relative_attention_bias = {k: [(k,'block', str(b),'layer','0','SelfAttention') for b in range(1, n_blocks)] for k in modules}
-  rules = {source:
-          target for k, source in first_block_relative_attention_bias.items() for target in other_blocks_relative_attention_bias[k]}
+  first_block_graph = {k: ('graph', k,'block','0','layer','0','SelfAttention') for k in modules}
+  other_blocks_graph = {k: [('graph', k,'block', str(b),'layer','0','SelfAttention') for b in range(1, n_blocks)] for k in modules}
+  rules = [(source,
+          target) for k, source in first_block_graph.items() for target in other_blocks_graph[k]]
   if not autoregressive:
     #adds the same thing to the cross attention
-    #TOTEST
-    source = ('decoder', '0', 'layer', '1', 'CrossAttention')
-    for target in [('decoder', str(b), 'layer', '1', 'CrossAttention') for b in range(1, n_blocks)]:
-      rules[source] = target
-  return tie(Model, rules, collections='graph', transpose=False)
+    source = ('graph', 'decoder', 'block', '0', 'layer', '1', 'CrossAttention')
+    for target in [('graph', 'decoder', 'block', str(b), 'layer', '1', 'CrossAttention') for b in range(1, n_blocks)]:
+      rules.append((source, target))
+  return tie(module_class, rules, collections='graph', transpose=False)
 
 def repeat_relative_pos_bias(params):
   #copy the relative attention bias embeddings from the block 0 to other blocks
