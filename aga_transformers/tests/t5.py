@@ -173,7 +173,7 @@ def test():
 
     ar_inputs = get_ar_inputs()
     input_ids = ar_inputs.pop("input_ids")
-    greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(model.params), graph_ar), input_ids, ar_inputs, n=n)
+    greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
 
     for i in range(n):
         assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
