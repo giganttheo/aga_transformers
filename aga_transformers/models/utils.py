@@ -7,51 +7,51 @@ from transformers import AutoConfig
 
 #copied from https://github.com/google/flax/discussions/1264#discussioncomment-5748491
 def tie(target, mappings, collections='params', transpose=False):
-    """Tie weights of `target` module` enumerated in `mappings` from
-    `collections`.
+  """Tie weights of `target` module` enumerated in `mappings` from
+  `collections`.
 
-    Example::
-        >>> class Model(nn.Module):
-        ...     @nn.compact
-        ...     def __call__(self, xs):
-        ...         ys = nn.Embed(10, 8)(xs)
-        ...         zs = nn.Dense(10)(ys)
-        ...         return zs
-        ...
-        >>> rules = {('params', 'Embed_0', 'embedding'):
-        ...          ('params', 'Dense_0', 'kernel')}
-        >>> TiedModel = tie(Model, rules)
-        >>> model = TiedModel()
-        >>> variables = model.init(jax.random.PRNGKey(42),
-        ...                        jnp.arange(6).reshape(2, 3))
+  Example::
+      >>> class Model(nn.Module):
+      ...     @nn.compact
+      ...     def __call__(self, xs):
+      ...         ys = nn.Embed(10, 8)(xs)
+      ...         zs = nn.Dense(10)(ys)
+      ...         return zs
+      ...
+      >>> rules = {('params', 'Embed_0', 'embedding'):
+      ...          ('params', 'Dense_0', 'kernel')}
+      >>> TiedModel = tie(Model, rules)
+      >>> model = TiedModel()
+      >>> variables = model.init(jax.random.PRNGKey(42),
+      ...                        jnp.arange(6).reshape(2, 3))
 
-    Args:
-        target: the module or function to be transformed.
-        mappings: weight sharing rules.
-        collections: the collection(s) to be transformed.
-        transpose: transpose tied weights or not.
-    Returns:
-        a wrapped version of ``target`` with shared weights.
-    """
-    if isinstance(mappings, dict):
-        mappings = [*mappings.items()]
+  Args:
+      target: the module or function to be transformed.
+      mappings: weight sharing rules.
+      collections: the collection(s) to be transformed.
+      transpose: transpose tied weights or not.
+  Returns:
+      a wrapped version of ``target`` with shared weights.
+  """
+  if isinstance(mappings, dict):
+    mappings = [*mappings.items()]
 
-    def tie_in(variables):
-        variables = flatten_dict(variables)
-        for src, dst in mappings:
-            if transpose:
-                variables[dst] = variables[src].T
-            else:
-                variables[dst] = variables[src]
-        return unflatten_dict(variables)
+  def tie_in(variables):
+    variables = flatten_dict(variables)
+    for src, dst in mappings:
+      if transpose:
+        variables[dst] = variables[src].T
+      else:
+        variables[dst] = variables[src]
+    return unflatten_dict(variables)
 
-    def tie_out(variables):
-        variables = flatten_dict(variables)
-        for _, dst in mappings:
-            variables.pop(dst, None)
-        return unflatten_dict(variables)
+  def tie_out(variables):
+    variables = flatten_dict(variables)
+    for _, dst in mappings:
+      variables.pop(dst, None)
+    return unflatten_dict(variables)
 
-    return nn.map_variables(target, collections, tie_in, tie_out, init=True)
+  return nn.map_variables(target, collections, tie_in, tie_out, init=True)
 
 def tie_relative_pos_bias(module_class, repo_path):
   """
