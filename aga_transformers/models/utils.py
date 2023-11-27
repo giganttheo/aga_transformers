@@ -3,8 +3,10 @@ import jax.numpy as jnp
 import flax.linen as nn
 from flax.traverse_util import flatten_dict, unflatten_dict
 
+from transformers import AutoConfig
+
 #copied from https://github.com/google/flax/discussions/1264#discussioncomment-5748491
-def tie(target, mappings, collections='params', transpose=True):
+def tie(target, mappings, collections='params', transpose=False):
     """Tie weights of `target` module` enumerated in `mappings` from
     `collections`.
 
@@ -51,18 +53,19 @@ def tie(target, mappings, collections='params', transpose=True):
 
     return nn.map_variables(target, collections, tie_in, tie_out, init=True)
 
-def tie_relative_pos_bias(Model):
+def tie_relative_pos_bias(model_class):
   """
-  #TODO: fix this. It does not work on a Transformer Model, but it should work on FlaxModules
   tie the relative position bias in consecutive layer to the first one
   (without copying the weights)
   """
-  n_blocks = Model.config.n_blocks
+  module_class = model_class.module_class
+  n_blocks = AutoConfig.from_pretrained("google/flan-t5-base").num_layers
   first_block_relative_attention_bias = {k: (k,'block','0','layer','0','SelfAttention','relative_attention_bias') for k in ['encoder', 'decoder']}
-  other_blocks_relative_attention_bias = {k: [(k,'block', str(b),'layer','0','SelfAttention','relative_attention_bias') for b in range(n_blocks)] for k in ['encoder', 'decoder']}
+  other_blocks_relative_attention_bias = {k: [(k,'block', str(b),'layer','0','SelfAttention','relative_attention_bias') for b in range(1, n_blocks)] for k in ['encoder', 'decoder']}
   rules = {source:
           target for k, source in first_block_relative_attention_bias.items() for target in other_blocks_relative_attention_bias[k]}
-  return tie(Model, rules, transpose=False)
+  model_class.module_class = tie(module_class, rules, transpose=False)
+  return model_class
 
 def tie_graph_layers(Model, n_blocks, autoregressive=False):
   """

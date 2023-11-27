@@ -10,7 +10,7 @@ from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 
 from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
-from ..models.utils import adapt_relative_pos_bias, add_graph_to_params
+from ..models.utils import adapt_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
 
@@ -26,12 +26,16 @@ def test():
     repo_path = "t5-small"
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
+    # model = FlaxT5ForConditionalGeneration.from_pretrained(
+    #     repo_path,
+    # )
+    FlaxT5ForConditionalGeneration = tie_relative_pos_bias(FlaxT5ForConditionalGeneration)
     model = FlaxT5ForConditionalGeneration.from_pretrained(
         repo_path,
     )
 
     model.params = model.to_bf16(model.params)
-    model.params = adapt_relative_pos_bias(model.params)
+    # model.params = adapt_relative_pos_bias(model.params)
 
     # Closeness with vanilla T5 model:
 
