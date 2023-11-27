@@ -64,6 +64,7 @@ def tie_relative_pos_bias(module_class, repo_path):
   other_blocks_relative_attention_bias = {k: [('params', k,'block', str(b),'layer','0','SelfAttention','relative_attention_bias', 'embedding') for b in range(1, n_blocks)] for k in ['encoder', 'decoder']}
   rules = {source:
           target for k, source in first_block_relative_attention_bias.items() for target in other_blocks_relative_attention_bias[k]}
+  print(rules)
   module_class = tie(module_class, rules, transpose=False)
   return module_class
 
