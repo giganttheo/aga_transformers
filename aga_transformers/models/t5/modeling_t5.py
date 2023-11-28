@@ -340,7 +340,7 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
-        relative_position = memory_position[..., receivers] - context_position[..., senders] #was [receivers]
+        relative_position = memory_position[receivers] - context_position[senders] #was [receivers]
         relative_position_bucket = self._relative_position_bucket(
             relative_position[..., None],
             bidirectional=(not self.causal),
@@ -350,7 +350,7 @@ class FlaxT5Attention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         heads = jnp.arange(self.n_heads)
-        return jnp.transpose(values[:, heads, :, 0, heads], (1, 0, 2))
+        return jnp.transpose(values[:, heads, :, heads], (1, 0, 2))
         # output has shape [bs, heads, seq_len]
 
     def compute_bias(self, query_length, key_length):
