@@ -350,6 +350,7 @@ class FlaxT5Attention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         heads = jnp.arange(self.n_heads)
+        print(f"values: {values.shape}")
         return jnp.transpose(values[:, heads, :, heads], (1, 0, 2))
         # output has shape [bs, heads, seq_len]
 
@@ -468,7 +469,7 @@ class FlaxT5Attention(nn.Module):
             receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
             senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
             graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
-            print(f"1: {graph_mask.shape}")
+
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
                 attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids])
@@ -489,7 +490,6 @@ class FlaxT5Attention(nn.Module):
                 else:
                     causal_mask = receivers <= senders
                 graph_mask = graph_mask * causal_mask
-                print(f"2: {graph_mask.shape}")
 
             # During fast autoregressive decoding, we feed one position at a time,
             # and cache the keys and values step by step.
@@ -505,7 +505,6 @@ class FlaxT5Attention(nn.Module):
                 jnp.full(graph_mask.shape, 0.0).astype(self.dtype),
                 jnp.full(graph_mask.shape, mask_value).astype(self.dtype),
             )
-            print(f"3: {graph_mask.shape}")
 
             # compute position bias
             position_bias = self._create_position_bias_sparse(
