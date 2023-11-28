@@ -56,7 +56,7 @@ def test():
         "max_source_length": 512,
         "max_target_length": 256,
         "n_heads": model.config.num_heads,
-        "batch_size": 1,
+        "batch_size": 4,
         "autoregressive":False,
     }
     graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
@@ -65,7 +65,7 @@ def test():
         "max_source_length": 512,
         "max_target_length": 256,
         "n_heads": model.config.num_heads,
-        "batch_size": 1,
+        "batch_size": 4,
         "autoregressive":True,
     }
     graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
@@ -76,14 +76,14 @@ def test():
     pad_token_id=model.config.pad_token_id
     decoder_start_token_id=model.config.decoder_start_token_id
 
-    ARTICLE_TO_SUMMARIZE = ["Small store not well stocked. Rather long wait at checkout. I was there yesterday, Monday August 29, in the late afternoon. The products and prices are interesting despite inflation. Some of the customers and employees are very particular... I can see that in 1 year everything has gone downhill..."]
+    ARTICLE_TO_SUMMARIZE = attention_kwargs["batch_size"] * ["Small store not well stocked. Rather long wait at checkout. I was there yesterday, Monday August 29, in the late afternoon. The products and prices are interesting despite inflation. Some of the customers and employees are very particular... I can see that in 1 year everything has gone downhill..."]
 
     def get_ar_inputs():
         return preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
     training_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
-    SUMMARY = ["This is a test summary."]
+    SUMMARY = attention_kwargs["batch_size"] * ["This is a test summary."]
 
     # Setup the tokenizer for targets
     labels = tokenizer(
