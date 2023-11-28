@@ -39,12 +39,12 @@ def tie(target, mappings, collections='params', transpose=False):
   def tie_in(variables):
     variables = flatten_dict(variables)
     for src, dst in mappings:
-      if src in variables.keys() and dst in variables.keys():
+      try:
         if transpose:
           variables[dst] = variables[src].T
         else:
           variables[dst] = variables[src]
-      else:
+      except:
         print(f"{src} or {dst} is not a valid variable")
     return unflatten_dict(variables)
 
