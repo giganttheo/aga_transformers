@@ -123,7 +123,7 @@ def test():
         model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
 
         input_ids = model._prepare_decoder_input_ids_for_generation(
-            1,
+            attention_kwargs["batch_size"],
             decoder_start_token_id=model.generation_config.decoder_start_token_id,
             bos_token_id=model.generation_config.bos_token_id,
             model_kwargs=model_kwargs,
