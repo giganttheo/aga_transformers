@@ -467,7 +467,7 @@ class FlaxT5Attention(nn.Module):
             #Graph attention
             receivers = self.variables["graph"]["receivers"]
             senders = self.variables["graph"]["senders"]
-            graph_mask = self.variables["graph"]["graph_mask"][None, None]
+            graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=1)
             
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
