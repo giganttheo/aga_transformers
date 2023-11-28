@@ -139,9 +139,8 @@ to distant tokens without sacrificing local context.
 
 def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], autoregressive=False, layer_wise=False,  **kwargs):
     #Encoder self attention pattern
-    if not layer_wise:
-      window_sizes = [window_sizes[0]]
-    enc_self_attn = [LongformerAttentionPattern(
+    if layer_wise:
+      enc_self_attn = [LongformerAttentionPattern(
                                     seq_len_q=max_source_length,
                                     seq_len_kv=max_source_length,
                                     window_size=window_size,
@@ -151,6 +150,17 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
                                     n_heads=n_heads,
                                     batch_size=batch_size,
                                     ).get_attention_graph() for window_size in window_sizes]
+    else:
+      enc_self_attn = LongformerAttentionPattern(
+                                    seq_len_q=max_source_length,
+                                    seq_len_kv=max_source_length,
+                                    window_size=window_sizes[0],
+                                    dilation=dilation,
+                                    block_size=block_size,
+                                    sentence_tokens=sentence_tokens,
+                                    n_heads=n_heads,
+                                    batch_size=batch_size,
+                                    ).get_attention_graph()
     if autoregressive:
         #Decoder self attention pattern
         dec_self_attn = VanillaAttentionPattern(
