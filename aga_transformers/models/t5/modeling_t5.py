@@ -471,8 +471,8 @@ class FlaxT5Attention(nn.Module):
             print(f"1: {graph_mask.shape}")
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids], in_axes=(None, 0), out_axes=(0))
-                graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
+                attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids], in_axes=(0, 0), out_axes=(0))
+                graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)[:, None, :]
                 # graph_mask = graph_mask * attention_mask[..., receivers]
 
             # for fast decoding causal attention mask should be shifted
