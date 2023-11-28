@@ -416,7 +416,7 @@ class FlaxT5Attention(nn.Module):
         elif self.has_relative_attention_bias:
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
         else: #attention_mask is never None
-            bs, _, seq_len = attention_mask.shape
+            bs, seq_len = attention_mask.shape
             position_bias = jnp.zeros((bs, self.n_heads, seq_len), dtype=self.dtype)
         return position_bias
 
