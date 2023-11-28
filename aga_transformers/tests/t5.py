@@ -27,11 +27,15 @@ def test():
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     module_class = FlaxT5ForConditionalGeneration.module_class
-    FlaxT5ForConditionalGeneration.module_class = tie_graph_layers(tie_relative_pos_bias(module_class, repo_path), repo_path, autoregressive=False)
+    module_class = tie_relative_pos_bias(module_class, repo_path)
+    FlaxT5ForConditionalGeneration.module_class = module_class
     model = FlaxT5ForConditionalGeneration.from_pretrained(
         repo_path,
     )
     model.params = model.to_bf16(model.params)
+
+    #tieing the graph so it is defined for first layer only
+    FlaxT5ForConditionalGeneration.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
     # Closeness with vanilla T5 model:
 
