@@ -137,8 +137,10 @@ increasing dilation only on 2 heads. This gives the model the ability to directl
 to distant tokens without sacrificing local context.
 """
 
-def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], autoregressive=False, **kwargs):
+def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], autoregressive=False, layer_wise=False,  **kwargs):
     #Encoder self attention pattern
+    if not layer_wise:
+      window_sizes = [window_sizes[0]]
     enc_self_attn = [LongformerAttentionPattern(
                                     seq_len_q=max_source_length,
                                     seq_len_kv=max_source_length,
@@ -171,5 +173,5 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
         dec_self_attn = {}
         #Encoder-Decoder cross attention pattern
         encdec_attn = {}
-    graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn)
+    graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph

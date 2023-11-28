@@ -1,3 +1,10 @@
+# Test if the GraphT5 model with a fully connected attention graph
+# gives the same results as the Vanilla T5 model
+# 3 tests are performed:
+#  * encoder
+#  * decoder (non-autoregressive ie training mode)
+#  * decoder autoregressive (ie inference mode)
+
 import numpy as np
 
 import jax.numpy as jnp
