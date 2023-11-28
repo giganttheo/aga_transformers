@@ -35,7 +35,7 @@ def test():
     model.params = model.to_bf16(model.params)
 
     #tieing the graph so it is defined for first layer only
-    FlaxT5ForConditionalGeneration.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
+    # FlaxT5ForConditionalGeneration.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
     # Closeness with vanilla T5 model:
 
