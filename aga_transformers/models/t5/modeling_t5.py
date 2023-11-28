@@ -465,15 +465,14 @@ class FlaxT5Attention(nn.Module):
 
         if self.has_variable("graph", "receivers"):
             #Graph attention
-            receivers = self.variables["graph"]["receivers"]
-            senders = self.variables["graph"]["senders"]
-            graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=1)
+            receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
+            senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
+            graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
             print(f"1: {graph_mask.shape}")
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids], in_axes=(0, 0), out_axes=(0))
-                graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)[:, None, :]
-                # graph_mask = graph_mask * attention_mask[..., receivers]
+                attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids])
+                graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
@@ -514,13 +513,15 @@ class FlaxT5Attention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask
+                position_bias = position_bias + graph_mask[:, None, :]
 
             # TODO: add rng for dropout
             # # create dropout rng
             # dropout_rng = None
             # if not deterministic and self.dropout > 0.0:
             #     dropout_rng = self.make_rng("dropout")
+
+            receivers, senders = receivers[0], senders[0]
 
             @partial(jax.jit)
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
@@ -559,7 +560,8 @@ class FlaxT5Attention(nn.Module):
                 key_states,
                 value_states,
                 position_bias)
-            #we don't need this in memory anymore...
+            
+            #we don't need this in memory anymore.
             del receivers
             del senders
             del graph_mask
