@@ -371,7 +371,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
 
-    train_metrics = get_metrics(train_metrics)
+    # train_metrics = get_metrics(train_metrics)
     for key, vals in train_metrics.items():
         tag = f"train_{key}"
         for i, val in enumerate(vals):
@@ -851,7 +851,7 @@ def main():
             eval_metrics.append(metrics)
 
         # normalize eval metrics
-        eval_metrics = get_metrics(eval_metrics)
+        # eval_metrics = get_metrics(eval_metrics)
         eval_metrics = jax.tree_util.tree_map(jnp.mean, eval_metrics)
 
         # compute ROUGE metrics
@@ -901,7 +901,7 @@ def main():
             pred_metrics.append(metrics)
         
         # normalize prediction metrics
-        pred_metrics = get_metrics(pred_metrics)
+        # pred_metrics = get_metrics(pred_metrics)
         pred_metrics = jax.tree_util.tree_map(jnp.mean, pred_metrics)
 
         # compute ROUGE metrics
