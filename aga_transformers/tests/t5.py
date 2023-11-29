@@ -31,6 +31,7 @@ def test():
     # Perform tests:
 
     repo_path = "t5-small"
+    batch_size = 4
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     module_class = FlaxT5ForConditionalGeneration.module_class
@@ -55,8 +56,6 @@ def test():
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
-        "n_heads": model.config.num_heads,
-        "batch_size": 4,
         "autoregressive":False,
     }
     graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
@@ -64,8 +63,6 @@ def test():
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
-        "n_heads": model.config.num_heads,
-        "batch_size": 4,
         "autoregressive":True,
     }
     graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
@@ -76,14 +73,14 @@ def test():
     pad_token_id=model.config.pad_token_id
     decoder_start_token_id=model.config.decoder_start_token_id
 
-    ARTICLE_TO_SUMMARIZE = attention_kwargs["batch_size"] * ["Small store not well stocked. Rather long wait at checkout. I was there yesterday, Monday August 29, in the late afternoon. The products and prices are interesting despite inflation. Some of the customers and employees are very particular... I can see that in 1 year everything has gone downhill..."]
+    ARTICLE_TO_SUMMARIZE = batch_size * ["Small store not well stocked. Rather long wait at checkout. I was there yesterday, Monday August 29, in the late afternoon. The products and prices are interesting despite inflation. Some of the customers and employees are very particular... I can see that in 1 year everything has gone downhill..."]
 
     def get_ar_inputs():
         return preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
     training_inputs = preprocess_function({"transcript": ARTICLE_TO_SUMMARIZE}, tokenizer, prefix="summarize: ", padding="max_length", max_length = attention_kwargs["max_source_length"])
 
-    SUMMARY = attention_kwargs["batch_size"] * ["This is a test summary."]
+    SUMMARY = batch_size * ["This is a test summary."]
 
     # Setup the tokenizer for targets
     labels = tokenizer(
@@ -123,7 +120,7 @@ def test():
         model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
 
         input_ids = model._prepare_decoder_input_ids_for_generation(
-            attention_kwargs["batch_size"],
+            batch_size,
             decoder_start_token_id=model.generation_config.decoder_start_token_id,
             bos_token_id=model.generation_config.bos_token_id,
             model_kwargs=model_kwargs,

@@ -6,7 +6,6 @@ from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_lay
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
-
 #wrapper to load the model and preprocess the weights
 
 def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, **model_kwargs):
@@ -19,7 +18,7 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
         **model_kwargs,
         dtype=dtype,
     )
-    if dtype == "bfloat16":
+    if dtype == "bfloat16" or dtype == jnp.dtype("bfloat16"):
         model.params = model.to_bf16(model.params)
 
     #tieing the graph so it is defined for first layer only
@@ -29,10 +28,7 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
         attention_kwargs = {
             "max_source_length": 2048,
             "max_target_length": 512,
-            "n_heads": model.config.num_heads,
             "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
-            "block_size": 1,
-            "batch_size": 1,
             "autoregressive":True,
         }
     if attention_mode == "led":
