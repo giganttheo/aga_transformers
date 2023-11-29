@@ -7,7 +7,7 @@ except BaseException:
 
 
 setup(name='aga_transformers',
-      version="0.0.1", #__version__,
+      version="0.0.2", #__version__,
       description='Arbitrary Graph Attention Transformers',
       author='Théo Gigant',
       author_email='theo.gigant@l2s.centralesupelec.fr',

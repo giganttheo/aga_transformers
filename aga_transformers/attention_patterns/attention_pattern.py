@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy as np
-import math
+
 from functools import reduce
 import jax
 
@@ -11,9 +11,8 @@ class AttentionPattern():
     self.senders = {}
     self.embeddings = None
     self.size = (0, 0)
-    self.n_heads = 1
+    # self.n_heads = 1 #not used ftm
     self.graph_mask = {}
-    self.batch_size = 0
 
   def _get_from_dict(self, dataDict, mapList):
     """Iterate nested dictionary"""
@@ -42,12 +41,10 @@ class AttentionPattern():
 
     def pad_to(mat, padding):
       padded_mat = np.zeros((padding), dtype=np.uint16)
-      # padded_mat = padded_mat.at[:mat.shape[0]].set(mat)
       padded_mat[:mat.shape[0]] = mat
       return padded_mat
     def get_mask(mat, padding):
       graph_mask = np.zeros((padding), dtype="i4")
-      # graph_mask = graph_mask.at[:mat.shape[0]].set(np.ones_like(mat, dtype="i4"))
       graph_mask[:mat.shape[0]] = np.ones_like(mat, dtype="i4")
       return graph_mask
 

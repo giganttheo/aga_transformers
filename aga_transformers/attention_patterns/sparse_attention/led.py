@@ -5,7 +5,7 @@ from ..vanilla_attention.vanilla import VanillaAttentionPattern
 from ..utils import graph_from_path
 
 class LongformerAttentionPattern(AttentionPattern):
-  def __init__(self, seq_len_q, seq_len_kv, window_size, block_size=1, sentence_tokens=[0], dilation=None, **kwargs):
+  def __init__(self, seq_len_q, seq_len_kv, window_size, sentence_tokens=[0], **kwargs):
     super().__init__()
 
     #global attn
@@ -55,7 +55,9 @@ increasing dilation only on 2 heads. This gives the model the ability to directl
 to distant tokens without sacrificing local context.
 """
 
-def create_led_attn_patterns(model, max_source_length, max_target_length, n_heads, batch_size, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], block_size=1, dilation=False, sentence_tokens=[0], autoregressive=False, layer_wise=False,  **kwargs):
+def create_led_attn_patterns(model, max_source_length, max_target_length, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0], autoregressive=False, layer_wise=False,  **kwargs):
+    if len(kwargs.keys()) > 0:
+      print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
     #Encoder self attention pattern
     if layer_wise:
       #in this mode, the attention pattern can be different for every layer
@@ -63,11 +65,7 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
                                     seq_len_q=max_source_length,
                                     seq_len_kv=max_source_length,
                                     window_size=window_size,
-                                    dilation=dilation,
-                                    block_size=block_size,
                                     sentence_tokens=sentence_tokens,
-                                    n_heads=n_heads,
-                                    batch_size=batch_size,
                                     ).get_attention_graph() for window_size in window_sizes]
     else:
       #in this mode, the attention pattern is the same for every layer
@@ -75,11 +73,7 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
                                     seq_len_q=max_source_length,
                                     seq_len_kv=max_source_length,
                                     window_size=window_sizes[0],
-                                    dilation=dilation,
-                                    block_size=block_size,
                                     sentence_tokens=sentence_tokens,
-                                    n_heads=n_heads,
-                                    batch_size=batch_size,
                                     ).get_attention_graph()
     if autoregressive:
         # For autoregressive decoding (ie during inference), we use
@@ -93,8 +87,6 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
         dec_self_attn = VanillaAttentionPattern(
                                         seq_len_q=1,
                                         seq_len_kv=max_target_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
                                         ).get_attention_graph()  
           
         #Encoder-Decoder cross attention pattern
@@ -103,8 +95,6 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, n_head
         encdec_attn = VanillaAttentionPattern(
                                         seq_len_q=1,
                                         seq_len_kv=max_source_length,
-                                        n_heads=n_heads,
-                                        batch_size=batch_size,
                                         ).get_attention_graph()
     else:
         # For non-autoregressive decoding (for instance for training), we use
