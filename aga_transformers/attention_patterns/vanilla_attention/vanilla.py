@@ -18,7 +18,6 @@ class VanillaAttentionPattern(AttentionPattern):
         layer_senders.append(j)
     receivers = np.array(layer_receivers, dtype=np.uint16)
     senders = np.array(layer_senders, dtype=np.uint16)
-    # receivers, senders = self._cleaning_duplicates(receivers, senders)
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
     receivers = np.array(receivers, dtype=np.uint16)
     senders = np.array(senders, dtype=np.uint16)
@@ -56,8 +55,24 @@ def create_dense_attn_patterns(model, max_source_length, max_target_length, n_he
                                         ).get_attention_graph()
     else:
         #Decoder self attention pattern
-        dec_self_attn = {}
+        dec_self_attn = VanillaAttentionPattern(
+                                        seq_len_q=max_target_length,
+                                        seq_len_kv=max_target_length,
+                                        n_heads=n_heads,
+                                        batch_size=batch_size,
+                                        ).get_attention_graph()    
         #Encoder-Decoder cross attention pattern
-        encdec_attn = {}
+        #kv is the receivers and in cross attention the encoder
+        #q is the senders and in cross attention the decoder
+        encdec_attn = VanillaAttentionPattern(
+                                        seq_len_q=max_target_length,
+                                        seq_len_kv=max_source_length,
+                                        n_heads=n_heads,
+                                        batch_size=batch_size,
+                                        ).get_attention_graph()
+        # #Decoder self attention pattern
+        # dec_self_attn = {}
+        # #Encoder-Decoder cross attention pattern
+        # encdec_attn = {}
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
