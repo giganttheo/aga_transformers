@@ -779,7 +779,7 @@ def main():
         "max_source_length": data_args.max_source_length,
         "max_target_length": max_target_length,
         "n_heads": model.config.num_heads,
-        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+        "window_sizes": [254]*12,#[16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64], #window of 254, ie radius of 127 following LongT5 paper
         "block_size": 1,
         "batch_size": training_args.per_device_train_batch_size,
         "autoregressive": False,
@@ -790,7 +790,7 @@ def main():
         "max_source_length": data_args.max_source_length,
         "max_target_length": max_target_length,
         "n_heads": model.config.num_heads,
-        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+        "window_sizes": [254]*12,#[16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
         "block_size": 1,
         "batch_size": training_args.per_device_eval_batch_size,
         "autoregressive": True,
@@ -832,14 +832,16 @@ def main():
 
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
         (loss, num_labels), grad = grad_fn(state.params)
-        num_labels = jax.lax.psum(num_labels, "batch")
+        # num_labels = jnp.sum(num_labels, axis=0)#jax.lax.psum(num_labels, "batch")
 
         # true loss = total loss / total samples
-        loss = jax.lax.psum(loss, "batch")
+        # loss = jax.lax.psum(loss, "batch")
+        # loss = jnp.sum(loss, axis=0)
         loss = jax.tree_util.tree_map(lambda x: x / num_labels, loss)
 
         # true grad = total grad / total samples
-        grad = jax.lax.psum(grad, "batch")
+        # grad = jax.lax.psum(grad, "batch")
+        # grad = jnp.sum(grad, axis=0)
         grad = jax.tree_util.tree_map(lambda x: x / num_labels, grad)
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
 
@@ -849,9 +851,9 @@ def main():
     # Define eval fn
     def eval_step(params, batch, label_smoothing_factor=0.0):
         labels = batch.pop("labels")
-        params_with_graph = add_graph_to_params(params, graph=graph)
-        logits = model(**batch, params=params_with_graph, train=False)[0]
-
+        # params_with_graph = add_graph_to_params(params, graph=graph)
+        logits = model(**batch, params=add_graph_to_params(params, graph=graph), train=False)[0]
+        # del params_with_graph
         loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
         num_labels = jax.lax.psum(num_labels, "batch")
 
@@ -870,24 +872,27 @@ def main():
     gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
 
     def generate_step(params, batch):
-        params_with_graph = add_graph_to_params(params, ar_graph)
+        # params_with_graph = add_graph_to_params(params, ar_graph)
         _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
-                                    params=params_with_graph,
+                                    params=add_graph_to_params(params, graph=ar_graph),
                                     attention_mask=batch["attention_mask"],
                                     **gen_kwargs)
+        # del params_with_graph
         return output_ids.sequences
 
     # Create parallel version of the train and eval step
-    p_train_step = jax.pmap(
-        partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch", # donate_argnums=(0,)
-    )
+    # p_train_step = jax.pmap(
+    #     partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor) "batch", # donate_argnums=(0,)
+    # )
+
+    train_step = partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor)
     p_eval_step = jax.pmap(partial(eval_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch")
     p_generate_step = jax.pmap(generate_step, "batch")
 
     # Replicate the train state on each device
-    state = state.replicate()
+    # state = state.replicate()
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
@@ -912,8 +917,9 @@ def main():
         # train
         for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            batch = shard(batch)
-            state, train_metric = p_train_step(state, batch)
+            # batch = shard(batch)
+            with jax.disable_jit():
+                state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
 
         train_time += time.time() - train_start
@@ -933,21 +939,22 @@ def main():
         eval_loader = data_loader(input_rng, eval_dataset, eval_batch_size, drop_last=False)
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
-            # Model forward
-            batch = next(eval_loader)
-            labels = batch["labels"]
+            with jax.disable_jit():
+                # Model forward
+                batch = next(eval_loader)
+                labels = batch["labels"]
 
-            metrics = pad_shard_unpad(p_eval_step, static_return=True)(
-                state.params, batch, min_device_batch=per_device_eval_batch_size
-            )
-            eval_metrics.append(metrics)
+                metrics = pad_shard_unpad(p_eval_step, static_return=True)(
+                    state.params, batch, min_device_batch=per_device_eval_batch_size
+                )
+                eval_metrics.append(metrics)
 
-            # generation
-            if data_args.predict_with_generate:
-                print("generate...")
-                generated_ids = pad_shard_unpad(p_generate_step)(state.params, batch)
-                eval_preds.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
-                eval_labels.extend(labels)
+                # generation
+                if data_args.predict_with_generate:
+                    print("generate...")
+                    generated_ids = pad_shard_unpad(p_generate_step)(state.params, batch)
+                    eval_preds.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
+                    eval_labels.extend(labels)
 
         # normalize eval metrics
         eval_metrics = get_metrics(eval_metrics)
@@ -991,20 +998,21 @@ def main():
         pred_loader = data_loader(input_rng, predict_dataset, eval_batch_size, drop_last=False)
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
-            # Model forward
-            batch = next(pred_loader)
-            labels = batch["labels"]
+            with jax.disable_jit():
+                # Model forward
+                batch = next(pred_loader)
+                labels = batch["labels"]
 
-            metrics = pad_shard_unpad(p_eval_step, static_return=True)(
-                state.params, batch, min_device_batch=per_device_eval_batch_size
-            )
-            pred_metrics.append(metrics)
+                metrics = pad_shard_unpad(p_eval_step, static_return=True)(
+                    state.params, batch, min_device_batch=per_device_eval_batch_size
+                )
+                pred_metrics.append(metrics)
 
-            # generation
-            if data_args.predict_with_generate:
-                generated_ids = pad_shard_unpad(p_generate_step)(state.params, batch)
-                pred_generations.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
-                pred_labels.extend(labels)
+                # generation
+                if data_args.predict_with_generate:
+                    generated_ids = pad_shard_unpad(p_generate_step)(state.params, batch)
+                    pred_generations.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
+                    pred_labels.extend(labels)
 
         # normalize prediction metrics
         pred_metrics = get_metrics(pred_metrics)

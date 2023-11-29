@@ -31,6 +31,8 @@ from flax.traverse_util import flatten_dict, unflatten_dict
 from jax.random import PRNGKey
 from functools import partial
 
+import einops
+
 ArrayTree = Union[jnp.ndarray, Iterable['ArrayTree'], Mapping[Any, 'ArrayTree']]
 
 
@@ -59,12 +61,13 @@ _CONFIG_FOR_DOC = "T5Config"
 
 remat = nn_partitioning.remat
 
+@partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
 def segment_softmax(logits: jnp.ndarray,
                     segment_ids: jnp.ndarray,
                     num_segments: Optional[int] = None,
                     indices_are_sorted: bool = False,
                     unique_indices: bool = False,
-                    bucket_size=None) -> ArrayTree:
+                    bucket_size: Optional[int] =None) -> ArrayTree:
   """
   segment_softmax inspired by jraph's implementation, but fixed to give the same results as jax.nn.softmax by using jax.ops segment functions
   """
@@ -80,16 +83,27 @@ def segment_softmax(logits: jnp.ndarray,
   softmax = logits / normalizers
   return softmax
 
-@partial(jax.vmap, in_axes=(0,0,0,0,0,0,None)) #vectorize over batches
-@partial(jax.vmap, in_axes=(-2,-2,-2,0,0,0,None), out_axes=(-2))  #vectorize over heads
+# ==> to change for optimization, in this version the graph is the same for the batch & heads
+# @partial(jax.vmap, in_axes=(0,0,0,0,None,None,None)) #vectorize over batches
+# @partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over heads
+
+# @partial(jax.vmap, in_axes=(0,0,0,0,0,0,None)) #vectorize over batches
+# @partial(jax.vmap, in_axes=(-2,-2,-2,0,0,0,None), out_axes=(-2))  #vectorize over heads
+
+#the order is important, otherwise the RAM usage explodes for some reason?
+#mb check if netket.jax.vmap_chunked works better?
+
+@partial(jax.jit, static_argnames=['dtype'])
+@partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
+@partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
   """
   Computes the dot product attention according to the attention pattern specified by the graph defined
   by the adjacency list (senders, receivers)
   """
-  q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype)
+  #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
   dtype = q.dtype
-  bucket_size=1000
+  bucket_size=10000
   seq_len, depth = q.shape
   #compute attention logits: <Q,K> / sqrt(d_q)
   attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
@@ -326,7 +340,7 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
-        relative_position = memory_position[receivers] - context_position[senders]
+        relative_position = memory_position[receivers] - context_position[senders] #was [receivers]
         relative_position_bucket = self._relative_position_bucket(
             relative_position[..., None],
             bidirectional=(not self.causal),
@@ -336,7 +350,8 @@ class FlaxT5Attention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         heads = jnp.arange(self.n_heads)
-        return values[:, heads, :, 0, heads].transpose((1, 0, 2))
+        return jnp.transpose(values[:, :, 0, heads], (0, 2, 1))
+        # output has shape [bs, heads, seq_len]
 
     def compute_bias(self, query_length, key_length):
         """Compute binned relative position bias"""
@@ -401,7 +416,8 @@ class FlaxT5Attention(nn.Module):
         elif self.has_relative_attention_bias:
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
         else: #attention_mask is never None
-            position_bias = jnp.zeros_like(attention_mask, dtype=self.dtype)
+            bs, seq_len = attention_mask.shape
+            position_bias = jnp.zeros((bs, self.n_heads, seq_len), dtype=self.dtype)
         return position_bias
 
     def _create_position_bias(
@@ -447,15 +463,15 @@ class FlaxT5Attention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1]).astype(self.dtype)
 
-        if "receivers" in self.variables["params"].keys():
+        if self.has_variable("graph", "receivers"):
             #Graph attention
-            receivers = self.variables["params"]["receivers"]
-            senders = self.variables["params"]["senders"]
-            graph_mask = self.variables["params"]["graph_mask"]
+            receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
+            senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
+            graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                attn_mask_2_graph_mask = jax.vmap(jax.vmap(lambda mask, ids: mask[ids], in_axes=(None, 0)))
+                attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids])
                 graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
 
             # for fast decoding causal attention mask should be shifted
@@ -495,7 +511,7 @@ class FlaxT5Attention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask
+                position_bias = position_bias + graph_mask[:, None, :]
 
             # TODO: add rng for dropout
             # # create dropout rng
@@ -503,14 +519,50 @@ class FlaxT5Attention(nn.Module):
             # if not deterministic and self.dropout > 0.0:
             #     dropout_rng = self.make_rng("dropout")
 
-            attn_output, attn_weights = scaled_dot_product_attention_graph(
+            receivers, senders = receivers[0], senders[0]
+
+            @partial(jax.jit)
+            @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
+            @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
+            def _scaled_dot_product_attention_graph(q, k, v, bias=None):
+                """
+                Computes the dot product attention according to the attention pattern specified by the graph defined
+                by the adjacency list (senders, receivers)
+                """
+                #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
+                dtype = q.dtype
+                bucket_size=10000
+                seq_len, depth = q.shape
+                #compute attention logits: <Q,K> / sqrt(d_q)
+                attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
+                if bias is not None:
+                    attn_logits = attn_logits + bias
+                #softmax over receiver nodes
+                w = segment_softmax(attn_logits,
+                                    segment_ids=senders,
+                                    num_segments=seq_len,
+                                    bucket_size=bucket_size).astype(dtype) #(num_edges,)
+                #attention weights applied to the values for every edge:
+                values = jnp.einsum('e,ed->ed', w, v[receivers]) #(num_edges, d_v)
+                #summing over the nodes
+                values = jax.ops.segment_sum(values,
+                                    segment_ids=senders,
+                                    num_segments=seq_len,
+                                    unique_indices=False,
+                                    indices_are_sorted=False,
+                                    bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
+                return values, w
+
+            attn_output, attn_weights = _scaled_dot_product_attention_graph(
                 query_states,
                 key_states,
                 value_states,
-                receivers,
-                senders,
-                position_bias,
-                self.dtype)
+                position_bias)
+            
+            #we don't need this in memory anymore.
+            del receivers
+            del senders
+            del graph_mask
 
         else:
             # regular attention (for decoder during training)
@@ -1164,7 +1216,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         rngs = {"dropout": dropout_rng} if dropout_rng is not None else {}
 
         return self.module.apply(
-            {"params": params or self.params},
+            params or {"params": self.params},
             input_ids=jnp.array(input_ids, dtype="i4"),
             attention_mask=jnp.array(attention_mask, dtype="i4"),
             decoder_input_ids=jnp.array(decoder_input_ids, dtype="i4"),
@@ -1259,7 +1311,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
             return encode_module(input_ids, attention_mask, **kwargs)
 
         return self.module.apply(
-            {"params": params or self.params},
+            params or {"params": self.params},
             input_ids=jnp.array(input_ids, dtype="i4"),
             attention_mask=jnp.array(attention_mask, dtype="i4"),
             output_attentions=output_attentions,
@@ -1329,7 +1381,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         if dropout_rng is not None:
             rngs["dropout"] = dropout_rng
 
-        inputs = {"params": params or self.params}
+        inputs = params or {"params": self.params}
 
         # if past_key_values are passed then cache is already initialized a private flag init_cache has to be
         # passed down to ensure cache is used. It has to be made sure that cache is marked as mutable so that
@@ -1625,7 +1677,7 @@ class FlaxT5EncoderModel(FlaxT5PreTrainedModel):
         rngs = {"dropout": dropout_rng} if dropout_rng is not None else {}
 
         return self.module.apply(
-            {"params": params or self.params},
+            params or {"params": self.params},
             input_ids=jnp.array(input_ids, dtype="i4"),
             attention_mask=jnp.array(attention_mask, dtype="i4"),
             output_attentions=output_attentions,
@@ -1809,7 +1861,7 @@ class FlaxT5ForConditionalGeneration(FlaxT5PreTrainedModel):
         if dropout_rng is not None:
             rngs["dropout"] = dropout_rng
 
-        inputs = {"params": params or self.params}
+        inputs = params or {"params": self.params}
 
         # if past_key_values are passed then cache is already initialized a private flag init_cache has to be
         # passed down to ensure cache is used. It has to be made sure that cache is marked as mutable so that
@@ -1886,8 +1938,8 @@ class FlaxT5ForConditionalGeneration(FlaxT5PreTrainedModel):
         self,
         decoder_input_ids,
         max_length,
-        attention_mask: Optional[jnp.DeviceArray] = None,
-        decoder_attention_mask: Optional[jnp.DeviceArray] = None,
+        attention_mask: Optional[jnp.ndarray] = None,
+        decoder_attention_mask: Optional[jnp.ndarray] = None,
         encoder_outputs=None,
         **kwargs,
     ):
