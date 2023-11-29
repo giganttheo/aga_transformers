@@ -529,7 +529,7 @@ def main():
         dtype=getattr(jnp, model_args.dtype)
         attention_kwargs = {
             "max_source_length": data_args.max_source_length,
-            "max_target_length": max_target_length,
+            "max_target_length": data_args.max_target_length,
             "window_sizes": [127], # [254]*12,
             "autoregressive": False,
         }
