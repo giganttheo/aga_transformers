@@ -42,7 +42,7 @@ from datasets import Dataset, load_dataset
 from filelock import FileLock
 from flax import jax_utils, traverse_util
 from flax.training import train_state
-from flax.training.common_utils import get_metrics, onehot, shard, shard_prng_key
+from flax.training.common_utils import shard_prng_key, stack_forest
 from huggingface_hub import Repository, create_repo
 from tqdm import tqdm
 
@@ -828,9 +828,11 @@ def main():
 
         train_time += time.time() - train_start
 
+        train_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
+
         epochs.write(
-            f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metric['loss']}, Learning Rate:"
-            f" {train_metric['learning_rate']})"
+            f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metrics['loss']}, Learning Rate:"
+            f" {train_metrics['learning_rate']})"
         )
 
         # ======================== Evaluating ==============================
@@ -852,7 +854,7 @@ def main():
 
         # normalize eval metrics
         # eval_metrics = get_metrics(eval_metrics)
-        eval_metrics = jax.tree_util.tree_map(jnp.mean, eval_metrics)
+        eval_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(eval_metrics))
 
         # compute ROUGE metrics
         rouge_desc = ""
@@ -902,7 +904,7 @@ def main():
         
         # normalize prediction metrics
         # pred_metrics = get_metrics(pred_metrics)
-        pred_metrics = jax.tree_util.tree_map(jnp.mean, pred_metrics)
+        pred_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(pred_metrics))
 
         # compute ROUGE metrics
         rouge_desc = ""
