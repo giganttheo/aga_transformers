@@ -846,7 +846,7 @@ def main():
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch, min_device_batch=per_device_eval_batch_size
+                state.params, batch
             )
             eval_metrics.append(metrics)
 
@@ -896,7 +896,7 @@ def main():
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch, min_device_batch=per_device_eval_batch_size
+                state.params, batch
             )
             pred_metrics.append(metrics)
         
