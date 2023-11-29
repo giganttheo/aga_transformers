@@ -8,7 +8,6 @@ from typing import Tuple
 from flax.training import train_state
 from functools import partial
 
-@partial(jax.jit, static_argnames=["graph", "model"])
 def loss_fn(
     model,
     params: PyTree,

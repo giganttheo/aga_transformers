@@ -759,6 +759,8 @@ def main():
 
     apply_fn, lora_params, optimizer = create_lora(model, adamw, dtype="bfloat16")
 
+    loss_fn = jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
@@ -768,7 +770,7 @@ def main():
 
         def compute_loss(params):
             labels = batch.pop("labels")
-            loss, _ = loss_fn(state.apply_fn, params, graph, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn(state.apply_fn, params, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
