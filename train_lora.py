@@ -868,10 +868,10 @@ def main():
         epochs.write(desc)
         epochs.desc = desc
 
-        # Save metrics
-        if has_tensorboard and jax.process_index() == 0:
-            cur_step = epoch * (len(train_dataset) // train_batch_size)
-            write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step)
+        # # Save metrics
+        # if has_tensorboard and jax.process_index() == 0:
+        #     cur_step = epoch * (len(train_dataset) // train_batch_size)
+        #     write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step)
       
 
         # save checkpoint after each epoch and push checkpoint to the hub
