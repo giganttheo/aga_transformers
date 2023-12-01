@@ -876,10 +876,10 @@ def main():
         #     write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step)
       
 
-        #TODO # save checkpoint after each epoch and push checkpoint to the hub
+        # save checkpoint after each epoch and push checkpoint to the hub
         if jax.process_index() == 0:
             # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-            model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params))
+            model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
                 repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)
