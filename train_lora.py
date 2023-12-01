@@ -60,7 +60,7 @@ from transformers.utils import get_full_repo_name, is_offline_mode, send_example
 
 import lorax
 
-from aga_transformers.models.utils import add_graph_to_params
+from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
 from aga_transformers.models.t5.t5 import load_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
@@ -803,7 +803,7 @@ def main():
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
-                                    params=add_graph_to_params(params, graph_ar),
+                                    params=add_graph_to_params(repeat_relative_pos_bias(params), graph_ar),
                                     attention_mask=batch["attention_mask"],
                                     **gen_kwargs)
         return output_ids.sequences
