@@ -800,7 +800,7 @@ def main():
         return metrics
 
     def generate_step(params, batch):
-        _ = batch.pop("labels") #added
+        # _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
                                     params=add_graph_to_params(params, graph_ar),
