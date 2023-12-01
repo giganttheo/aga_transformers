@@ -57,6 +57,8 @@ from transformers import (
 )
 from transformers.utils import get_full_repo_name, is_offline_mode, send_example_telemetry
 
+import lorax
+
 from aga_transformers.models.utils import add_graph_to_params
 from aga_transformers.models.t5.t5 import load_t5
 from aga_transformers.train.lora import create_lora
@@ -875,12 +877,12 @@ def main():
       
 
         #TODO # save checkpoint after each epoch and push checkpoint to the hub
-        # if jax.process_index() == 0:
-        #     params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-        #     model.save_pretrained(training_args.output_dir, params=params)
-        #     tokenizer.save_pretrained(training_args.output_dir)
-        #     if training_args.push_to_hub:
-        #         repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)
+        if jax.process_index() == 0:
+            # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
+            model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params))
+            tokenizer.save_pretrained(training_args.output_dir)
+            if training_args.push_to_hub:
+                repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)
 
     # ======================== Prediction loop ==============================
     if training_args.do_predict:
