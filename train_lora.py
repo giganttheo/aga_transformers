@@ -45,6 +45,7 @@ from flax.training import train_state
 from flax.training.common_utils import shard_prng_key, stack_forest
 from huggingface_hub import Repository, create_repo
 from tqdm import tqdm
+import wandb
 
 import transformers
 from transformers import (
@@ -397,6 +398,7 @@ def create_learning_rate_fn(
     return schedule_fn
 
 
+
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -409,6 +411,9 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    # Initializing a Weights & Biases Run
+    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -696,7 +701,6 @@ def main():
     if has_tensorboard and jax.process_index() == 0:
         try:
             from flax.metrics.tensorboard import SummaryWriter
-
             summary_writer = SummaryWriter(log_dir=Path(training_args.output_dir))
         except ImportError as ie:
             has_tensorboard = False
@@ -870,10 +874,10 @@ def main():
         epochs.write(desc)
         epochs.desc = desc
 
-        # # Save metrics
-        # if has_tensorboard and jax.process_index() == 0:
-        #     cur_step = epoch * (len(train_dataset) // train_batch_size)
-        #     write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step)
+        # Save metrics
+        if has_tensorboard and jax.process_index() == 0:
+            cur_step = epoch * (len(train_dataset) // train_batch_size)
+            write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step)
       
 
         # save checkpoint after each epoch and push checkpoint to the hub
@@ -927,6 +931,8 @@ def main():
             path = os.path.join(training_args.output_dir, "test_results.json")
             with open(path, "w") as f:
                 json.dump(rouge_metrics, f, indent=4, sort_keys=True)
+    wandb.finish()
+
 
 
 if __name__ == "__main__":
