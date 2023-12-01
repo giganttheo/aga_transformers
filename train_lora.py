@@ -540,7 +540,7 @@ def main():
             "window_sizes": [127], # [254]*12,
             "autoregressive": False,
         }
-        tokenizer, model, graph = load_t5(repo_path=model_args.model_name_or_path, dtype=dtype, attention_kwargs=attention_kwargs, layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype=dtype, attention_kwargs=attention_kwargs, layer_wise=False)
 
     if training_args.gradient_checkpointing:
         model.enable_gradient_checkpointing()
@@ -799,6 +799,15 @@ def main():
         metrics = {"loss": loss}
         return metrics
 
+    def generate_step(params, batch):
+        _ = batch.pop("labels") #added
+        output_ids = model.generate(
+                                    batch["input_ids"],
+                                    params=add_graph_to_params(params, graph_ar),
+                                    attention_mask=batch["attention_mask"],
+                                    **gen_kwargs)
+        return output_ids.sequences
+
     # Define generation function
     max_length = (
         data_args.val_max_target_length if data_args.val_max_target_length is not None else model.config.max_length
@@ -858,16 +867,26 @@ def main():
             )
             eval_metrics.append(metrics)
 
+            # generation
+            if data_args.predict_with_generate:
+                print("generate...")
+                generated_ids = generate_step(
+                                        lorax.merge_params(state.params, destructive=False),
+                                        batch
+                                        )
+                eval_preds.extend(generated_ids.reshape(-1, gen_kwargs["max_length"]))
+                eval_labels.extend(labels)
+
         # normalize eval metrics
         # eval_metrics = get_metrics(eval_metrics)
         eval_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(eval_metrics))
 
         # compute ROUGE metrics
         rouge_desc = ""
-        # if data_args.predict_with_generate:
-        #     rouge_metrics = compute_metrics(eval_preds, eval_labels)
-        #     eval_metrics.update(rouge_metrics)
-        #     rouge_desc = " ".join([f"Eval {key}: {value} |" for key, value in rouge_metrics.items()])
+        if data_args.predict_with_generate:
+            rouge_metrics = compute_metrics(eval_preds, eval_labels)
+            eval_metrics.update(rouge_metrics)
+            rouge_desc = " ".join([f"Eval {key}: {value} |" for key, value in rouge_metrics.items()])
 
         # Print metrics and update progress bar
         desc = f"Epoch... ({epoch + 1}/{num_epochs} | Eval Loss: {eval_metrics['loss']} | {rouge_desc})"
@@ -907,6 +926,16 @@ def main():
                 state.params, batch
             )
             pred_metrics.append(metrics)
+
+            # generation
+            if data_args.predict_with_generate:
+                print("generate...")
+                generated_ids = generate_step(
+                                        lorax.merge_params(state.params, destructive=False),
+                                        batch
+                                        )
+                pred_generations.extend(generated_ids.reshape(-1, gen_kwargs["max_length"]))
+                pred_labels.extend(labels)
         
         # normalize prediction metrics
         # pred_metrics = get_metrics(pred_metrics)

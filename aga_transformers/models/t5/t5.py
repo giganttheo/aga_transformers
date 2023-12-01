@@ -31,11 +31,14 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
             "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
             "autoregressive":True,
         }
+    graph_ar = {}
     if attention_mode == "led":
-        graph = create_led_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
+        attention_kwargs.pop("autoregressive")
+        graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
+        graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
     else:
         graph = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
-    return tokenizer, model, graph
+    return tokenizer, model, graph, graph_ar
 
 def preprocess_function(examples, tokenizer, max_length=512, prefix="summarize: ", text_column="transcript", padding='longest'):
     inputs = examples[text_column]
