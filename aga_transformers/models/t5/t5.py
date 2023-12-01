@@ -22,7 +22,7 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
         model.params = model.to_bf16(model.params)
 
     #tieing the graph so it is defined for first layer only
-    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=attention_kwargs["autoregressive"])
+    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)
     
     if attention_kwargs is None:
         attention_kwargs = {
