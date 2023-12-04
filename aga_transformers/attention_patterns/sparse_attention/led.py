@@ -34,15 +34,7 @@ class LongformerAttentionPattern(AttentionPattern):
       for j in window - global_tokens:
         layer_receivers.append(i)
         layer_senders.append(j)
-    #local window attention
-    for i in seq_kv - global_tokens:
-      window = set([i + offset * 1 for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * 1 >= 0])
-      for j in window - global_tokens:
-        layer_receivers.append(i)
-        layer_senders.append(j)
       
-    receivers = np.array(layer_receivers, dtype=np.uint16)
-    senders = np.array(layer_senders, dtype=np.uint16)
     receivers = np.array(layer_receivers, dtype=np.uint16)
     senders = np.array(layer_senders, dtype=np.uint16)
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
@@ -70,22 +62,11 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
     if layer_wise:
       #in this mode, the attention pattern can be different for every layer
       enc_self_attn = [LongformerAttentionPattern(
-    if layer_wise:
-      #in this mode, the attention pattern can be different for every layer
-      enc_self_attn = [LongformerAttentionPattern(
                                     seq_len_q=max_source_length,
                                     seq_len_kv=max_source_length,
                                     window_size=window_size,
                                     sentence_tokens=sentence_tokens,
                                     ).get_attention_graph() for window_size in window_sizes]
-    else:
-      #in this mode, the attention pattern is the same for every layer
-      enc_self_attn = LongformerAttentionPattern(
-                                    seq_len_q=max_source_length,
-                                    seq_len_kv=max_source_length,
-                                    window_size=window_sizes[0],
-                                    sentence_tokens=sentence_tokens,
-                                    ).get_attention_graph()
     else:
       #in this mode, the attention pattern is the same for every layer
       enc_self_attn = LongformerAttentionPattern(
@@ -113,9 +94,7 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
         dec_self_attn = VanillaAttentionPattern(
                                         seq_len_q=1,
                                         seq_len_kv=max_target_length,
-                                        ).get_attention_graph()  
-          
-                                        ).get_attention_graph()  
+                                        ).get_attention_graph()
           
         #Encoder-Decoder cross attention pattern
         #kv is the receivers (the encoder output in cross attention)
@@ -141,6 +120,5 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
         # Encoder-Decoder cross attention pattern
         # Encoder-Decoder cross attention pattern
         encdec_attn = {}
-    graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
