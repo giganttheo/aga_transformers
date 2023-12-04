@@ -52,3 +52,44 @@ class DependencyAttentionPattern(AttentionPattern):
     self.senders = senders
     self.graph_mask = graph_mask
     self.size = (len(graph["nodes"]), len(graph["nodes"]))
+
+def create_dependency_attn_patterns(model, max_source_length, max_target_length, text, tokens, autoregressive=False, layer_wise=False,  **kwargs):
+    if len(kwargs.keys()) > 0:
+      print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
+    #Encoder self attention pattern
+    enc_self_attn = DependencyAttentionPattern(
+                                text=text,
+                                tokens=tokens,
+                                ).get_attention_graph()
+    if autoregressive:
+        # For autoregressive decoding (ie during inference), we use
+        # a dense one-to-many attention pattern.
+        # This is because in huggingface implementation of T5,
+        # during autoregressive decoding, the tokens are fed one by one,
+        # and are thus remapped to position 0 in the query
+        # (which has length 1)
+
+        #Decoder self attention pattern
+        dec_self_attn = VanillaAttentionPattern(
+                                        seq_len_q=1,
+                                        seq_len_kv=max_target_length,
+                                        ).get_attention_graph()  
+          
+        #Encoder-Decoder cross attention pattern
+        #kv is the receivers (the encoder output in cross attention)
+        #q is the senders (the decoder input in cross attention)
+        encdec_attn = VanillaAttentionPattern(
+                                        seq_len_q=1,
+                                        seq_len_kv=max_source_length,
+                                        ).get_attention_graph()
+    else:
+        # For non-autoregressive decoding (for instance for training), we use
+        # the vanilla T5 behaviour. It is equivalent to use a dense many-to-many
+        # attention pattern using VanillaAttentionPattern, but more efficient.
+      
+        # Decoder self attention pattern
+        dec_self_attn = {}
+        # Encoder-Decoder cross attention pattern
+        encdec_attn = {}
+    graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
+    return graph
