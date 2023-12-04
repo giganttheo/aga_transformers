@@ -5,13 +5,6 @@
 #  * decoder (non-autoregressive ie training mode)
 #  * decoder autoregressive (ie inference mode)
 
-# Test if the GraphT5 model with a fully connected attention graph
-# gives the same results as the Vanilla T5 model
-# 3 tests are performed:
-#  * encoder
-#  * decoder (non-autoregressive ie training mode)
-#  * decoder autoregressive (ie inference mode)
-
 import numpy as np
 
 import jax.numpy as jnp
@@ -24,7 +17,6 @@ from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 
 from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
-from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
 from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 
@@ -45,16 +37,10 @@ def test():
     module_class = FlaxT5ForConditionalGeneration.module_class
     module_class = tie_relative_pos_bias(module_class, repo_path)
     FlaxT5ForConditionalGeneration.module_class = module_class
-    module_class = FlaxT5ForConditionalGeneration.module_class
-    module_class = tie_relative_pos_bias(module_class, repo_path)
-    FlaxT5ForConditionalGeneration.module_class = module_class
     model = FlaxT5ForConditionalGeneration.from_pretrained(
         repo_path,
     )
     model.params = model.to_bf16(model.params)
-
-    #tieing the graph so it is defined for first layer only
-    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
     #tieing the graph so it is defined for first layer only
     model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
@@ -70,17 +56,19 @@ def test():
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
+        "n_heads": model.config.num_heads,
+        "batch_size": 4,
         "autoregressive":False,
     }
-    graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
     graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
+        "n_heads": model.config.num_heads,
+        "batch_size": 4,
         "autoregressive":True,
     }
-    graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
     graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
@@ -178,13 +166,10 @@ def test():
                 is_sent_finished=False,
                 model_kwargs=next_model_kwargs,
             ), model_outputs
-            ), model_outputs
         r = []
         states = []
         for rep in range(n):
             states.append(state)
-            state, output = greedy_search_body_fn(states[rep])
-            r.append((output, state.running_token))
             state, output = greedy_search_body_fn(states[rep])
             r.append((output, state.running_token))
         return r, states
@@ -197,7 +182,6 @@ def test():
 
     ar_inputs = get_ar_inputs()
     input_ids = ar_inputs.pop("input_ids")
-    greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
     greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
 
     for i in range(n):
