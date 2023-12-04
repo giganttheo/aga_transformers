@@ -6,7 +6,6 @@ from ..utils import graph_from_path
 
 class LongformerAttentionPattern(AttentionPattern):
   def __init__(self, seq_len_q, seq_len_kv, window_size, sentence_tokens=[0], **kwargs):
-  def __init__(self, seq_len_q, seq_len_kv, window_size, sentence_tokens=[0], **kwargs):
     super().__init__()
 
     #global attn
