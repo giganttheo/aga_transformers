@@ -44,7 +44,7 @@ class LongformerAttentionPattern(AttentionPattern):
     self.receivers = receivers
     self.senders = senders
     self.graph_mask = graph_mask
-    self.size = (seq_len_kv, seq_len_q)  
+    self.size = (seq_len_kv, seq_len_q)
 
 """
 in the paper:
@@ -55,7 +55,7 @@ increasing dilation only on 2 heads. This gives the model the ability to directl
 to distant tokens without sacrificing local context.
 """
 
-def create_led_attn_patterns(model, max_source_length, max_target_length, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0], autoregressive=False, layer_wise=False,  **kwargs):
+def create_led_attn_patterns(model, max_source_length, max_target_length, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
     #Encoder self attention pattern

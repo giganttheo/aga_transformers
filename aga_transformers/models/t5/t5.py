@@ -30,6 +30,7 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
             "max_target_length": 512,
             "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
             "autoregressive":True,
+            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
     graph_ar = {}
     if attention_mode == "led":

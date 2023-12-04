@@ -540,6 +540,7 @@ def main():
             "max_target_length": data_args.max_target_length,
             "window_sizes": [127], # [254]*12,
             "autoregressive": False,
+            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype=dtype, attention_kwargs=attention_kwargs, layer_wise=False)
 
