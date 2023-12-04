@@ -6,7 +6,6 @@ from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_lay
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
-
 #wrapper to load the model and preprocess the weights
 
 def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, **model_kwargs):
@@ -29,17 +28,18 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
         attention_kwargs = {
             "max_source_length": 2048,
             "max_target_length": 512,
-            "n_heads": model.config.num_heads,
             "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
-            "block_size": 1,
-            "batch_size": 1,
             "autoregressive":True,
+            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
+    graph_ar = {}
     if attention_mode == "led":
-        graph = create_led_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
+        attention_kwargs.pop("autoregressive")
+        graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
+        graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
     else:
         graph = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
-    return tokenizer, model, graph
+    return tokenizer, model, graph, graph_ar
 
 def preprocess_function(examples, tokenizer, max_length=512, prefix="summarize: ", text_column="transcript", padding='longest'):
     inputs = examples[text_column]

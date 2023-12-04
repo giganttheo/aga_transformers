@@ -41,11 +41,11 @@ import optax
 from datasets import Dataset, load_dataset
 from filelock import FileLock
 from flax import jax_utils, traverse_util
-from flax.jax_utils import pad_shard_unpad, unreplicate
 from flax.training import train_state
-from flax.training.common_utils import get_metrics, onehot, shard, shard_prng_key
+from flax.training.common_utils import shard_prng_key, stack_forest
 from huggingface_hub import Repository, create_repo
 from tqdm import tqdm
+import wandb
 
 import transformers
 from transformers import (
@@ -58,10 +58,12 @@ from transformers import (
 )
 from transformers.utils import get_full_repo_name, is_offline_mode, send_example_telemetry
 
-from aga_transformers.models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
-from aga_transformers.models.utils import adapt_relative_pos_bias, add_graph_to_params
-from aga_transformers.attention_patterns.sparse_attention.led import create_led_attn_patterns
-from aga_transformers.train.utils import get_apply_fn
+import lorax
+
+from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
+from aga_transformers.models.t5.t5 import load_t5
+from aga_transformers.train.lora import create_lora
+from aga_transformers.train.loss import loss_fn
 
 logger = logging.getLogger(__name__)
 
@@ -337,13 +339,11 @@ summarization_name_mapping = {
     "gigant/tib": ("transcript", "abstract"),
 }
 
-
 class TrainState(train_state.TrainState):
     dropout_rng: jnp.ndarray
 
     def replicate(self):
         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
-
 
 def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuffle: bool = False, drop_last=True):
     """
@@ -374,7 +374,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
 
-    train_metrics = get_metrics(train_metrics)
+    # train_metrics = get_metrics(train_metrics)
+    train_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
     for key, vals in train_metrics.items():
         tag = f"train_{key}"
         for i, val in enumerate(vals):
@@ -398,6 +399,7 @@ def create_learning_rate_fn(
     return schedule_fn
 
 
+
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -410,6 +412,9 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    # Initializing a Weights & Biases Run
+    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -528,26 +533,16 @@ def main():
             "You are instantiating a new tokenizer from scratch. This is not supported by this script."
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
-
     if model_args.model_name_or_path:
-        model = FlaxT5ForConditionalGeneration.from_pretrained(
-            model_args.model_name_or_path,
-            dtype = jnp.bfloat16,
-            # config=config,
-            # seed=training_args.seed,
-            # dtype=getattr(jnp, model_args.dtype),
-            # use_auth_token=True if model_args.use_auth_token else None,
-        )
-    else:
-        model = FlaxT5ForConditionalGeneration.from_config(
-            config,
-            seed=training_args.seed,
-            dtype=getattr(jnp, model_args.dtype),
-        )
-
-    model.params = model.to_bf16(model.params)
-    #duplicate the positional encoding to every block
-    model.params = adapt_relative_pos_bias(model.params)
+        dtype=getattr(jnp, model_args.dtype)
+        attention_kwargs = {
+            "max_source_length": data_args.max_source_length,
+            "max_target_length": data_args.max_target_length,
+            "window_sizes": [127], # [254]*12,
+            "autoregressive": False,
+            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        }
+        tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype=dtype, attention_kwargs=attention_kwargs, layer_wise=False)
 
     if training_args.gradient_checkpointing:
         model.enable_gradient_checkpointing()
@@ -708,7 +703,6 @@ def main():
     if has_tensorboard and jax.process_index() == 0:
         try:
             from flax.metrics.tensorboard import SummaryWriter
-
             summary_writer = SummaryWriter(log_dir=Path(training_args.output_dir))
         except ImportError as ie:
             has_tensorboard = False
@@ -721,8 +715,6 @@ def main():
             "Please run pip install tensorboard to enable."
         )
     
-    apply_fn_with_graph = get_apply_fn(model)
-
     # Initialize our training
     rng = jax.random.PRNGKey(training_args.seed)
     rng, dropout_rng = jax.random.split(rng)
@@ -771,96 +763,52 @@ def main():
         mask=decay_mask_fn,
     )
     
+    # Create LoRA model
+
+    apply_fn, lora_params, optimizer = create_lora(model, adamw, dtype="bfloat16")
+
+    loss_fn_ = jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+
     # Setup train state
     
-    state = TrainState.create(apply_fn=apply_fn_with_graph, params=model.params, tx=adamw, dropout_rng=dropout_rng) # previously params=model.params, apply_fn=model.__call__
+    state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
-    attention_kwargs = {
-        "max_source_length": data_args.max_source_length,
-        "max_target_length": max_target_length,
-        "n_heads": model.config.num_heads,
-        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
-        "block_size": 1,
-        "batch_size": training_args.per_device_train_batch_size,
-        "autoregressive": False,
-    }
-    graph = create_led_attn_patterns(model, **attention_kwargs)
-
-    ar_attention_kwargs = {
-        "max_source_length": data_args.max_source_length,
-        "max_target_length": max_target_length,
-        "n_heads": model.config.num_heads,
-        "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
-        "block_size": 1,
-        "batch_size": training_args.per_device_eval_batch_size,
-        "autoregressive": True,
-    }
-    ar_graph = create_led_attn_patterns(model, **ar_attention_kwargs)
-
-    # label smoothed cross entropy
-    def loss_fn(logits, labels, padding_mask, label_smoothing_factor=0.0):
-        """
-        The label smoothing implementation is adapted from Flax's official example:
-        https://github.com/google/flax/blob/87a211135c6a377c8f29048a1cac3840e38b9da4/examples/wmt/train.py#L104
-        """
-        vocab_size = logits.shape[-1]
-        confidence = 1.0 - label_smoothing_factor
-        low_confidence = (1.0 - confidence) / (vocab_size - 1)
-        normalizing_constant = -(
-            confidence * jnp.log(confidence) + (vocab_size - 1) * low_confidence * jnp.log(low_confidence + 1e-20)
-        )
-        soft_labels = onehot(labels, vocab_size, on_value=confidence, off_value=low_confidence)
-
-        loss = optax.softmax_cross_entropy(logits, soft_labels)
-        loss = loss - normalizing_constant
-
-        # ignore padded tokens from loss
-        loss = loss * padding_mask
-        loss = loss.sum()
-        num_labels = padding_mask.sum()
-        return loss, num_labels
-
-    # Define gradient update step fn
-    def train_step(state, batch, label_smoothing_factor=0.0):
+    def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
         def compute_loss(params):
             labels = batch.pop("labels")
-            logits = state.apply_fn(**batch, graph=graph, params=params, dropout_rng=dropout_rng, train=True)[0]
-            loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
-            return loss, num_labels
-
+            loss, _ = loss_fn_(state.apply_fn, params, dropout_rng=dropout_rng, **batch)
+            return loss, None
+        
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
-        (loss, num_labels), grad = grad_fn(state.params)
-        num_labels = jax.lax.psum(num_labels, "batch")
-
-        # true loss = total loss / total samples
-        loss = jax.lax.psum(loss, "batch")
-        loss = jax.tree_util.tree_map(lambda x: x / num_labels, loss)
-
-        # true grad = total grad / total samples
-        grad = jax.lax.psum(grad, "batch")
-        grad = jax.tree_util.tree_map(lambda x: x / num_labels, grad)
+        (loss, _), grad = grad_fn(state.params)
+        
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
-
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
         return new_state, metrics
 
+
     # Define eval fn
-    def eval_step(params, batch, label_smoothing_factor=0.0):
+    def eval_step(params, batch):
         labels = batch.pop("labels")
-        params_with_graph = add_graph_to_params(params, graph=graph)
-        logits = model(**batch, params=params_with_graph, train=False)[0]
+        loss, _ = loss_fn(apply_fn, params, graph, train=False, **batch)
 
-        loss, num_labels = loss_fn(logits, labels, batch["decoder_attention_mask"], label_smoothing_factor)
-        num_labels = jax.lax.psum(num_labels, "batch")
-
-        # true loss = total loss / total samples
-        loss = jax.lax.psum(loss, "batch")
-        loss = jax.tree_util.tree_map(lambda x: x / num_labels, loss)
+        # # true loss = total loss / total samples
+        # loss = jax.lax.psum(loss, "batch")
+        # loss = jax.tree_util.tree_map(lambda x: x / num_labels, loss)
 
         metrics = {"loss": loss}
         return metrics
+
+    def generate_step(params, batch):
+        # _ = batch.pop("labels") #added
+        output_ids = model.generate(
+                                    batch["input_ids"],
+                                    params=add_graph_to_params(repeat_relative_pos_bias(params), graph_ar),
+                                    attention_mask=batch["attention_mask"],
+                                    **gen_kwargs)
+        return output_ids.sequences
 
     # Define generation function
     max_length = (
@@ -868,26 +816,6 @@ def main():
     )
     num_beams = data_args.num_beams if data_args.num_beams is not None else model.config.num_beams
     gen_kwargs = {"max_length": max_length, "num_beams": num_beams}
-
-    def generate_step(params, batch):
-        params_with_graph = add_graph_to_params(params, ar_graph)
-        _ = batch.pop("labels") #added
-        output_ids = model.generate(
-                                    batch["input_ids"],
-                                    params=params_with_graph,
-                                    attention_mask=batch["attention_mask"],
-                                    **gen_kwargs)
-        return output_ids.sequences
-
-    # Create parallel version of the train and eval step
-    p_train_step = jax.pmap(
-        partial(train_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch", # donate_argnums=(0,)
-    )
-    p_eval_step = jax.pmap(partial(eval_step, label_smoothing_factor=training_args.label_smoothing_factor), "batch")
-    p_generate_step = jax.pmap(generate_step, "batch")
-
-    # Replicate the train state on each device
-    state = state.replicate()
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
@@ -912,17 +840,16 @@ def main():
         # train
         for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            batch = shard(batch)
-            state, train_metric = p_train_step(state, batch)
+            state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
 
         train_time += time.time() - train_start
 
-        train_metric = unreplicate(train_metric)
+        train_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
 
         epochs.write(
-            f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metric['loss']}, Learning Rate:"
-            f" {train_metric['learning_rate']})"
+            f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metrics['loss']}, Learning Rate:"
+            f" {train_metrics['learning_rate']})"
         )
 
         # ======================== Evaluating ==============================
@@ -937,21 +864,24 @@ def main():
             batch = next(eval_loader)
             labels = batch["labels"]
 
-            metrics = pad_shard_unpad(p_eval_step, static_return=True)(
-                state.params, batch, min_device_batch=per_device_eval_batch_size
+            metrics = eval_step(
+                state.params, batch
             )
             eval_metrics.append(metrics)
 
             # generation
             if data_args.predict_with_generate:
                 print("generate...")
-                generated_ids = pad_shard_unpad(p_generate_step)(state.params, batch)
-                eval_preds.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
+                generated_ids = generate_step(
+                                        lorax.merge_params(state.params, destructive=False),
+                                        batch
+                                        )
+                eval_preds.extend(generated_ids.reshape(-1, gen_kwargs["max_length"]))
                 eval_labels.extend(labels)
 
         # normalize eval metrics
-        eval_metrics = get_metrics(eval_metrics)
-        eval_metrics = jax.tree_util.tree_map(jnp.mean, eval_metrics)
+        # eval_metrics = get_metrics(eval_metrics)
+        eval_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(eval_metrics))
 
         # compute ROUGE metrics
         rouge_desc = ""
@@ -968,14 +898,13 @@ def main():
         # Save metrics
         if has_tensorboard and jax.process_index() == 0:
             cur_step = epoch * (len(train_dataset) // train_batch_size)
-            write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step)
-
-        
+            write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
+      
 
         # save checkpoint after each epoch and push checkpoint to the hub
         if jax.process_index() == 0:
-            params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-            model.save_pretrained(training_args.output_dir, params=params)
+            # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
+            model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
                 repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)
@@ -995,20 +924,24 @@ def main():
             batch = next(pred_loader)
             labels = batch["labels"]
 
-            metrics = pad_shard_unpad(p_eval_step, static_return=True)(
-                state.params, batch, min_device_batch=per_device_eval_batch_size
+            metrics = eval_step(
+                state.params, batch
             )
             pred_metrics.append(metrics)
 
             # generation
             if data_args.predict_with_generate:
-                generated_ids = pad_shard_unpad(p_generate_step)(state.params, batch)
-                pred_generations.extend(jax.device_get(generated_ids.reshape(-1, gen_kwargs["max_length"])))
+                print("generate...")
+                generated_ids = generate_step(
+                                        lorax.merge_params(state.params, destructive=False),
+                                        batch
+                                        )
+                pred_generations.extend(generated_ids.reshape(-1, gen_kwargs["max_length"]))
                 pred_labels.extend(labels)
-
+        
         # normalize prediction metrics
-        pred_metrics = get_metrics(pred_metrics)
-        pred_metrics = jax.tree_util.tree_map(jnp.mean, pred_metrics)
+        # pred_metrics = get_metrics(pred_metrics)
+        pred_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(pred_metrics))
 
         # compute ROUGE metrics
         rouge_desc = ""
@@ -1029,6 +962,8 @@ def main():
             path = os.path.join(training_args.output_dir, "test_results.json")
             with open(path, "w") as f:
                 json.dump(rouge_metrics, f, indent=4, sort_keys=True)
+    wandb.finish()
+
 
 
 if __name__ == "__main__":
