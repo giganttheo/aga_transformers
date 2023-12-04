@@ -14,7 +14,8 @@ def dependency_parser(sentences):
   return [nlp(sentence) for sentence in sentences]
 
 class DependencyAttentionPattern(AttentionPattern):
-  #Attention pattern constructed from the dependency graph
+  #Attention pattern constructed from the dependency graph, using the Berkeley Neural Parser model
+  # https://github.com/nikitakit/self-attentive-parser
   def __init__(self, text, tokens, **kwargs):
     # text is the text (one big string)
     # tokens is the tokenized text
