@@ -20,7 +20,7 @@ class LongformerAttentionPattern(AttentionPattern):
 
     # global attention
     for i in global_tokens:
-      for j in seq_q - global_tokens:
+      for j in seq_q:
         layer_receivers.append(i)
         layer_senders.append(j)
     for j in global_tokens:
