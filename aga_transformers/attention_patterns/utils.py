@@ -1,5 +1,6 @@
 
 def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], layer_wise=True):
+  # creates a tree of graph attention patterns, given a tree with path
   if not isinstance(tree, dict):
     return None
   if 'SelfAttention' in path:
@@ -29,3 +30,39 @@ def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], la
     else:
       return None
   return {k: graph_from_path(t, enc_self_attn=enc_self_attn, dec_self_attn=dec_self_attn, encdec_attn=encdec_attn, path=path+[k]) for (k, t) in tree.items()}
+
+def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1):
+    # maps a segmentation that goes with a tokenized text, using a tokenization strategy (1)
+    # to the relevant segmentation using another tokenization strategy (2)
+    # # Example Usage
+    # tokenized_1 = ["Summarize", ":", "This", "is", "a", "test", "sentence", "!", "Also", "this"]
+    # tokenized_2 = ['▁Sum', 'mar', 'ize', ':', '▁This', '▁is', '▁', 'a', '▁test',
+    # '▁sentence', '!', '▁Also', '▁this', '</s>']
+    # segments_1 = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+    # map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1)
+
+    segments_2 = []
+    index_2 = 0
+    
+    def normalize(string):
+      return string.lower().replace(" ", "")
+
+    for token_1, segment_1 in zip(tokenized_1, segments_1):
+      if index_2 < len(tokenized_2):
+        tmp = tokenized_2[index_2].lower()
+        num_tokens = 1
+        index_2 += 1
+        while index_2 < len(tokenized_2) and not (normalize(token_1) in tmp):
+          tmp += normalize(tokenized_2[index_2])
+          index_2 += 1
+          num_tokens += 1
+        segments_2.extend([segment_1]*num_tokens)
+    return segments_2
+
+def get_new_token_ids(tokenized_1, tokenized_2):
+  # mapping[id] returns the list of tokens of tokenized_2 that correspond to tokenized_1[id]
+  segments_2 = map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, range(len(tokenized_1)))
+  mapping = [[] for i in tokenized_1]
+  for i, segment in enumerate(segments_2):
+    mapping[segment].append(i)
+  return mapping

@@ -40,7 +40,7 @@ class LongformerAttentionPattern(AttentionPattern):
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
     receivers = np.array(receivers, dtype=np.uint16)
     senders = np.array(senders, dtype=np.uint16)
-    graph_mask = np.array(graph_mask, dtype=np.bool)
+    graph_mask = np.array(graph_mask, dtype=bool)
     self.receivers = receivers
     self.senders = senders
     self.graph_mask = graph_mask
