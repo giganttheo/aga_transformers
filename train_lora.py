@@ -375,7 +375,8 @@ def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
 
     # train_metrics = get_metrics(train_metrics)
-    train_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
+    # train_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
+    
     for key, vals in train_metrics.items():
         tag = f"train_{key}"
         for i, val in enumerate(vals):
