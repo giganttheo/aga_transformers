@@ -376,7 +376,7 @@ def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
 
     # train_metrics = get_metrics(train_metrics)
     # train_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
-    
+
     for key, vals in train_metrics.items():
         tag = f"train_{key}"
         for i, val in enumerate(vals):
@@ -846,11 +846,11 @@ def main():
 
         train_time += time.time() - train_start
 
-        train_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
+        train_metric = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
 
         epochs.write(
-            f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metrics['loss']}, Learning Rate:"
-            f" {train_metrics['learning_rate']})"
+            f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metric['loss']}, Learning Rate:"
+            f" {train_metric['learning_rate']})"
         )
 
         # ======================== Evaluating ==============================
