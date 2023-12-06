@@ -82,7 +82,7 @@ def dependency_parser(text):
 class ConstituencyAttentionPattern(AttentionPattern):
   #Attention pattern constructed from the constituency graph, using the Berkeley Neural Parser model
   # https://github.com/nikitakit/self-attentive-parser
-  def __init__(self, text, tokens, **kwargs):
+  def __init__(self, text, tokens, radius = 4, **kwargs):
     # text is the text (one big string)
     # tokens is the tokenized text
     
@@ -97,7 +97,6 @@ class ConstituencyAttentionPattern(AttentionPattern):
       """
       docs is a the output of the SpaCy dependency parser
       """
-      radius = 4
       edges = {}
       receivers = []
       senders = []
