@@ -15,7 +15,8 @@ TODO list:
    * [x] longformer-style attn pattern
      * [ ] add dilation support
      * [ ] add block window support
-   * [x] dependency graph attn pattern 
+   * [x] dependency graph attn pattern
+   * [x] constituency graph attn pattern
  * [ ] optimizations
    * [ ] add a more efficient global / local attention computation
    * [x] accept attention pattern defined per layer or share between layers (tieing)
