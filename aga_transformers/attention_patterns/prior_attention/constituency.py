@@ -97,23 +97,30 @@ class ConstituencyAttentionPattern(AttentionPattern):
       """
       docs is a the output of the SpaCy dependency parser
       """
-      radius = 4 # max length in the tree to have an edge in the graph
-      sent = list(doc.sents)[0]
-      t = rec_const_parsing(parse_tree(sent._.parse_string)[0])
-      t.set_all_ids()
-      all_nodes = t.get_list_nodes()
-      leaves_and_path = tree_to_leaves_and_path(t, all_nodes)
-      nodes = [all_nodes[leaf_and_path[0]] for leaf_and_path in leaves_and_path ]
-      tree_ids2doc_ids = {leaf_and_path[0]: token.i for token, leaf_and_path in zip(doc, leaves_and_path) }
+      radius = 4
       edges = {}
       receivers = []
       senders = []
-      for node_1 in leaves_and_path:
-        for node_2 in leaves_and_path:
-          if len(get_path_from_1_to_2(node_1[1].split("/"), node_2[1].split("/"))) <= radius:
-            senders.append(tree_ids2doc_ids[node_1[0]])
-            receivers.append(tree_ids2doc_ids[node_2[0]])
-            edges[(tree_ids2doc_ids[node_1[0]], tree_ids2doc_ids[node_2[0]])] = get_path_from_1_to_2(node_1[1].split("/"), node_2[1].split("/"))
+      nodes = []
+      offset = 0
+      for sent in list(doc.sents):
+        t = rec_const_parsing(parse_tree(sent._.parse_string)[0])
+        t.set_all_ids()
+        all_nodes = t.get_list_nodes()
+        leaves_and_path = tree_to_leaves_and_path(t, all_nodes)
+        nodes.extend([all_nodes[leaf_and_path[0]] for leaf_and_path in leaves_and_path ])
+        tree_ids2doc_ids = {leaf_and_path[0]: token.i for token, leaf_and_path in zip(doc, leaves_and_path) }
+
+        for node_1 in leaves_and_path:
+          for node_2 in leaves_and_path:
+            sender = offset + tree_ids2doc_ids[node_1[0]]
+            receiver = offset + tree_ids2doc_ids[node_2[0]]
+            path_1_to_2 = get_path_from_1_to_2(node_1[1].split("/"), node_2[1].split("/"))
+            if len(path_1_to_2) <= radius:
+              senders.append(sender)
+              receivers.append(receiver)
+              edges[(sender, receiver)] = path_1_to_2
+        offset += len(sent)
       return {"nodes": nodes, "senders": senders, "receivers": receivers, "edges": edges}
 
     graph = construct_constituency_graph(dependency_parser(text))
