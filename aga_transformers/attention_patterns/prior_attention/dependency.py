@@ -23,7 +23,7 @@ class DependencyAttentionPattern(AttentionPattern):
       return nlp(text)
     def construct_dependency_graph(doc):
       """
-      docs is a list of outputs of the SpaCy dependency parser
+      docs is a the output of the SpaCy dependency parser
       """
       nodes = [token.text for token in doc]
       senders = []
