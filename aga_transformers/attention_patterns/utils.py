@@ -45,7 +45,7 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1):
     index_2 = 0
     
     def normalize(string):
-      return string.lower().replace(" ", "")
+      return string.lower().replace("▁", "").replace(" ", "")
 
     for token_1, segment_1 in zip(tokenized_1, segments_1):
       if index_2 < len(tokenized_2):
