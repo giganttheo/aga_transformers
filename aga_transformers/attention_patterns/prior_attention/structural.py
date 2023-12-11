@@ -33,7 +33,7 @@ def get_slides2segments_edges(data_point):
 class StructuralAttentionPattern(AttentionPattern):
     def __init__(self, data_point, tokenizer, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(data_point)
-        tokenized = tokenizer(data_point)
+        tokenized = tokenizer(data_point['transcript'])
 
         # get the mapping from the segments to the tokens (new_tokens[i] is the tokens ids in segment i)
         new_tokens = get_new_token_ids(data_point['transcript_segments']['text'], tokenized.tokens())
@@ -70,7 +70,7 @@ class StructuralAttentionPattern(AttentionPattern):
         self.size = (num_tokens, num_tokens)
 
 
-def create_structural_attn_patterns(max_source_length, max_target_length, model, data_point, tokenizer, autoregressive=False, layer_wise=False,  **kwargs):
+def create_structural_attn_patterns(model, max_source_length, max_target_length, data_point, tokenizer, autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_structural_attn_patterns')
     #Encoder self attention pattern
