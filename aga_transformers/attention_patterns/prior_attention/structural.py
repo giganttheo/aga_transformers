@@ -60,12 +60,14 @@ class StructuralAttentionPattern(AttentionPattern):
                         senders.append(node_slide)
                         senders.append(node_token)
                         receivers.append(node_slide)
-                    for node_token_2 in node_tokens:
-                        # edges between tokens within the same slide
-                        if (node_token_2, node_token) not in edges:
-                            edges.add((node_token_2, node_token))
-                            receivers.append(node_token)
-                            senders.append(node_token_2)
+                    for edge_sentence_id_2 in edges_slide:
+                        node_tokens_2 = new_tokens[edge_sentence_id_2]
+                        for node_token_2 in node_tokens_2:
+                            # edges between tokens within the same slide
+                            if (node_token_2, node_token) not in edges:
+                                edges.add((node_token_2, node_token))
+                                receivers.append(node_token)
+                                senders.append(node_token_2)
             for slide_id_2 in range(len(edges_slides_to_transcript_segments)):
                 # slide / slide edges
                 node_slide_2 = slides_offset + slide_id_2
@@ -76,7 +78,7 @@ class StructuralAttentionPattern(AttentionPattern):
 
         num_tokens = slides_offset + len(edges_slides_to_transcript_segments) - 1
         del edges
-        
+
         receivers = np.array(receivers, dtype=np.uint16)
         senders = np.array(senders, dtype=np.uint16)
         receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
