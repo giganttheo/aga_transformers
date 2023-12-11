@@ -31,7 +31,7 @@ def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], la
       return None
   return {k: graph_from_path(t, enc_self_attn=enc_self_attn, dec_self_attn=dec_self_attn, encdec_attn=encdec_attn, path=path+[k]) for (k, t) in tree.items()}
 
-def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1):
+def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, tokenizer=None):
     # maps a segmentation that goes with a tokenized text, using a tokenization strategy (1)
     # to the relevant segmentation using another tokenization strategy (2)
     # # Example Usage
@@ -48,7 +48,7 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1):
       return string.lower().replace("▁", "").replace(" ", "")
 
     for token_1, segment_1 in zip(tokenized_1, segments_1):
-      if index_2 < len(tokenized_2):
+      if index_2 < len(tokenized_2) and normalize(token_1) != '':
         tmp = normalize(tokenized_2[index_2])
         num_tokens = 1
         index_2 += 1
