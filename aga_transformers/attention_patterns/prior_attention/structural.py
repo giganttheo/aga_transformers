@@ -22,7 +22,7 @@ def get_slides2segments_edges(data_point):
     print(f"kf: {i_keyframes}, tr: {i_transcript}")
     edges_slides_to_transcript_segments[i_keyframes] = edges_slides_to_transcript_segments[i_keyframes] + [i_transcript]
 
-    while ends[i_transcript] > keyframes_timestamps[i_keyframes][-1] and i_keyframes < len(keyframes_timestamps) - 1:
+    while ends[i_transcript] > keyframes_timestamps[i_keyframes][-1] and i_keyframes + 1 < len(keyframes_timestamps):
       # the current segment finishes after the current frame
       i_keyframes += 1
       print(f"kf: {i_keyframes}, tr: {i_transcript}")
@@ -51,10 +51,17 @@ class StructuralAttentionPattern(AttentionPattern):
             for edge_sentence_id in edges_slide:
                 node_tokens = new_tokens[edge_sentence_id]
                 for node_token in node_tokens:
+                    # slide / tokens edges
                     receivers.append(node_token)
                     senders.append(node_slide)
                     senders.append(node_token)
                     receivers.append(node_slide)
+                    for node_token_2 in node_tokens:
+                       # edges between tokens within the same slide
+                        receivers.append(node_token)
+                        senders.append(node_token_2)
+                        senders.append(node_token)
+                        receivers.append(node_token_2)
 
         num_tokens = edges_offset + len(edges_slides_to_transcript_segments)
 
