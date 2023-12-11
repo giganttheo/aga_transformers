@@ -41,7 +41,7 @@ class StructuralAttentionPattern(AttentionPattern):
         def max_listoflists(inputlist):
             return max([max(sublist) for sublist in inputlist if sublist != []])
 
-        edges_offset = max_listoflists(new_tokens)
+        edges_offset = max_listoflists(new_tokens) + 1
 
         receivers = []
         senders = []
