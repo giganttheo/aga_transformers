@@ -41,33 +41,42 @@ class StructuralAttentionPattern(AttentionPattern):
         def max_listoflists(inputlist):
             return max([max(sublist) for sublist in inputlist if sublist != []])
 
-        edges_offset = max_listoflists(new_tokens) + 1
+        slides_offset = max_listoflists(new_tokens) + 1
 
         receivers = []
         senders = []
+        edges = set({})
 
-        for edge_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
-            node_slide = edges_offset + edge_id #slide
+        for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
+            node_slide = slides_offset + slide_id #slide
             for edge_sentence_id in edges_slide:
                 node_tokens = new_tokens[edge_sentence_id]
                 for node_token in node_tokens:
                     # slide / tokens edges
-                    receivers.append(node_token)
-                    senders.append(node_slide)
-                    senders.append(node_token)
-                    receivers.append(node_slide)
-                    for node_token_2 in node_tokens:
-                       # edges between tokens within the same slide
+                    if(node_token, node_slide) not in edges and (node_slide, node_token) not in edges:
+                        edges.add((node_token, node_slide))
+                        edges.add((node_slide, node_token))
                         receivers.append(node_token)
-                        senders.append(node_token_2)
-            for edge_id_2 in range(len(edges_slides_to_transcript_segments)):
+                        senders.append(node_slide)
+                        senders.append(node_token)
+                        receivers.append(node_slide)
+                    for node_token_2 in node_tokens:
+                        # edges between tokens within the same slide
+                        if (node_token_2, node_token) not in edges:
+                            edges.add((node_token_2, node_token))
+                            receivers.append(node_token)
+                            senders.append(node_token_2)
+            for slide_id_2 in range(len(edges_slides_to_transcript_segments)):
                 # slide / slide edges
-                node_slide_2 = edges_offset + edge_id_2
-                receivers.append(node_slide)
-                senders.append(node_slide_2)
+                node_slide_2 = slides_offset + slide_id_2
+                if (node_slide_2, node_slide) not in edges:
+                    edges.add((node_slide_2, node_slide))
+                    receivers.append(node_slide)
+                    senders.append(node_slide_2)
 
-        num_tokens = edges_offset + len(edges_slides_to_transcript_segments)
-
+        num_tokens = slides_offset + len(edges_slides_to_transcript_segments) - 1
+        del edges
+        
         receivers = np.array(receivers, dtype=np.uint16)
         senders = np.array(senders, dtype=np.uint16)
         receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
