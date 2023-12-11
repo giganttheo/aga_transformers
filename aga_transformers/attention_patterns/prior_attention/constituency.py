@@ -103,13 +103,14 @@ class ConstituencyAttentionPattern(AttentionPattern):
       nodes = []
       offset = 0
       for sent in list(doc.sents):
+        print(sent)
         t = rec_const_parsing(parse_tree(sent._.parse_string)[0])
         t.set_all_ids()
         all_nodes = t.get_list_nodes()
         leaves_and_path = tree_to_leaves_and_path(t, all_nodes)
         nodes.extend([all_nodes[leaf_and_path[0]] for leaf_and_path in leaves_and_path ])
         tree_ids2doc_ids = {leaf_and_path[0]: token.i for token, leaf_and_path in zip(doc, leaves_and_path) }
-
+        print(t)
         for node_1 in leaves_and_path:
           for node_2 in leaves_and_path:
             sender = offset + tree_ids2doc_ids[node_1[0]]
