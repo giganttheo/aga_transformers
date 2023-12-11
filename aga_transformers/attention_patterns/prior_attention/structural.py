@@ -62,6 +62,12 @@ class StructuralAttentionPattern(AttentionPattern):
                         senders.append(node_token_2)
                         senders.append(node_token)
                         receivers.append(node_token_2)
+            for edge_id_2 in range(len(edges_slides_to_transcript_segments)):
+                # slide / slide edges
+                receivers.append(edge_id)
+                senders.append(edge_id_2)
+                senders.append(edge_id)
+                receivers.append(edge_id_2)
 
         num_tokens = edges_offset + len(edges_slides_to_transcript_segments)
 
