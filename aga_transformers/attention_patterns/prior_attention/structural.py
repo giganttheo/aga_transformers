@@ -22,7 +22,7 @@ def get_slides2segments_edges(data_point):
     print(f"kf: {i_keyframes}, tr: {i_transcript}")
     edges_slides_to_transcript_segments[i_keyframes] = edges_slides_to_transcript_segments[i_keyframes] + [i_transcript]
 
-    while ends[i_transcript] > keyframes_timestamps[i_keyframes][-1] and i_keyframes < len(keyframes_timestamps):
+    while ends[i_transcript] > keyframes_timestamps[i_keyframes][-1] and i_keyframes < len(keyframes_timestamps) - 1:
       # the current segment finishes after the current frame
       i_keyframes += 1
       print(f"kf: {i_keyframes}, tr: {i_transcript}")
