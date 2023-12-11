@@ -1,3 +1,4 @@
+from unidecode import unidecode
 
 def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], layer_wise=True):
   # creates a tree of graph attention patterns, given a tree with path
@@ -45,7 +46,7 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, toke
     index_2 = 0
 
     def normalize(string):
-      return string.lower().replace("▁", "").replace(" ", "")
+      return unidecode(string.lower().replace("▁", "").replace(" ", "")).casefold()
 
     for token_1, segment_1 in zip(tokenized_1, segments_1):
       if index_2 < len(tokenized_2) and normalize(token_1) != '':
