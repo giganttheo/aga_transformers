@@ -49,18 +49,15 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, toke
       return unidecode(string.lower().replace("▁", "").replace(" ", "")).casefold()
 
     for token_1, segment_1 in zip(tokenized_1, segments_1):
-      if index_2 < len(tokenized_2) and normalize(token_1) != '':
+      if index_2 < len(tokenized_2):
         tmp = normalize(tokenized_2[index_2])
         num_tokens = 1
         index_2 += 1
-        while index_2 < len(tokenized_2) and not (normalize(token_1) in tmp):
+        while index_2 < len(tokenized_2) and not (normalize(token_1) in tmp and normalize(token_1) != ''):
           tmp += normalize(tokenized_2[index_2])
           index_2 += 1
           num_tokens += 1
         segments_2.extend([segment_1]*num_tokens)
-      elif index_2 < len(tokenized_2):
-        segments_2.append([])
-        index_2 += 1
     return segments_2
 
 def get_new_token_ids(tokenized_1, tokenized_2):
