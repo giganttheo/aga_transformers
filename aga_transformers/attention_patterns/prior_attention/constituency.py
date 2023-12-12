@@ -128,6 +128,7 @@ class ConstituencyAttentionPattern(AttentionPattern):
       return {"nodes": nodes, "senders": senders, "receivers": receivers, "edges": edges}
 
     graph = construct_constituency_graph(dependency_parser(text))
+    print(graph["nodes"])
     new_token_ids = get_new_token_ids(graph["nodes"], tokens)
     print(new_token_ids)
     print(len(new_token_ids))
