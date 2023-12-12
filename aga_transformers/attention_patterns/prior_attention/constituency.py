@@ -146,13 +146,14 @@ class ConstituencyAttentionPattern(AttentionPattern):
     self.graph_mask = graph_mask
     self.size = (len(graph["nodes"]), len(graph["nodes"]))
 
-def create_constituency_attn_patterns(model, max_source_length, max_target_length, text, tokens, autoregressive=False, layer_wise=False,  **kwargs):
+def create_constituency_attn_patterns(model, max_source_length, max_target_length, text, tokens, radius, autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_constituency_attn_patterns')
     #Encoder self attention pattern
     enc_self_attn = ConstituencyAttentionPattern(
                                 text=text,
                                 tokens=tokens,
+                                radius=radius,
                                 ).get_attention_graph()
     if autoregressive:
         # For autoregressive decoding (ie during inference), we use
