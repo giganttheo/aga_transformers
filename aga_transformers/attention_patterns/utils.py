@@ -60,6 +60,7 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, toke
         segments_2.extend([segment_1]*num_tokens)
       elif index_2 < len(tokenized_2):
         segments_2.append([])
+        index_2 += 1
     return segments_2
 
 def get_new_token_ids(tokenized_1, tokenized_2):
