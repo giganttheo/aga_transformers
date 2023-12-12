@@ -58,12 +58,14 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, toke
           index_2 += 1
           num_tokens += 1
         segments_2.extend([segment_1]*num_tokens)
+      elif index_2 < len(tokenized_2):
+        segments_2.append([])
     return segments_2
 
 def get_new_token_ids(tokenized_1, tokenized_2):
   # mapping[id] returns the list of tokens of tokenized_2 that correspond to tokenized_1[id]
   segments_2 = map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, range(len(tokenized_1)))
-  mapping = [[] for i in tokenized_1]
+  mapping = [[] for _ in tokenized_1]
   for i, segment in enumerate(segments_2):
     mapping[segment].append(i)
   return mapping
