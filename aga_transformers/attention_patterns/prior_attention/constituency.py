@@ -2,6 +2,7 @@ import numpy as np
 import en_core_web_trf
 import benepar
 import re
+from unidecode import unidecode
 
 from ..attention_pattern import AttentionPattern
 from ..vanilla_attention.vanilla import VanillaAttentionPattern
@@ -10,6 +11,9 @@ from ..utils import graph_from_path, get_new_token_ids
 nlp = en_core_web_trf.load()
 benepar.download('benepar_en3')
 nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
+
+def normalize(string):
+  return unidecode(string.lower().replace("▁", "").replace(" ", "")).casefold()
 
 def parse_tree(sentence):
     stack = []  # or a `collections.deque()` object, which is a little faster
@@ -58,7 +62,7 @@ def tree_to_leaves_and_path(t, nodes, sentence, path=""):
   for child in t.children:
     leaves.extend(tree_to_leaves_and_path(child, nodes, sentence, path + "/" + nodes[t.id]))
     #for each subtree
-    if len(child.children) == 0 and child.name in map(str, sentence):
+    if len(child.children) == 0 and normalize(child.name) in map(lambda x: normalize(str(x)), sentence):
       #is leaf
       leaves.append((child.id, path + "/" + nodes[t.id]))
   return leaves
