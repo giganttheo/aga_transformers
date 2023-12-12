@@ -125,6 +125,7 @@ class ConstituencyAttentionPattern(AttentionPattern):
     new_token_ids = get_new_token_ids(graph["nodes"], tokens)
     print(new_token_ids)
     print(len(new_token_ids))
+    print(max(graph["receivers"]), max(graph["senders"]))
     new_edges = [(new_id_s, new_id_r) for (id_s, id_r) in graph["edges"] for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]]
 
     receivers = np.array([edge[1] for edge in new_edges], dtype=np.uint16)
