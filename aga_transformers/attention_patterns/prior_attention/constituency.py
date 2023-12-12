@@ -111,7 +111,6 @@ class ConstituencyAttentionPattern(AttentionPattern):
         t.set_all_ids()
         all_nodes = t.get_list_nodes()
         leaves_and_path = tree_to_leaves_and_path(t, all_nodes, sent)
-        print(leaves_and_path)
         nodes.extend([all_nodes[leaf_and_path[0]] for leaf_and_path in leaves_and_path ])
         tree_ids2doc_ids = {leaf_and_path[0]: token.i for token, leaf_and_path in zip(doc, leaves_and_path) }
         for node_1 in leaves_and_path:
@@ -124,6 +123,7 @@ class ConstituencyAttentionPattern(AttentionPattern):
               receivers.append(receiver)
               edges[(sender, receiver)] = path_1_to_2
         offset += len(leaves_and_path)
+        print(f"offset: {offset} (+{len(leaves_and_path)})")
       return {"nodes": nodes, "senders": senders, "receivers": receivers, "edges": edges}
 
     graph = construct_constituency_graph(dependency_parser(text))
