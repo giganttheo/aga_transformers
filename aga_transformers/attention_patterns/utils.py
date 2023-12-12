@@ -53,15 +53,14 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, toke
         tmp = normalize(tokenized_2[index_2])
         num_tokens = 1
         index_2 += 1
-        if normalize(token_1) == '':
-          # segments_2.extend([])
-          pass
-        else:
+        if normalize(token_1) != '':
           while index_2 < len(tokenized_2) and not (normalize(token_1) in tmp):
             tmp += normalize(tokenized_2[index_2])
             index_2 += 1
             num_tokens += 1
           segments_2.extend([segment_1]*num_tokens)
+        else:
+          segments_2.append(segment_1)
     return segments_2
 
 def get_new_token_ids(tokenized_1, tokenized_2):
