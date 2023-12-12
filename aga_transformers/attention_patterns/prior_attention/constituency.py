@@ -58,7 +58,6 @@ def tree_to_leaves_and_path(t, nodes, sentence, path=""):
   for child in t.children:
     leaves.extend(tree_to_leaves_and_path(child, nodes, sentence, path + "/" + nodes[t.id]))
     #for each subtree
-    print(child.name, sentence)
     if len(child.children) == 0 and child.name in map(str, sentence):
       #is leaf
       leaves.append((child.id, path + "/" + nodes[t.id]))
@@ -124,7 +123,7 @@ class ConstituencyAttentionPattern(AttentionPattern):
 
     graph = construct_constituency_graph(dependency_parser(text))
     new_token_ids = get_new_token_ids(graph["nodes"], tokens)
-    # print(new_token_ids)
+    print(new_token_ids)
     new_edges = [(new_id_s, new_id_r) for (id_s, id_r) in graph["edges"] for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]]
 
     receivers = np.array([edge[1] for edge in new_edges], dtype=np.uint16)
