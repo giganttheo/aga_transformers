@@ -52,13 +52,13 @@ class Tree():
   def get_list_nodes(self):
     return [self.name] + [_ for child in self.children for _ in child.get_list_nodes()]
 
-def tree_to_leaves_and_path(t, nodes, path=""):
+def tree_to_leaves_and_path(t, nodes, sentence, path=""):
   #return the leaves + the path
   leaves = []
   for child in t.children:
-    leaves.extend(tree_to_leaves_and_path(child, nodes, path + "/" + nodes[t.id]))
+    leaves.extend(tree_to_leaves_and_path(child, nodes, sentence, path + "/" + nodes[t.id]))
     #for each subtree
-    if len(child.children) == 0 and child.name in nodes:
+    if len(child.children) == 0 and child.name in sentence:
       #is leaf
       leaves.append((child.id, path + "/" + nodes[t.id]))
   return leaves
@@ -106,7 +106,7 @@ class ConstituencyAttentionPattern(AttentionPattern):
         t = rec_const_parsing(parse_tree(sent._.parse_string)[0])
         t.set_all_ids()
         all_nodes = t.get_list_nodes()
-        leaves_and_path = tree_to_leaves_and_path(t, sent)
+        leaves_and_path = tree_to_leaves_and_path(t, all_nodes, sent)
         nodes.extend([all_nodes[leaf_and_path[0]] for leaf_and_path in leaves_and_path ])
         tree_ids2doc_ids = {leaf_and_path[0]: token.i for token, leaf_and_path in zip(doc, leaves_and_path) }
         for node_1 in leaves_and_path:
