@@ -53,7 +53,7 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, toke
         tmp = normalize(tokenized_2[index_2])
         num_tokens = 1
         index_2 += 1
-        if normalize(token_1) != '':
+        if normalize(token_1) == '':
           segments_2.extend([])
         else:
           while index_2 < len(tokenized_2) and not (normalize(token_1) in tmp):
