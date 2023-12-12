@@ -124,6 +124,7 @@ class ConstituencyAttentionPattern(AttentionPattern):
               edges[(sender, receiver)] = path_1_to_2
         offset += len(leaves_and_path)
         print(f"offset: {offset} (+{len(leaves_and_path)})")
+        print([all_nodes[leaf_and_path[0]] for leaf_and_path in leaves_and_path ])
       return {"nodes": nodes, "senders": senders, "receivers": receivers, "edges": edges}
 
     graph = construct_constituency_graph(dependency_parser(text))
