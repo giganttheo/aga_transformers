@@ -59,7 +59,7 @@ def tree_to_leaves_and_path(t, nodes, sentence, path=""):
     leaves.extend(tree_to_leaves_and_path(child, nodes, sentence, path + "/" + nodes[t.id]))
     #for each subtree
     print(child.name, sentence)
-    if len(child.children) == 0 and child.name in sentence:
+    if len(child.children) == 0 and child.name in map(str, sentence):
       #is leaf
       leaves.append((child.id, path + "/" + nodes[t.id]))
   return leaves
