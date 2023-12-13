@@ -54,11 +54,9 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, toke
         tmp = residual + normalize(tokenized_2[index_2])
         num_tokens = 1
         index_2 += 1
-        print(f"tmp: {tmp}")
         if normalize(token_1) != '':
           while index_2 < len(tokenized_2) and not (normalize(token_1) in tmp):
             tmp += normalize(tokenized_2[index_2])
-            print(f"Token 1: {token_1}, {tmp}")
             index_2 += 1
             num_tokens += 1
           residual = re.split(re.escape(normalize(token_1)), tmp, 1)[-1]
