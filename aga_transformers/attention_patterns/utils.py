@@ -60,7 +60,7 @@ def map_segmentation_to_new_tokenizer(tokenized_1, tokenized_2, segments_1, norm
             tmp += normalize_fn(tokenized_2[index_2])
             index_2 += 1
             num_tokens += 1
-          residual = re.split(re.escape(normalize_fn(token_1)), tmp, 1)[-1]
+          # residual = re.split(re.escape(normalize_fn(token_1)), tmp, 1)[-1]
           segments_2.extend([segment_1]*num_tokens)
         else:
           segments_2.append(segment_1)
