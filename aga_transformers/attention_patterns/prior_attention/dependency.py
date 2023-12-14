@@ -42,7 +42,9 @@ class DependencyAttentionPattern(AttentionPattern):
       return {"nodes": nodes, "edges": edges, "senders": senders, "receivers": receivers, "edge_labels": edge_labels}
 
     graph = construct_dependency_graph(dependency_parser(text))
+    print(graph)
     new_token_ids = get_new_token_ids(graph["nodes"], tokens, normalize_fn=normalize)
+    print(new_token_ids)
     new_edges = [(new_id_s, new_id_r) for (id_s, id_r) in graph["edges"] for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]]
 
     receivers = np.array([edge[1] for edge in new_edges], dtype=np.uint16)
