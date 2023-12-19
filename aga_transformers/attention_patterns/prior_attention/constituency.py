@@ -2,6 +2,7 @@ import numpy as np
 import en_core_web_trf
 import benepar
 import re
+from unidecode import unidecode
 
 from ..attention_pattern import AttentionPattern
 from ..vanilla_attention.vanilla import VanillaAttentionPattern
@@ -10,6 +11,9 @@ from ..utils import graph_from_path, get_new_token_ids
 nlp = en_core_web_trf.load()
 benepar.download('benepar_en3')
 nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
+
+def normalize(string):
+  return unidecode(string.lower().replace("▁", "").replace(" ", "")).casefold()
 
 def parse_tree(sentence):
     stack = []  # or a `collections.deque()` object, which is a little faster
@@ -52,13 +56,13 @@ class Tree():
   def get_list_nodes(self):
     return [self.name] + [_ for child in self.children for _ in child.get_list_nodes()]
 
-def tree_to_leaves_and_path(t, nodes, path=""):
+def tree_to_leaves_and_path(t, nodes, sentence, path=""):
   #return the leaves + the path
   leaves = []
   for child in t.children:
-    leaves.extend(tree_to_leaves_and_path(child, nodes, path + "/" + nodes[t.id]))
+    leaves.extend(tree_to_leaves_and_path(child, nodes, sentence, path + "/" + nodes[t.id]))
     #for each subtree
-    if len(child.children) == 0:
+    if len(child.children) == 0 and normalize(child.name) in map(lambda x: normalize(str(x)), sentence):
       #is leaf
       leaves.append((child.id, path + "/" + nodes[t.id]))
   return leaves
@@ -106,10 +110,9 @@ class ConstituencyAttentionPattern(AttentionPattern):
         t = rec_const_parsing(parse_tree(sent._.parse_string)[0])
         t.set_all_ids()
         all_nodes = t.get_list_nodes()
-        leaves_and_path = tree_to_leaves_and_path(t, all_nodes)
+        leaves_and_path = tree_to_leaves_and_path(t, all_nodes, sent)
         nodes.extend([all_nodes[leaf_and_path[0]] for leaf_and_path in leaves_and_path ])
         tree_ids2doc_ids = {leaf_and_path[0]: token.i for token, leaf_and_path in zip(doc, leaves_and_path) }
-
         for node_1 in leaves_and_path:
           for node_2 in leaves_and_path:
             sender = offset + tree_ids2doc_ids[node_1[0]]
@@ -119,11 +122,10 @@ class ConstituencyAttentionPattern(AttentionPattern):
               senders.append(sender)
               receivers.append(receiver)
               edges[(sender, receiver)] = path_1_to_2
-        offset += len(sent)
+        offset += len(leaves_and_path)
       return {"nodes": nodes, "senders": senders, "receivers": receivers, "edges": edges}
 
     graph = construct_constituency_graph(dependency_parser(text))
-
     new_token_ids = get_new_token_ids(graph["nodes"], tokens)
     new_edges = [(new_id_s, new_id_r) for (id_s, id_r) in graph["edges"] for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]]
 
@@ -138,13 +140,14 @@ class ConstituencyAttentionPattern(AttentionPattern):
     self.graph_mask = graph_mask
     self.size = (len(graph["nodes"]), len(graph["nodes"]))
 
-def create_constituency_attn_patterns(model, max_source_length, max_target_length, text, tokens, autoregressive=False, layer_wise=False,  **kwargs):
+def create_constituency_attn_patterns(model, max_source_length, max_target_length, text, tokens, radius, autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_constituency_attn_patterns')
     #Encoder self attention pattern
     enc_self_attn = ConstituencyAttentionPattern(
                                 text=text,
                                 tokens=tokens,
+                                radius=radius,
                                 ).get_attention_graph()
     if autoregressive:
         # For autoregressive decoding (ie during inference), we use
