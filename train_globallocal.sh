@@ -1,5 +1,5 @@
 python ./train_lora.py \
-	--output_dir "./lora-t5-graph-small-16k" \
+	--output_dir "./lora-t5-graph-base-16k" \
 	--model_name_or_path "google/flan-t5-base" \
 	--tokenizer_name "google/flan-t5-base" \
 	--dataset_name="gigant/tib" \
