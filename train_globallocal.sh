@@ -2,7 +2,7 @@ export http_proxy=http://webproxy.lab-ia.fr:8080
 export https_proxy=http://webproxy.lab-ia.fr:8080
 export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
-pip install --proxy=http://webproxy.lab-ia.fr:8080 -U "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --proxy=http://webproxy.lab-ia.fr:8080 -U "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ls -ld /usr/local/cuda*
 python ./train_lora.py \
 	--output_dir "./lora-t5-graph-base-16k" \
