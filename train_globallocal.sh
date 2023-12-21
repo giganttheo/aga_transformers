@@ -1,3 +1,4 @@
+nvcc --version
 python ./train_lora.py \
 	--output_dir "./lora-t5-graph-base-16k" \
 	--model_name_or_path "google/flan-t5-base" \
