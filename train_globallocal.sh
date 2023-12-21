@@ -8,7 +8,7 @@ python ./train_lora.py \
 	--do_eval \
 	--do_predict \
 	--predict_with_generate \
-	--num_train_epochs 5 \
+	--num_train_epochs 3 \
 	--learning_rate 1e-6 \
 	--warmup_steps 10 \
 	--per_device_train_batch_size 1 \
