@@ -65,6 +65,10 @@ from aga_transformers.models.t5.t5 import load_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 
+
+
+print(f"Devices: {jax.devices()}")
+
 logger = logging.getLogger(__name__)
 
 try:

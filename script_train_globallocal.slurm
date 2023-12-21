@@ -1,5 +1,6 @@
 #!/bin/sh
 #SBATCH -J t5-graph-base-16k
+#SBATCH -n 1
 #SBATCH -p all
 #SBATCH -t 2:00:00
 #SBATCH -o ./%j.out
