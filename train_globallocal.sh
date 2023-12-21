@@ -3,6 +3,7 @@ export https_proxy=http://webproxy.lab-ia.fr:8080
 export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
 ls -ld /usr/local/cuda*
+export PATH=/usr/local/cuda-11.2/bin:$PATH.
 python ./train_lora.py \
 	--output_dir "./lora-t5-graph-base-16k" \
 	--model_name_or_path "google/flan-t5-base" \
