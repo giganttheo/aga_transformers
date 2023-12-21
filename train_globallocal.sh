@@ -4,6 +4,9 @@ export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
 nvidia-smi
 ls -ld /usr/local/cuda*
+conda install cudatoolkit-dev -c conda-forge
+conda install cuda -c nvidia
+pip install  --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 python ./train_lora.py \
 	--output_dir "./lora-t5-graph-base-16k" \
