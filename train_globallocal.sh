@@ -2,6 +2,7 @@ export http_proxy=http://webproxy.lab-ia.fr:8080
 export https_proxy=http://webproxy.lab-ia.fr:8080
 export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
+nvidia-smi
 ls -ld /usr/local/cuda*
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 python ./train_lora.py \
