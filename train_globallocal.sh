@@ -4,8 +4,6 @@ export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
 nvidia-smi
 ls -ld /usr/local/cuda*
-nvcc --version
-cat /usr/local/cuda/include/cudnn.h | grep CUDNN_MAJOR -A 2
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 python ./train_lora.py \
 	--output_dir "./lora-t5-graph-base-16k" \

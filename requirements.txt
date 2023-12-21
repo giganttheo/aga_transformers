@@ -1,5 +1,6 @@
 transformers==4.33.0
 numpy
+matplotlib
 jax
 jaxlib
 jaxtyping
