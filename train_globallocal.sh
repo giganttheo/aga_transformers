@@ -26,5 +26,5 @@ python ./train_lora.py \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
-	--max_source_length 8192 \ #16384 \
+	--max_source_length 8192 \
 	--val_max_target_length 512
