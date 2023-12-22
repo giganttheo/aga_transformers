@@ -2,16 +2,16 @@ export http_proxy=http://webproxy.lab-ia.fr:8080
 export https_proxy=http://webproxy.lab-ia.fr:8080
 export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
-nvidia-smi
-ls -ld /usr/local/cuda*
+# nvidia-smi
+# ls -ld /usr/local/cuda*
 # conda install cudatoolkit-dev -c conda-forge
-# conda install cuda=11.2 -c nvidia
-# pip install  --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# conda install cuda=11.2.0 cudnn cudatoolkit-dev -c nvidia
+# pip install  --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 # export PATH=/usr/local/cuda-11.2/bin:$PATH.
 python ./train_lora.py \
-	--output_dir "./lora-t5-graph-base-16k" \
-	--model_name_or_path "google/flan-t5-base" \
-	--tokenizer_name "google/flan-t5-base" \
+	--output_dir "./lora-t5-graph-small-8k" \
+	--model_name_or_path "google/flan-t5-small" \
+	--tokenizer_name "google/flan-t5-small" \
 	--dataset_name="gigant/tib" \
 	--source_prefix "summarize: " \
 	--do_train \
@@ -26,5 +26,5 @@ python ./train_lora.py \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
-	--max_source_length 16384 \
+	--max_source_length 8192 \ #16384 \
 	--val_max_target_length 512
