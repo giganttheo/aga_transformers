@@ -1,7 +1,7 @@
 #!/bin/sh
 #SBATCH -J t5-graph-base-16k
 #SBATCH -n 1
-#SBATCH -nnodes 1
+#SBATCH --nnodes=1
 #SBATCH --nodelist=n[1-5]
 #SBATCH -p all
 #SBATCH -t 24:00:00
