@@ -3,6 +3,9 @@ export https_proxy=http://webproxy.lab-ia.fr:8080
 export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
 
+conda activate gatr-train
+cd ~/graph-transformer/aga_transformers
+
 conda install cuda=11.2.0 cudnn cudatoolkit-dev -c nvidia
 pip install  --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.20 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
