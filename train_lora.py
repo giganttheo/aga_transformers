@@ -66,7 +66,7 @@ from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 
 
-
+TF_CPP_MIN_LOG_LEVEL=0 
 print(f"Devices: {jax.devices()}")
 
 logger = logging.getLogger(__name__)
