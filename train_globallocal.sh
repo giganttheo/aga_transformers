@@ -11,6 +11,8 @@ pip install  --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"=
 
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 
+nvidia-smi
+
 python ./train_lora.py \
 	--output_dir "./lora-t5-graph-small-4k" \
 	--model_name_or_path "google/flan-t5-small" \
