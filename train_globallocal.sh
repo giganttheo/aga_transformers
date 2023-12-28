@@ -8,8 +8,8 @@ cd ~/graph-transformer/aga_transformers
 
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 
-conda install cuda cudnn cudatoolkit=11.2.0 -c nvidia
-pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.20 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+conda install cudnn=8.6 cudatoolkit=11.2.142 -c nvidia
+pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.19 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 nvidia-smi
 
