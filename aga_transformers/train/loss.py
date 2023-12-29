@@ -8,6 +8,8 @@ from typing import Tuple
 from flax.training import train_state
 from functools import partial
 
+import lorax
+
 def loss_fn(
     model,
     params: PyTree,
@@ -46,8 +48,16 @@ def lora_loss_fn(
     **model_kwargs
     ) -> Tuple[jax.Array, PyTree]:
     
-    model_output = model(
-        params=({"params": frozen_params, "graph": graph}, {"params": tunable_params}),
+    def apply_fn(params, **kwargs):
+        model(
+            params={"params": params, "graph": graph},
+            **kwargs
+        )
+
+    lora_model = lorax.lora(apply_fn)
+
+    model_output = lora_model(
+        (frozen_params, tunable_params),
         input_ids=input_ids,
         attention_mask=attention_mask,
         decoder_input_ids=decoder_input_ids, 

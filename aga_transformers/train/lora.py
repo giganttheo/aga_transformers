@@ -34,14 +34,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # which had a spec value other than LORA_FULL or LORA_FREEZE
     frozen_params, lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
 
-    # lorax.lora wraps a callable so that the arguments can be lorax.LoraWeight
-    # instances. (It's actually just an alias for qax.use_implicit_args, so
-    # the wrapped function can handle other qax types as well)
-    lora_model = lorax.lora(model)
-    # apply_fn = partial(lora_model.__call__, frozen_params=frozen_params)
-    apply_fn = lora_model.__call__
-
-    return apply_fn, frozen_params, lora_params, optimizer
+    return model.__call__ frozen_params, lora_params, optimizer
 
 # def create_lora(model, optimizer, dtype="bfloat16"):
 
