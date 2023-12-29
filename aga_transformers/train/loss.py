@@ -64,6 +64,8 @@ def lora_loss_fn(
         decoder_attention_mask=decoder_attention_mask,
         **model_kwargs,
     )
+
+    print(model_output)
     
     target_logits = model_output.logits[:, :-1, :].astype(jnp.float32)
     token_losses = optax.softmax_cross_entropy_with_integer_labels(target_logits, decoder_input_ids[:, 1:]) * decoder_attention_mask[:, 1:]
