@@ -47,7 +47,7 @@ def lora_loss_fn(
     ) -> Tuple[jax.Array, PyTree]:
     
     model_output = model(
-        params={"params": (frozen_params, tunable_params), "graph": graph},
+        params=({"params": frozen_params, "graph": graph}, tunable_params),
         input_ids=input_ids,
         attention_mask=attention_mask,
         decoder_input_ids=decoder_input_ids, 
