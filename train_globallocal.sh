@@ -7,9 +7,22 @@ export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
 cd ~/graph-transformer/aga_transformers
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
+export PATH=~/miniconda3/pkgs/cudnn-8.9.2.26-cuda11_0/include:$PATH.
+
+# export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
+
+export PATH=/usr/local/cuda/bin:$PATH.
+
+export PATH=~/miniconda3/envs/gatr-train/bin:$PATH.
 
 
-pip install --proxy=http://webproxy.lab-ia.fr:8080 -f https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.4.19+cuda11.cudnn86-cp310-cp310-manylinux2014_x86_64.whl
+pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda102]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+CONDA_OVERRIDE_CUDA="10.2" conda install cudnn cudatoolkit cuda-nvcc -c nvidia -c conda-forge
+
+
+
+
+pip install --proxy=http://webproxy.lab-ia.fr:8080 https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.4.19+cuda11.cudnn86-cp310-cp310-manylinux2014_x86_64.whl
 
 # CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* jax=0.4.15 cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade numpy wheel build
@@ -17,10 +30,14 @@ pip install --proxy=http://webproxy.lab-ia.fr:8080 -f https://storage.googleapis
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.19 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 #  cuda=11.2.142
 
+pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_local]"==0.4.20 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+conda install cudnn cudatoolkit cuda-nvcc -c nvidia -c conda-forge
+
 pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.4.18+cuda11.cudnn86-cp310-cp310-manylinux2014_x86_64.whl jax==0.4.18
 # CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 
+CONDA_OVERRIDE_CUDA="11.2" conda install cuda=11.2 jaxlib=*=*cuda* jax cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 
 
 nvidia-smi
