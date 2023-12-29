@@ -38,7 +38,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # instances. (It's actually just an alias for qax.use_implicit_args, so
     # the wrapped function can handle other qax types as well)
     lora_model = lorax.lora(model)
-    apply_fn = lora_model.__call__
+    apply_fn = partial(lora_model.__call__, frozen_params=frozen_params)
 
     return apply_fn, frozen_params, lora_params, optimizer
 
