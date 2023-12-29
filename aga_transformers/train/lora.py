@@ -34,7 +34,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # which had a spec value other than LORA_FULL or LORA_FREEZE
     frozen_params, lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
 
-    return model.__call__ frozen_params, lora_params, optimizer
+    return model.__call__, frozen_params, lora_params, optimizer
 
 # def create_lora(model, optimizer, dtype="bfloat16"):
 
