@@ -771,7 +771,7 @@ def main():
     # Create LoRA model
     apply_fn, frozen_params, lora_params, optimizer = create_lora(model, adamw, dtype="bfloat16")
 
-    loss_fn_ = jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    loss_fn_ = jax.jit(partial(loss_fn, graph=graph, frozen_params=frozen_params), static_argnames=["model"])
 
     # Setup train state
     
