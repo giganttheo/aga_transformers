@@ -63,7 +63,7 @@ import lorax
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
 from aga_transformers.models.t5.t5 import load_t5
 from aga_transformers.train.lora import create_lora
-from aga_transformers.train.loss import lora_loss_fn as loss_fn
+from aga_transformers.train.loss import loss_fn
 
 
 TF_CPP_MIN_LOG_LEVEL=0 
@@ -769,9 +769,9 @@ def main():
     )
     
     # Create LoRA model
-    apply_fn, frozen_params, lora_params, optimizer = create_lora(model, adamw, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_lora(model, adamw, dtype="bfloat16")
 
-    loss_fn_ = jax.jit(partial(loss_fn, graph=graph, frozen_params=frozen_params), static_argnames=["model"])
+    loss_fn_ = jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
 
     # Setup train state
     
