@@ -1,15 +1,27 @@
+
+conda activate gatr-train
+
 export http_proxy=http://webproxy.lab-ia.fr:8080
 export https_proxy=http://webproxy.lab-ia.fr:8080
 export HTTP_PROXY=http://webproxy.lab-ia.fr:8080
 export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
-
-conda activate gatr-train
 cd ~/graph-transformer/aga_transformers
-
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 
-conda install cudnn=8.6 cudatoolkit=11.2.142 -c nvidia
-pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.19 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+pip install --proxy=http://webproxy.lab-ia.fr:8080 -f https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.4.19+cuda11.cudnn86-cp310-cp310-manylinux2014_x86_64.whl
+
+# CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* jax=0.4.18 cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade numpy wheel build
+# conda install cudnn=8.9 cudatoolkit=11.2.142 -c nvidia
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.19 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+#  cuda=11.2.142
+
+pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.4.18+cuda11.cudnn86-cp310-cp310-manylinux2014_x86_64.whl jax==0.4.18
+# CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
+CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
+
+
 
 nvidia-smi
 
