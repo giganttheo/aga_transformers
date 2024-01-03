@@ -779,14 +779,13 @@ def main():
     # optimizer = adamw
 
     # loss_fn_ = partial(loss_fn, graph=graph)
-    loss_fn_ = loss_fn
+    loss_fn_ = jax.jit(loss_fn)
     # jax.jit(loss_fn, static_argnames=["model"])
 
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
-    @jax.jit
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
