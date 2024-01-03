@@ -779,8 +779,8 @@ def main():
     # optimizer = adamw
 
     # loss_fn_ = partial(loss_fn, graph=graph)
-    loss_fn_ = jax.jit(loss_fn)
-    # jax.jit(loss_fn, static_argnames=["model"])
+    # loss_fn_ = jax.jit(loss_fn)
+    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
 
     # Setup train state
     
