@@ -43,8 +43,8 @@ def create_lora(model, optimizer, dtype="bfloat16"):
         if 'embedding' in path:
             print(f'Fully finetuning param {path}')
             return LORA_FULL
-        dim = 16
-        # print(f'Using LoRA with dim={dim} for param {path}')
+        dim = 4
+        print(f'Using LoRA with dim={dim} for param {path}')
         return dim
 
     # Create a pytree with the same shape as params indicating how each parameter should be handled
