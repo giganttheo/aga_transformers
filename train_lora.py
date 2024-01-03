@@ -759,7 +759,7 @@ def main():
         return traverse_util.unflatten_dict(flat_mask)
 
     # create adam optimizer
-    tx = optax.adafactor(
+    optimizer = optax.adafactor(
         learning_rate=linear_decay_lr_schedule_fn,
         dtype_momentum=dtype,
         # b1=training_args.adam_beta1,
@@ -768,17 +768,20 @@ def main():
         # weight_decay=training_args.weight_decay,
         # mask=decay_mask_fn,
     )
+
+    optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, tx, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
 
     # apply_fn = model.__call__
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ = partial(loss_fn, graph=graph)
+    # loss_fn_ = partial(loss_fn, graph=graph)
+    loss_fn_ = loss_fn
     # jax.jit(loss_fn, static_argnames=["model"])
-    
+
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
