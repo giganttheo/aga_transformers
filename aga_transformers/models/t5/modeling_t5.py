@@ -61,9 +61,17 @@ _CONFIG_FOR_DOC = "T5Config"
 
 remat = nn_partitioning.remat
 
+
+# attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
+
+@jax.jit
+@jax.vmap
+def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
+    return mask[..., ids]
+
 @partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
-def segment_softmax(logits: jnp.ndarray,
-                    segment_ids: jnp.ndarray,
+def segment_softmax(logits: jax.Array,
+                    segment_ids: jax.Array,
                     num_segments: Optional[int] = None,
                     indices_are_sorted: bool = False,
                     unique_indices: bool = False,
@@ -471,7 +479,6 @@ class FlaxT5Attention(nn.Module):
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids])
                 graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
 
             # for fast decoding causal attention mask should be shifted

@@ -802,7 +802,6 @@ def main():
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
         return new_state, metrics
 
-
     # Define eval fn
     def eval_step(params, batch):
         labels = batch.pop("labels")

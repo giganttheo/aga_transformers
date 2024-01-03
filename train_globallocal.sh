@@ -64,6 +64,7 @@ export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
 export TOKENIZERS_PARALLELISM=true
 
 export XLA_PYTHON_CLIENT_ALLOCATOR=platform
+export JAX_NUMPY_RANK_PROMOTION=warn
 
 ###
 nvidia-smi
