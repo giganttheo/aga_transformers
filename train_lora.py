@@ -776,18 +776,20 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ = partial(jax.jit(loss_fn, static_argnames=["model"]), graph=graph)
-
+    loss_fn_ = partial(loss_fn, graph=graph)
+    # jax.jit(loss_fn, static_argnames=["model"])
+    
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
+    @jax.jit
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
         def compute_loss(params):
             labels = batch.pop("labels")
-            loss, _ = loss_fn_(state.apply_fn, params, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(state.apply_fn, params, graph, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
