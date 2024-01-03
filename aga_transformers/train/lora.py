@@ -41,10 +41,10 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
         if 'embedding' in path:
-            print(f'Fully finetuning param {path}')
+            # print(f'Fully finetuning param {path}')
             return LORA_FULL
         dim = 4
-        print(f'Using LoRA with dim={dim} for param {path}')
+        # print(f'Using LoRA with dim={dim} for param {path}')
         return dim
 
     # Create a pytree with the same shape as params indicating how each parameter should be handled
@@ -72,6 +72,6 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     lora_model = lorax.lora(model)
     apply_fn = lora_model.__call__
 
-    print(lora_params)
+    # print(lora_params)
 
     return apply_fn, lora_params, lora_optimizer

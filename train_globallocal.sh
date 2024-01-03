@@ -60,7 +60,7 @@ export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
 cd ~/graph-transformer/aga_transformers
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
-CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
+# CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 
 
 
