@@ -54,7 +54,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # - k > 0: The parameter will be LoRA tuned with a rank k update
 
     # Simple_spec is a helper to do this, but you can also create the label pytree yourself
-    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=True)
+    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=False)
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
