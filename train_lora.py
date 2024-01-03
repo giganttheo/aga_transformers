@@ -778,7 +778,8 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
     
