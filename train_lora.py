@@ -776,7 +776,7 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ = jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    loss_fn_ = partial(jax.jit(loss_fn, static_argnames=["model"]), graph=graph)
 
     # Setup train state
     
@@ -851,6 +851,7 @@ def main():
             batch = next(train_loader)
             state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
+            print(train_metrics[-1])
 
         train_time += time.time() - train_start
 

@@ -30,7 +30,7 @@ def loss_fn(
         **model_kwargs,
     )
     
-    target_logits = model_output.logits[:, :-1, :].astype(jnp.float32)
+    target_logits = model_output.logits[:, :-1, :]#.astype(jnp.float32) #todo ?
     token_losses = optax.softmax_cross_entropy_with_integer_labels(target_logits, decoder_input_ids[:, 1:]) * decoder_attention_mask[:, 1:]
     loss = token_losses.sum() / decoder_attention_mask[:, 1:].sum()
     
