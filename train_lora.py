@@ -65,16 +65,6 @@ from aga_transformers.models.t5.t5 import load_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 
-#XLA performance flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#xla-performance-flags
-
-os.environ['XLA_FLAGS'] = (
-    '--xla_gpu_enable_triton_softmax_fusion=true '
-    '--xla_gpu_triton_gemm_any=True '
-    '--xla_gpu_enable_async_collectives=true '
-    '--xla_gpu_enable_latency_hiding_scheduler=true '
-    '--xla_gpu_enable_highest_priority_async_stream=true '
-)
-
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
 os.environ.update({

@@ -63,8 +63,14 @@ export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
 # CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 export TOKENIZERS_PARALLELISM=true
 
-export XLA_PYTHON_CLIENT_ALLOCATOR=platform
-export JAX_NUMPY_RANK_PROMOTION=warn
+# export XLA_PYTHON_CLIENT_ALLOCATOR=platform
+# export JAX_NUMPY_RANK_PROMOTION=warn
+
+
+
+#XLA performance flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#xla-performance-flags
+
+export XLA_FLAGS = '--xla_gpu_enable_triton_softmax_fusion=true --xla_gpu_triton_gemm_any=true --xla_gpu_enable_async_collectives=true --xla_gpu_enable_latency_hiding_scheduler=true --xla_gpu_enable_highest_priority_async_stream=true'
 
 ###
 nvidia-smi
