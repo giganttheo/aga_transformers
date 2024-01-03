@@ -63,7 +63,7 @@ import lorax
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
 from aga_transformers.models.t5.t5 import load_t5
 from aga_transformers.train.lora import create_lora
-from aga_transformers.train.loss import lora_loss_fn as loss_fn
+from aga_transformers.train.loss import loss_fn
 
 
 TF_CPP_MIN_LOG_LEVEL=0 
