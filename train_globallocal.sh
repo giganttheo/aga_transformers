@@ -68,7 +68,7 @@ CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoo
 nvidia-smi
 
 python ./train_lora.py \
-	--output_dir "./lora-t5-graph-small-4k" \
+	--output_dir "./lora-t5-graph-small-8k" \
 	--model_name_or_path "google/flan-t5-small" \
 	--tokenizer_name "google/flan-t5-small" \
 	--dataset_name="gigant/tib" \
@@ -80,10 +80,10 @@ python ./train_lora.py \
 	--num_train_epochs 3 \
 	--learning_rate 1e-6 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 2 \
-	--per_device_eval_batch_size 2 \
+	--per_device_train_batch_size 1 \
+	--per_device_eval_batch_size 1 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
-	--max_source_length 4096 \
+	--max_source_length 8192 \
 	--val_max_target_length 512

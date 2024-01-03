@@ -759,17 +759,18 @@ def main():
         return traverse_util.unflatten_dict(flat_mask)
 
     # create adam optimizer
-    adamw = optax.adamw(
+    tx = optax.adafactor(
         learning_rate=linear_decay_lr_schedule_fn,
-        b1=training_args.adam_beta1,
-        b2=training_args.adam_beta2,
-        eps=training_args.adam_epsilon,
-        weight_decay=training_args.weight_decay,
-        mask=decay_mask_fn,
+        dtype_momentum=dtype,
+        # b1=training_args.adam_beta1,
+        # b2=training_args.adam_beta2,
+        # eps=training_args.adam_epsilon,
+        # weight_decay=training_args.weight_decay,
+        # mask=decay_mask_fn,
     )
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, adamw, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_lora(model, tx, dtype="bfloat16")
 
     # apply_fn = model.__call__
     # lora_params = model.params
