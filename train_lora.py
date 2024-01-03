@@ -190,7 +190,7 @@ class ModelArguments:
         metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
     )
     dtype: Optional[str] = field(
-        default="float32",
+        default="bfloat16",
         metadata={
             "help": (
                 "Floating-point format in which the model weights should be initialized and trained. Choose one of"
@@ -547,7 +547,7 @@ def main():
             "autoregressive": False,
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
-        tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype=dtype, attention_kwargs=attention_kwargs, layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
 
     if training_args.gradient_checkpointing:
         model.enable_gradient_checkpointing()
