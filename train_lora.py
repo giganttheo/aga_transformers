@@ -539,11 +539,11 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
     if model_args.model_name_or_path:
-        dtype=getattr(jnp, model_args.dtype)
+        dtype=model_args.dtype
         attention_kwargs = {
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
-            "window_sizes": [127], # [254]*12,
+            "window_sizes": [254], # [254]*12,
             "autoregressive": False,
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
