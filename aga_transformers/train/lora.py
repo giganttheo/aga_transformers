@@ -64,7 +64,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # of parameters.
     # The frozen parameters won't have optimizer states etc
     # created for them
-    optimizer = lorax.wrap_optimizer(optimizer, lora_spec)
+    lora_optimizer = lorax.wrap_optimizer(optimizer, lora_spec)
 
     # lorax.lora wraps a callable so that the arguments can be lorax.LoraWeight
     # instances. (It's actually just an alias for qax.use_implicit_args, so
@@ -72,4 +72,6 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     lora_model = lorax.lora(model)
     apply_fn = lora_model.__call__
 
-    return apply_fn, lora_params, optimizer
+    print(lora_params)
+
+    return apply_fn, lora_params, lora_optimizer
