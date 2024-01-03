@@ -778,8 +778,8 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
-    loss_fn_ = partial(loss_fn, graph=graph)
+    loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
     
@@ -795,6 +795,8 @@ def main():
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
         (loss, _), grad = grad_fn(state.params)
+
+        grad = jax.tree_map(lambda x: x.astype(jnp.bfloat16), grad) #? TODO
         
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
