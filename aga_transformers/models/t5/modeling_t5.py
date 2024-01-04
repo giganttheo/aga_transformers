@@ -110,6 +110,7 @@ def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, d
   by the adjacency list (senders, receivers)
   """
   #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
+  # //!\\ this one is not used, please check _scaled_dot_product_attention_graph
   dtype = q.dtype
   bucket_size=1000 #previously 10000
   seq_len, depth = q.shape
@@ -540,10 +541,11 @@ class FlaxT5Attention(nn.Module):
                 """
                 #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
                 dtype = q.dtype
-                bucket_size=1000
+                bucket_size=1000 #previously 10000
                 seq_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
-                attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
+                q = q / jnp.sqrt(depth).astype(dtype)
+                attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
                 if bias is not None:
                     attn_logits = attn_logits + bias
                 #softmax over receiver nodes
