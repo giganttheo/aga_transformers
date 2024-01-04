@@ -64,12 +64,12 @@ remat = nn_partitioning.remat
 
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
-@jax.jit
+# @jax.jit
 @jax.vmap
 def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
     return mask.astype(bool)[..., ids]
 
-@partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
+# @partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
 def segment_softmax(logits: jax.Array,
                     segment_ids: jax.Array,
                     num_segments: Optional[int] = None,
@@ -101,7 +101,7 @@ def segment_softmax(logits: jax.Array,
 #the order is important, otherwise the RAM usage explodes for some reason?
 #mb check if netket.jax.vmap_chunked works better?
 
-@partial(jax.jit, static_argnames=['dtype'])
+# @partial(jax.jit, static_argnames=['dtype'])
 @partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
 @partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
@@ -532,7 +532,7 @@ class FlaxT5Attention(nn.Module):
 
             receivers, senders = receivers[0], senders[0]
 
-            @partial(jax.jit)
+            # @partial(jax.jit)
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
             def _scaled_dot_product_attention_graph(q, k, v, bias=None):

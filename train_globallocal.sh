@@ -145,4 +145,7 @@ python ./train_lora.py \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 4096 \
-	--val_max_target_length 512
+	--val_max_target_length 512 \
+	--max_train_samples 100 \
+	--max_eval_samples 100 \
+	--max_predict_samples 100
