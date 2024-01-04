@@ -64,6 +64,7 @@ remat = nn_partitioning.remat
 
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
+@jax.jit
 @jax.vmap
 def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
     return mask[..., ids].astype(bool)
@@ -539,7 +540,7 @@ class FlaxT5Attention(nn.Module):
                 """
                 #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
                 dtype = q.dtype
-                bucket_size=10000
+                bucket_size=1000
                 seq_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
                 attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
