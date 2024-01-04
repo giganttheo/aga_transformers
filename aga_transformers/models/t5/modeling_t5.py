@@ -67,7 +67,7 @@ remat = nn_partitioning.remat
 @jax.jit
 @jax.vmap
 def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
-    return mask[..., ids].astype(bool)
+    return mask.astype(bool)[..., ids]
 
 @partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
 def segment_softmax(logits: jax.Array,
@@ -498,6 +498,7 @@ class FlaxT5Attention(nn.Module):
                 else:
                     causal_mask = jnp.less_equal(receivers, senders)
                 graph_mask = jnp.logical_and(graph_mask, causal_mask)
+                del causal_mask
 
             # During fast autoregressive decoding, we feed one position at a time,
             # and cache the keys and values step by step.
@@ -539,9 +540,8 @@ class FlaxT5Attention(nn.Module):
                 Computes the dot product attention according to the attention pattern specified by the graph defined
                 by the adjacency list (senders, receivers)
                 """
-                #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
                 dtype = q.dtype
-                bucket_size=99999999 #previously 10000
+                bucket_size=10000
                 seq_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
                 q = q / jnp.sqrt(depth).astype(dtype)
