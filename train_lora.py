@@ -867,7 +867,7 @@ def main():
                 state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
             print(train_metrics[-1])
-            summary_writer.scalar("train loss", train_metrics[-1], step + (epoch * steps_per_epoch))
+            summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
 
         train_time += time.time() - train_start
 
