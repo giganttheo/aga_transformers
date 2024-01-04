@@ -804,9 +804,10 @@ def main():
         (loss, _), grad = grad_fn(state.params)
 
         grad = jax.tree_map(lambda x: x.astype(jnp.bfloat16), grad) #? TODO
-        
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
+        
+        new_state.block_until_ready()
         return new_state, metrics
 
     # Define eval fn
@@ -860,7 +861,9 @@ def main():
         # train
         for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
+            jax.profiler.start_trace(Path(training_args.output_dir))
             state, train_metric = train_step(state, batch)
+            jax.profiler.stop_trace()
             train_metrics.append(train_metric)
             print(train_metrics[-1])
 
