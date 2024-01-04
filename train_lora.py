@@ -427,7 +427,8 @@ def main():
 
     # Initializing a Weights & Biases Run
     wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
-    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
+    wandb.init(project=training_args.output_dir.split("/")[-1])
+    # wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -866,7 +867,7 @@ def main():
                 state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
             print(train_metrics[-1])
-            summary_writer.scalar("train_time", train_time, step + (epoch * steps_per_epoch))
+            summary_writer.scalar("train loss", train_metrics[-1], step + (epoch * steps_per_epoch))
 
         train_time += time.time() - train_start
 
