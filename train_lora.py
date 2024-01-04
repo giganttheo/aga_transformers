@@ -860,9 +860,8 @@ def main():
         # train
         for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            jax.profiler.start_trace(Path(training_args.output_dir))
-            state, train_metric = train_step(state, batch)
-            jax.profiler.stop_trace()
+            with jax.profiler.trace(Path(training_args.output_dir)):
+                state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
             print(train_metrics[-1])
 
