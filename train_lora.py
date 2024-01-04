@@ -806,8 +806,7 @@ def main():
         grad = jax.tree_map(lambda x: x.astype(jnp.bfloat16), grad) #? TODO
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
-        
-        new_state.block_until_ready()
+        grad.block_until_ready()
         return new_state, metrics
 
     # Define eval fn
