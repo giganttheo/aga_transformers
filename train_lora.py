@@ -426,6 +426,7 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Initializing a Weights & Biases Run
+    wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
     wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
@@ -716,6 +717,7 @@ def main():
         try:
             from flax.metrics.tensorboard import SummaryWriter
             summary_writer = SummaryWriter(log_dir=Path(training_args.output_dir))
+            print(f"Writing summary in {Path(training_args.output_dir)}")
         except ImportError as ie:
             has_tensorboard = False
             logger.warning(
@@ -858,12 +860,13 @@ def main():
         train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
-        for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
+        for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
             with jax.profiler.trace(str(Path(training_args.output_dir))):
                 state, train_metric = train_step(state, batch)
             train_metrics.append(train_metric)
             print(train_metrics[-1])
+            summary_writer.scalar("train_time", train_time, step + (epoch * steps_per_epoch))
 
         train_time += time.time() - train_start
 
