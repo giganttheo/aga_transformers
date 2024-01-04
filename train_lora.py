@@ -865,6 +865,7 @@ def main():
             batch = next(train_loader)
             with jax.profiler.trace(str(Path(training_args.output_dir))):
                 state, train_metric = train_step(state, batch)
+            wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             print(train_metrics[-1])
             summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
