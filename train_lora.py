@@ -426,9 +426,9 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Initializing a Weights & Biases Run
-    wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
-    wandb.init(project=training_args.output_dir.split("/")[-1])
-    # wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
+    # wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
+    # wandb.init(project=training_args.output_dir.split("/")[-1])
+    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
