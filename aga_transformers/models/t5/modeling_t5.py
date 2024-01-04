@@ -541,7 +541,7 @@ class FlaxT5Attention(nn.Module):
                 """
                 #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
                 dtype = q.dtype
-                bucket_size=100000 #previously 10000
+                bucket_size=99999999 #previously 10000
                 seq_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
                 q = q / jnp.sqrt(depth).astype(dtype)
