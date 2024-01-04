@@ -64,7 +64,7 @@ remat = nn_partitioning.remat
 
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
-@jax.jit
+@partial(jax.jit, static_argnames=['ids'])
 @jax.vmap
 def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
     return mask[..., ids]
@@ -479,7 +479,7 @@ class FlaxT5Attention(nn.Module):
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
+                graph_mask = graph_mask & attn_mask_2_graph_mask(attention_mask, receivers)
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
@@ -495,7 +495,7 @@ class FlaxT5Attention(nn.Module):
                     causal_mask = receivers <= causal_attention_mask_shift
                 else:
                     causal_mask = receivers <= senders
-                graph_mask = graph_mask * causal_mask
+                graph_mask = graph_mask & causal_mask
 
             # During fast autoregressive decoding, we feed one position at a time,
             # and cache the keys and values step by step.

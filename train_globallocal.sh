@@ -60,8 +60,11 @@ export HTTPS_PROXY=http://webproxy.lab-ia.fr:8080
 cd ~/graph-transformer/aga_transformers
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
+export TOKENIZERS_PARALLELISM=false
+
+
 # CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
-export TOKENIZERS_PARALLELISM=true
+export TOKENIZERS_PARALLELISM=false
 
 # export XLA_PYTHON_CLIENT_ALLOCATOR=platform
 # export JAX_NUMPY_RANK_PROMOTION=warn
@@ -70,7 +73,11 @@ export TOKENIZERS_PARALLELISM=true
 
 #XLA performance flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#xla-performance-flags
 
-export XLA_FLAGS = '--xla_gpu_enable_triton_softmax_fusion=true --xla_gpu_triton_gemm_any=true --xla_gpu_enable_async_collectives=true --xla_gpu_enable_latency_hiding_scheduler=true --xla_gpu_enable_highest_priority_async_stream=true'
+# export XLA_FLAGS='--xla_gpu_enable_triton_softmax_fusion=true --xla_gpu_triton_gemm_any=true --xla_gpu_enable_async_collectives=true --xla_gpu_enable_latency_hiding_scheduler=true --xla_gpu_enable_highest_priority_async_stream=true'
+
+# export XLA_FLAGS='--xla_gpu_triton_gemm_any=true'
+
+# export XLA_FLAGS=''
 
 ###
 nvidia-smi
@@ -116,4 +123,26 @@ python ./train_lora.py \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
+	--val_max_target_length 512
+
+
+python ./train_lora.py \
+	--output_dir "./lora-t5-graph-small-4k" \
+	--model_name_or_path "google/flan-t5-small" \
+	--tokenizer_name "google/flan-t5-small" \
+	--dataset_name="gigant/tib" \
+	--source_prefix "summarize: " \
+	--do_train \
+	--do_eval \
+	--do_predict \
+	--predict_with_generate \
+	--num_train_epochs 3 \
+	--learning_rate 1e-6 \
+	--warmup_steps 100 \
+	--per_device_train_batch_size 4 \
+	--per_device_eval_batch_size 4 \
+	--overwrite_output_dir \
+	--dtype "bfloat16" \
+	--max_target_length 512 \
+	--max_source_length 4096 \
 	--val_max_target_length 512
