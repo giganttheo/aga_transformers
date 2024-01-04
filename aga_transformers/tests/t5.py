@@ -133,7 +133,7 @@ def test():
 
         logits_processor = FlaxLogitsProcessorList()
 
-        batch_size, cur_len = input_ids.shape
+        _, cur_len = input_ids.shape
         sequences = jnp.full((batch_size, 512), pad_token_id, dtype=jnp.int32)
         sequences = lax.dynamic_update_slice(sequences, input_ids, (0, 0))
 

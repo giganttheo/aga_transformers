@@ -491,7 +491,7 @@ class FlaxT5Attention(nn.Module):
                     # during autoregressive decoding, the current query token was remapped
                     # to sender 0, but should really be causal_attention_mask_shift
                     # senders = jnp.full(senders.shape, 0)
-                    causal_mask = receivers <= causal_attention_mask_shift
+                    causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
                 else:
                     causal_mask = jnp.less_equal(receivers, senders)
                 graph_mask = jnp.logical_and(graph_mask, causal_mask)
@@ -518,6 +518,7 @@ class FlaxT5Attention(nn.Module):
 
             if graph_mask is not None:
                 position_bias = position_bias + graph_mask[:, None, :]
+                del graph_mask
 
             # TODO: add rng for dropout
             # # create dropout rng
@@ -566,9 +567,8 @@ class FlaxT5Attention(nn.Module):
                 position_bias)
             
             #we don't need this in memory anymore.
-            del receivers
-            del senders
-            del graph_mask
+            # del receivers
+            # del senders
 
         else:
             # regular attention (for decoder during training)
