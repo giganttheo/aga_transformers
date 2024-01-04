@@ -67,7 +67,7 @@ remat = nn_partitioning.remat
 # @jax.jit
 @jax.vmap
 def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
-    return mask.astype(bool)[..., ids]
+    return mask.astype(bool).take(ids, axis=-1) #[..., ids]
 
 # @partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
 def segment_softmax(logits: jax.Array,
@@ -350,7 +350,7 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
-        relative_position = memory_position[receivers] - context_position[senders] #was [receivers]
+        relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0) #was [receivers]
         relative_position_bucket = self._relative_position_bucket(
             relative_position[..., None],
             bidirectional=(not self.causal),
@@ -545,7 +545,8 @@ class FlaxT5Attention(nn.Module):
                 seq_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
                 q = q / jnp.sqrt(depth).astype(dtype)
-                attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
+                # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
+                attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
                 if bias is not None:
                     attn_logits = attn_logits + bias
                 #softmax over receiver nodes
@@ -554,7 +555,7 @@ class FlaxT5Attention(nn.Module):
                                     num_segments=seq_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
                 #attention weights applied to the values for every edge:
-                values = jnp.einsum('e,ed->ed', w, v[receivers]) #(num_edges, d_v)
+                values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
                 #summing over the nodes
                 values = jax.ops.segment_sum(values,
                                     segment_ids=senders,

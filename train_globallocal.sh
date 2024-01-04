@@ -68,7 +68,7 @@ export TOKENIZERS_PARALLELISM=false
 
 # export XLA_PYTHON_CLIENT_ALLOCATOR=platform
 # export JAX_NUMPY_RANK_PROMOTION=warn
-
+export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 
 #XLA performance flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#xla-performance-flags
