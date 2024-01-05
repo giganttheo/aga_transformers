@@ -598,7 +598,7 @@ class FlaxT5Attention(nn.Module):
                 
                 values = attn(w, v)
                 print(values.shape)
-                return values, w
+                return values, w.data
 
             attn_output, attn_weights = _scaled_dot_product_attention_bcoo(
                 query_states,
