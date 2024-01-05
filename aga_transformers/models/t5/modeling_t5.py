@@ -86,7 +86,7 @@ def segment_softmax(logits: jax.Array,
   # Then take the exp
   logits = jnp.exp(logits)
   # Then calculate the normalizers
-  normalizers =   jax.ops.segment_sum(logits, segment_ids=segment_ids, num_segments=num_segments, indices_are_sorted=indices_are_sorted, unique_indices=unique_indices, bucket_size=bucket_size)
+  normalizers = jax.ops.segment_sum(logits, segment_ids=segment_ids, num_segments=num_segments, indices_are_sorted=indices_are_sorted, unique_indices=unique_indices, bucket_size=bucket_size)
   normalizers = normalizers[segment_ids]
   softmax = logits / normalizers
   return softmax
