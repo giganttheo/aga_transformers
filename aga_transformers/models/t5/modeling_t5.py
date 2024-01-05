@@ -575,8 +575,8 @@ class FlaxT5Attention(nn.Module):
                 q_len, depth = q.shape
                 k_len = k.shape[0]
                 indices = jnp.stack([receivers, senders], axis=-1)
-                print(indices.shape)
-                print(q.shape)
+                # print(indices.shape)
+                # print(q.shape)
                 attn_logits = sparse.bcoo_dot_general_sampled(q[None] / jnp.sqrt(depth).astype(dtype), jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
                 if bias is not None:
                     attn_logits = attn_logits + bias
@@ -584,9 +584,10 @@ class FlaxT5Attention(nn.Module):
                                     segment_ids=receivers,
                                     num_segments=q_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
+                print(w.shape, (q_len, k_len))
                 w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]))
 
-                print(w.shape)
+                # print(w.shape)
                 # norm = jax.experimental.sparse.bcoo_reduce_sum(w, axes=np.array([1]))
                 # norm = jax.experimental.sparse.bcoo_broadcast_in_dim(norm, shape=np.array([seq_len, seq_len]), broadcast_dimensions=np.array([1]))
                 # w.data = w.data / norm.data
@@ -596,6 +597,7 @@ class FlaxT5Attention(nn.Module):
                     return jnp.einsum("...qk,...kd->...qd", w, v)
                 
                 values = attn(w, v)
+                print(values.shape)
                 return values, w
 
             attn_output, attn_weights = _scaled_dot_product_attention_bcoo(
