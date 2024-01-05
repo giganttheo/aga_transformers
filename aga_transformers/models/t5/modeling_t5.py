@@ -582,7 +582,7 @@ class FlaxT5Attention(nn.Module):
                                     segment_ids=receivers,
                                     num_segments=q_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
-                w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]), dtype=dtype)
+                w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]))
 
                 @sparse.sparsify
                 def attn(w, v):
