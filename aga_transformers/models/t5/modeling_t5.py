@@ -29,6 +29,7 @@ from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
 from jax.random import PRNGKey
+from jax.experimental import sparse
 from functools import partial
 
 import einops
@@ -532,40 +533,67 @@ class FlaxT5Attention(nn.Module):
 
             receivers, senders = receivers[0], senders[0]
 
-            # @partial(jax.jit)
+            # # @partial(jax.jit)
+            # @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
+            # @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
+            # def _scaled_dot_product_attention_graph(q, k, v, bias=None):
+            #     """
+            #     Computes the dot product attention according to the attention pattern specified by the graph defined
+            #     by the adjacency list (senders, receivers)
+            #     """
+            #     dtype = q.dtype
+            #     bucket_size=10000
+            #     seq_len, depth = q.shape
+            #     #compute attention logits: <Q,K> / sqrt(d_q)
+            #     q = q / jnp.sqrt(depth).astype(dtype)
+            #     # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
+            #     attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
+            #     if bias is not None:
+            #         attn_logits = attn_logits + bias
+            #     #softmax over receiver nodes
+            #     w = segment_softmax(attn_logits,
+            #                         segment_ids=senders,
+            #                         num_segments=seq_len,
+            #                         bucket_size=bucket_size).astype(dtype) #(num_edges,)
+            #     #attention weights applied to the values for every edge:
+            #     values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
+            #     #summing over the nodes
+            #     values = jax.ops.segment_sum(values,
+            #                         segment_ids=senders,
+            #                         num_segments=seq_len,
+            #                         unique_indices=False,
+            #                         indices_are_sorted=False,
+            #                         bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
+            #     return values, w
+
+            #BCOO attention
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
-            def _scaled_dot_product_attention_graph(q, k, v, bias=None):
-                """
-                Computes the dot product attention according to the attention pattern specified by the graph defined
-                by the adjacency list (senders, receivers)
-                """
+            def _scaled_dot_product_attention_bcoo(q, k, v, bias=None):
                 dtype = q.dtype
-                bucket_size=10000
+                bucket_size=10_000
                 seq_len, depth = q.shape
-                #compute attention logits: <Q,K> / sqrt(d_q)
-                q = q / jnp.sqrt(depth).astype(dtype)
-                # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
-                attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
+                indices = jnp.stack([receivers, senders], axis=-1)
+                attn_logits = sparse.bcoo_dot_general_sampled(q[None] / jnp.sqrt(depth).astype(dtype), jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))
                 if bias is not None:
-                    attn_logits = attn_logits + bias
-                #softmax over receiver nodes
-                w = segment_softmax(attn_logits,
-                                    segment_ids=senders,
+                    attn_logits.data = attn_logits.data + bias
+                w = segment_softmax(attn_logits[0],
+                                    segment_ids=receivers,
                                     num_segments=seq_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
-                #attention weights applied to the values for every edge:
-                values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
-                #summing over the nodes
-                values = jax.ops.segment_sum(values,
-                                    segment_ids=senders,
-                                    num_segments=seq_len,
-                                    unique_indices=False,
-                                    indices_are_sorted=False,
-                                    bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
-                return values, w
+                w = sparse.BCOO((w, indices), shape=np.array([seq_len, seq_len]))
 
-            attn_output, attn_weights = _scaled_dot_product_attention_graph(
+                # norm = jax.experimental.sparse.bcoo_reduce_sum(w, axes=np.array([1]))
+                # norm = jax.experimental.sparse.bcoo_broadcast_in_dim(norm, shape=np.array([seq_len, seq_len]), broadcast_dimensions=np.array([1]))
+                # w.data = w.data / norm.data
+
+                @sparse.sparsify
+                def attn(w, v):
+                    return jnp.einsum("...qk,...kd->...qd", w, v)
+                values = attn(w, v)
+                return values
+
+            attn_output, attn_weights = _scaled_dot_product_attention_bcoo(
                 query_states,
                 key_states,
                 value_states,
