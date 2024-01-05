@@ -579,14 +579,14 @@ class FlaxT5Attention(nn.Module):
                 if bias is not None:
                     attn_logits = attn_logits + bias
                 w = segment_softmax(attn_logits,
-                                    segment_ids=receivers,
+                                    segment_ids=senders,
                                     num_segments=q_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
                 w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]))
 
                 @sparse.sparsify
                 def attn(w, v):
-                    return jnp.einsum("...qk,...kd->...qd", w, v)
+                    return jnp.einsum("...qk,...kd->...qd", w, v).astype(dtype)
                 
                 values = attn(w, v)
                 return values, w.data
