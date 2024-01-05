@@ -580,6 +580,7 @@ class FlaxT5Attention(nn.Module):
                 attn_logits = sparse.bcoo_dot_general_sampled(q[None], jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
                 if bias is not None:
                     attn_logits = attn_logits + bias
+                #TODO: add another way to compute this (non-quadratic)
                 w = segment_softmax(attn_logits,
                                     segment_ids=senders,
                                     num_segments=q_len,
