@@ -574,7 +574,7 @@ class FlaxT5Attention(nn.Module):
                 bucket_size=10_000
                 q_len, depth = q.shape
                 k_len = k.shape[0]
-                indices = jnp.stack([receivers, senders], axis=-1)
+                indices = jnp.stack([senders, receivers], axis=-1)
                 attn_logits = sparse.bcoo_dot_general_sampled(q[None] / jnp.sqrt(depth).astype(dtype), jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
                 if bias is not None:
                     attn_logits = attn_logits + bias
