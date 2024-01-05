@@ -351,7 +351,7 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
-        relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0) #was [receivers]
+        relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0)
         relative_position_bucket = self._relative_position_bucket(
             relative_position[..., None],
             bidirectional=(not self.causal),
@@ -567,6 +567,7 @@ class FlaxT5Attention(nn.Module):
             #     return values, w
 
             #BCOO attention
+            @jax.jit
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
             def _scaled_dot_product_attention_bcoo(q, k, v, bias=None):
@@ -575,7 +576,8 @@ class FlaxT5Attention(nn.Module):
                 q_len, depth = q.shape
                 k_len = k.shape[0]
                 indices = jnp.stack([senders, receivers], axis=-1)
-                attn_logits = sparse.bcoo_dot_general_sampled(q[None] / jnp.sqrt(depth).astype(dtype), jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
+                q = q / jnp.sqrt(depth).astype(dtype)
+                attn_logits = sparse.bcoo_dot_general_sampled(q[None], jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
                 if bias is not None:
                     attn_logits = attn_logits + bias
                 w = segment_softmax(attn_logits,
