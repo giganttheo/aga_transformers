@@ -61,9 +61,17 @@ _CONFIG_FOR_DOC = "T5Config"
 
 remat = nn_partitioning.remat
 
-@partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
-def segment_softmax(logits: jnp.ndarray,
-                    segment_ids: jnp.ndarray,
+
+# attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
+
+# @jax.jit
+@jax.vmap
+def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
+    return mask.astype(bool).take(ids, axis=-1) #[..., ids]
+
+# @partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
+def segment_softmax(logits: jax.Array,
+                    segment_ids: jax.Array,
                     num_segments: Optional[int] = None,
                     indices_are_sorted: bool = False,
                     unique_indices: bool = False,
@@ -78,7 +86,7 @@ def segment_softmax(logits: jnp.ndarray,
   # Then take the exp
   logits = jnp.exp(logits)
   # Then calculate the normalizers
-  normalizers =   jax.ops.segment_sum(logits, segment_ids=segment_ids, num_segments=num_segments, indices_are_sorted=indices_are_sorted, unique_indices=unique_indices, bucket_size=bucket_size)
+  normalizers = jax.ops.segment_sum(logits, segment_ids=segment_ids, num_segments=num_segments, indices_are_sorted=indices_are_sorted, unique_indices=unique_indices, bucket_size=bucket_size)
   normalizers = normalizers[segment_ids]
   softmax = logits / normalizers
   return softmax
@@ -93,7 +101,7 @@ def segment_softmax(logits: jnp.ndarray,
 #the order is important, otherwise the RAM usage explodes for some reason?
 #mb check if netket.jax.vmap_chunked works better?
 
-@partial(jax.jit, static_argnames=['dtype'])
+# @partial(jax.jit, static_argnames=['dtype'])
 @partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
 @partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
 def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
@@ -102,11 +110,13 @@ def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, d
   by the adjacency list (senders, receivers)
   """
   #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
+  # //!\\ this one is not used, please check _scaled_dot_product_attention_graph
   dtype = q.dtype
-  bucket_size=10000
+  bucket_size=1000 #previously 10000
   seq_len, depth = q.shape
   #compute attention logits: <Q,K> / sqrt(d_q)
-  attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
+  q =  q / jnp.sqrt(depth).astype(dtype)
+  attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
   if bias is not None:
     attn_logits = attn_logits + bias
   #softmax over receiver nodes
@@ -340,7 +350,7 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
-        relative_position = memory_position[receivers] - context_position[senders] #was [receivers]
+        relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0) #was [receivers]
         relative_position_bucket = self._relative_position_bucket(
             relative_position[..., None],
             bidirectional=(not self.causal),
@@ -471,8 +481,7 @@ class FlaxT5Attention(nn.Module):
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                attn_mask_2_graph_mask = jax.vmap(lambda mask, ids: mask[..., ids])
-                graph_mask = graph_mask * attn_mask_2_graph_mask(attention_mask, receivers)
+                graph_mask = jnp.logical_and(graph_mask, attn_mask_2_graph_mask(attention_mask, receivers))
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
@@ -485,10 +494,11 @@ class FlaxT5Attention(nn.Module):
                     # during autoregressive decoding, the current query token was remapped
                     # to sender 0, but should really be causal_attention_mask_shift
                     # senders = jnp.full(senders.shape, 0)
-                    causal_mask = receivers <= causal_attention_mask_shift
+                    causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
                 else:
-                    causal_mask = receivers <= senders
-                graph_mask = graph_mask * causal_mask
+                    causal_mask = jnp.less_equal(receivers, senders)
+                graph_mask = jnp.logical_and(graph_mask, causal_mask)
+                del causal_mask
 
             # During fast autoregressive decoding, we feed one position at a time,
             # and cache the keys and values step by step.
@@ -512,6 +522,7 @@ class FlaxT5Attention(nn.Module):
 
             if graph_mask is not None:
                 position_bias = position_bias + graph_mask[:, None, :]
+                del graph_mask
 
             # TODO: add rng for dropout
             # # create dropout rng
@@ -521,7 +532,7 @@ class FlaxT5Attention(nn.Module):
 
             receivers, senders = receivers[0], senders[0]
 
-            @partial(jax.jit)
+            # @partial(jax.jit)
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
             def _scaled_dot_product_attention_graph(q, k, v, bias=None):
@@ -529,12 +540,13 @@ class FlaxT5Attention(nn.Module):
                 Computes the dot product attention according to the attention pattern specified by the graph defined
                 by the adjacency list (senders, receivers)
                 """
-                #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
                 dtype = q.dtype
                 bucket_size=10000
                 seq_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
-                attn_logits = jnp.einsum('ed, ed -> e', q[senders] / jnp.sqrt(depth).astype(dtype), k[receivers]) # (num_edges,)
+                q = q / jnp.sqrt(depth).astype(dtype)
+                # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
+                attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
                 if bias is not None:
                     attn_logits = attn_logits + bias
                 #softmax over receiver nodes
@@ -543,7 +555,7 @@ class FlaxT5Attention(nn.Module):
                                     num_segments=seq_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
                 #attention weights applied to the values for every edge:
-                values = jnp.einsum('e,ed->ed', w, v[receivers]) #(num_edges, d_v)
+                values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
                 #summing over the nodes
                 values = jax.ops.segment_sum(values,
                                     segment_ids=senders,
@@ -560,9 +572,8 @@ class FlaxT5Attention(nn.Module):
                 position_bias)
             
             #we don't need this in memory anymore.
-            del receivers
-            del senders
-            del graph_mask
+            # del receivers
+            # del senders
 
         else:
             # regular attention (for decoder during training)

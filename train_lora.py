@@ -65,6 +65,17 @@ from aga_transformers.models.t5.t5 import load_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 
+#NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
+
+os.environ.update({
+  "NCCL_LL128_BUFFSIZE": "-2",
+  "NCCL_LL_BUFFSIZE": "-2",
+   "NCCL_PROTO": "SIMPLE,LL,LL128",
+ })
+
+TF_CPP_MIN_LOG_LEVEL=0 
+print(f"Devices: {jax.devices()}")
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -186,7 +197,7 @@ class ModelArguments:
         metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
     )
     dtype: Optional[str] = field(
-        default="float32",
+        default="bfloat16",
         metadata={
             "help": (
                 "Floating-point format in which the model weights should be initialized and trained. Choose one of"
@@ -415,6 +426,8 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # Initializing a Weights & Biases Run
+    # wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
+    # wandb.init(project=training_args.output_dir.split("/")[-1])
     wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
@@ -535,7 +548,7 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
     if model_args.model_name_or_path:
-        dtype=getattr(jnp, model_args.dtype)
+        dtype=model_args.dtype
         attention_kwargs = {
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
@@ -543,7 +556,7 @@ def main():
             "autoregressive": False,
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
-        tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype=dtype, attention_kwargs=attention_kwargs, layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
 
     if training_args.gradient_checkpointing:
         model.enable_gradient_checkpointing()
@@ -705,6 +718,7 @@ def main():
         try:
             from flax.metrics.tensorboard import SummaryWriter
             summary_writer = SummaryWriter(log_dir=Path(training_args.output_dir))
+            print(f"Writing summary in {Path(training_args.output_dir)}")
         except ImportError as ie:
             has_tensorboard = False
             logger.warning(
@@ -755,20 +769,27 @@ def main():
         return traverse_util.unflatten_dict(flat_mask)
 
     # create adam optimizer
-    adamw = optax.adamw(
+    optimizer = optax.adafactor(
         learning_rate=linear_decay_lr_schedule_fn,
-        b1=training_args.adam_beta1,
-        b2=training_args.adam_beta2,
-        eps=training_args.adam_epsilon,
-        weight_decay=training_args.weight_decay,
-        mask=decay_mask_fn,
+        dtype_momentum=dtype,
+        # b1=training_args.adam_beta1,
+        # b2=training_args.adam_beta2,
+        # eps=training_args.adam_epsilon,
+        # weight_decay=training_args.weight_decay,
+        # mask=decay_mask_fn,
     )
+
+    # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
     
     # Create LoRA model
+    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
 
-    apply_fn, lora_params, optimizer = create_lora(model, adamw, dtype="bfloat16")
+    # apply_fn = model.__call__
+    # lora_params = model.params
+    # optimizer = adamw
 
-    loss_fn_ = jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
     
@@ -784,11 +805,12 @@ def main():
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
         (loss, _), grad = grad_fn(state.params)
-        
+
+        grad = jax.tree_map(lambda x: x.astype(jnp.bfloat16), grad) #? TODO
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
+        loss.block_until_ready()
         return new_state, metrics
-
 
     # Define eval fn
     def eval_step(params, batch):
@@ -839,10 +861,14 @@ def main():
         train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
-        for _ in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
+        for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            state, train_metric = train_step(state, batch)
+            with jax.profiler.trace(str(Path(training_args.output_dir))):
+                state, train_metric = train_step(state, batch)
+            wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
+            print(train_metrics[-1])
+            summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
 
         train_time += time.time() - train_start
 
