@@ -542,7 +542,7 @@ class FlaxT5Attention(nn.Module):
             #     by the adjacency list (senders, receivers)
             #     """
             #     dtype = q.dtype
-            #     bucket_size=10000
+            #     bucket_size=10_000
             #     seq_len, depth = q.shape
             #     #compute attention logits: <Q,K> / sqrt(d_q)
             #     q = q / jnp.sqrt(depth).astype(dtype)
@@ -574,8 +574,11 @@ class FlaxT5Attention(nn.Module):
                 bucket_size=10_000
                 seq_len, depth = q.shape
                 indices = jnp.stack([receivers, senders], axis=-1)
+                print(indices.shape)
+                print(q.shape)
                 attn_logits = sparse.bcoo_dot_general_sampled(q[None] / jnp.sqrt(depth).astype(dtype), jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
                 if bias is not None:
+                    print(bias.shape)
                     attn_logits = attn_logits + bias
                 w = segment_softmax(attn_logits,
                                     segment_ids=receivers,
