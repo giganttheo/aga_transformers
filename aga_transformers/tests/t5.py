@@ -113,6 +113,7 @@ def test():
         print("Test passed for encoder")
     except:
         print("Error: ", np.mean(np.abs(output_training.encoder_last_hidden_state - output_reference.encoder_last_hidden_state)))
+        print(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state)
 
     ## Decoder part
 
