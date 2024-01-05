@@ -591,7 +591,7 @@ class FlaxT5Attention(nn.Module):
                 def attn(w, v):
                     return jnp.einsum("...qk,...kd->...qd", w, v)
                 values = attn(w, v)
-                return values
+                return values, w
 
             attn_output, attn_weights = _scaled_dot_product_attention_bcoo(
                 query_states,
