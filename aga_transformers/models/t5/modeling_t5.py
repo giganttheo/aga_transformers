@@ -572,7 +572,8 @@ class FlaxT5Attention(nn.Module):
             def _scaled_dot_product_attention_bcoo(q, k, v, bias=None):
                 dtype = q.dtype
                 bucket_size=10_000
-                seq_len, depth = q.shape
+                q_len, depth = q.shape
+                k_len = k.shape[0]
                 indices = jnp.stack([receivers, senders], axis=-1)
                 print(indices.shape)
                 print(q.shape)
@@ -582,9 +583,9 @@ class FlaxT5Attention(nn.Module):
                     attn_logits = attn_logits + bias
                 w = segment_softmax(attn_logits,
                                     segment_ids=receivers,
-                                    num_segments=seq_len,
+                                    num_segments=q_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
-                w = sparse.BCOO((w, indices), shape=np.array([seq_len, seq_len]))
+                w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]))
 
                 # norm = jax.experimental.sparse.bcoo_reduce_sum(w, axes=np.array([1]))
                 # norm = jax.experimental.sparse.bcoo_broadcast_in_dim(norm, shape=np.array([seq_len, seq_len]), broadcast_dimensions=np.array([1]))
