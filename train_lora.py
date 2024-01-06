@@ -41,7 +41,7 @@ import optax
 from datasets import Dataset, load_dataset
 from filelock import FileLock
 from flax import jax_utils, traverse_util
-from flax.training import train_state
+from flax.training import train_state, checkpoints
 from flax.training.common_utils import shard_prng_key, stack_forest
 from huggingface_hub import Repository, create_repo
 from flax.serialization import msgpack_restore, to_bytes
@@ -797,28 +797,30 @@ def main():
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
-    def save_as_msgpack(params, save_path: str, compression = None) -> None:
-        msgpack_bytes: bytes = to_bytes(params)
-        if compression == "GZIP":
-            msgpack_bytes = zlib.compress(msgpack_bytes)
-        with open(save_path, "wb+") as file:
-            file.write(msgpack_bytes)
+    # def save_as_msgpack(params, save_path: str, compression = None) -> None:
+    #     msgpack_bytes: bytes = to_bytes(params)
+    #     if compression == "GZIP":
+    #         msgpack_bytes = zlib.compress(msgpack_bytes)
+    #     with open(save_path, "wb+") as file:
+    #         file.write(msgpack_bytes)
 
-    def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
-        with open(save_path, "rb+") as file:
-            bytes_data = file.read()
-        if compression == "GZIP":
-            bytes_data = zlib.decompress(bytes_data)
-        params = msgpack_restore(bytes_data)
-        return params
+    # def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
+    #     with open(save_path, "rb+") as file:
+    #         bytes_data = file.read()
+    #     if compression == "GZIP":
+    #         bytes_data = zlib.decompress(bytes_data)
+    #     params = msgpack_restore(bytes_data)
+    #     return params
 
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
+    CKPT_DIR = f"{training_args.output_dir}/ckpt/"
     if training_args.resume_from_checkpoint:
-        print(f"Resuming from checkpoint {training_args.output_dir}/latest.msgpack")
-        state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+        print(f"Resuming from checkpoint {CKPT_DIR}")
+        # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+        state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
@@ -838,6 +840,7 @@ def main():
         return new_state, metrics
 
     # Define eval fn
+    @jax.jit
     def eval_step(params, batch):
         labels = batch.pop("labels")
         loss, _ = loss_fn(apply_fn, params, graph, train=False, **batch)
@@ -849,6 +852,7 @@ def main():
         metrics = {"loss": loss}
         return metrics
 
+    @jax.jit
     def generate_step(params, batch):
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
@@ -961,7 +965,8 @@ def main():
         # save checkpoint after each epoch and push checkpoint to the hub
         if jax.process_index() == 0:
             # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-            save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+            # save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+            checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
             model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:

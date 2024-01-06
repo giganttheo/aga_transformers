@@ -90,21 +90,19 @@ python ./train_lora.py \
 	--source_prefix "summarize: " \
 	--do_train \
 	--do_eval \
-	--do_predict \
 	--predict_with_generate \
 	--num_train_epochs 3 \
 	--learning_rate 1e-3 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 4 \
-	--per_device_eval_batch_size 4 \
+	--per_device_train_batch_size 12 \
+	--per_device_eval_batch_size 12 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
-	--max_train_samples 500 \
-	--max_eval_samples 200 \
-	--max_predict_samples 8 \
+	--max_train_samples 120 \
+	--max_eval_samples 12 \
 	--gradient_checkpointing
 
 
