@@ -28,7 +28,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 import datasets
 import evaluate
@@ -44,6 +44,8 @@ from flax import jax_utils, traverse_util
 from flax.training import train_state
 from flax.training.common_utils import shard_prng_key, stack_forest
 from huggingface_hub import Repository, create_repo
+from flax.serialization import msgpack_restore, to_bytes
+import zlib
 from tqdm import tqdm
 import wandb
 
@@ -98,6 +100,7 @@ class TrainingArguments:
     output_dir: str = field(
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
     )
+    resume_from_checkpoint: bool = field(default=False)
     overwrite_output_dir: bool = field(
         default=False,
         metadata={
@@ -127,9 +130,9 @@ class TrainingArguments:
     adafactor: bool = field(default=False, metadata={"help": "Whether or not to replace AdamW by Adafactor."})
     num_train_epochs: float = field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
     warmup_steps: int = field(default=0, metadata={"help": "Linear warmup over warmup_steps."})
-    logging_steps: int = field(default=500, metadata={"help": "Log every X updates steps."})
+    # logging_steps: int = field(default=500, metadata={"help": "Log every X updates steps."})
     save_steps: int = field(default=500, metadata={"help": "Save checkpoint every X updates steps."})
-    eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
+    # eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
     seed: int = field(default=42, metadata={"help": "Random seed that will be set at the beginning of training."})
     push_to_hub: bool = field(
         default=False, metadata={"help": "Whether or not to upload the trained model to the model hub after training."}
@@ -791,9 +794,28 @@ def main():
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
+    def save_as_msgpack(params, save_path: str, compression = None) -> None:
+        msgpack_bytes: bytes = to_bytes(params)
+        if compression == "GZIP":
+            msgpack_bytes = zlib.compress(msgpack_bytes)
+        with open(save_path, "wb+") as file:
+            file.write(msgpack_bytes)
+
+    def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
+        with open(save_path, "rb+") as file:
+            bytes_data = file.read()
+        if compression == "GZIP":
+            bytes_data = zlib.decompress(bytes_data)
+        params = msgpack_restore(bytes_data)
+        return params
+
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
+
+    if training_args.resume_from_checkpoint:
+        print(f"Resuming from checkpoint {training_args.output_dir}/latest.msgpack")
+        state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
@@ -863,15 +885,21 @@ def main():
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            with jax.profiler.trace(str(Path(training_args.output_dir))):
-                state, train_metric = train_step(state, batch)
-            wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
+            # with jax.profiler.trace(str(Path(training_args.output_dir))):
+            state, train_metric = train_step(state, batch)
+            # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
-            print(train_metrics[-1])
-            summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
+            # print(train_metrics[-1])
+            if step % int(training_args.logging_steps) == 0:
+                # summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
+                train_time += time.time() - train_start
+                # Save metrics
+                if has_tensorboard and jax.process_index() == 0:
+                    cur_step = epoch * (len(train_dataset) // train_batch_size)
+                    write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
+            
 
         train_time += time.time() - train_start
-
         train_metric = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
 
         epochs.write(
@@ -927,10 +955,10 @@ def main():
             cur_step = epoch * (len(train_dataset) // train_batch_size)
             write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
       
-
         # save checkpoint after each epoch and push checkpoint to the hub
         if jax.process_index() == 0:
             # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
+            save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
             model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:

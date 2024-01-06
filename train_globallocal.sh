@@ -93,7 +93,7 @@ python ./train_lora.py \
 	--do_predict \
 	--predict_with_generate \
 	--num_train_epochs 3 \
-	--learning_rate 1e-6 \
+	--learning_rate 1e-3 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 4 \
 	--per_device_eval_batch_size 4 \
@@ -101,7 +101,9 @@ python ./train_lora.py \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
-	--val_max_target_length 512
+	--val_max_target_length 512 \
+	--max_predict_samples 8 \
+	--gradient_checkpointing
 
 
 python ./train_lora.py \
