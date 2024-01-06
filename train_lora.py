@@ -819,13 +819,12 @@ def main():
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
     CKPT_DIR = f"{training_args.output_dir}/ckpt/"
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
     if training_args.resume_from_checkpoint:
         print(f"Resuming from checkpoint {CKPT_DIR}")
         # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
         # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
-        orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-        raw_restored = orbax_checkpointer.restore(CKPT_DIR)
-        state = raw_restored["model"]
+        state = orbax_checkpointer.restore(CKPT_DIR)
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
@@ -950,6 +949,14 @@ def main():
         # eval_metrics = get_metrics(eval_metrics)
         eval_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(eval_metrics))
 
+        print("============Eval preds===========")
+        for i in range(len(eval_preds)):
+            print("\n\n\n")
+            print("Pred: ")
+            print(eval_preds[i])
+            print("Label: ")
+            print(eval_labels[i])
+
         # compute ROUGE metrics
         rouge_desc = ""
         if data_args.predict_with_generate:
@@ -973,10 +980,8 @@ def main():
             # save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
             # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
             # Bundle everything together.
-            ckpt = {'model': state}
-            orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
-            save_args = orbax_utils.save_args_from_target(ckpt)
-            orbax_checkpointer.save(CKPT_DIR, ckpt, save_args=save_args)
+            # save_args = orbax_utils.save_args_from_target(ckpt)
+            orbax_checkpointer.save(CKPT_DIR, state)
             model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
