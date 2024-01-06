@@ -562,6 +562,9 @@ def main():
         tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
 
     if training_args.gradient_checkpointing:
+        print("=============================")
+        print("Enabling gradient checkpointing")
+        print("=============================")
         model.enable_gradient_checkpointing()
 
     if model.config.decoder_start_token_id is None:
