@@ -890,13 +890,13 @@ def main():
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
-            if step % int(training_args.logging_steps) == 0:
-                # summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
-                train_time += time.time() - train_start
-                # Save metrics
-                if has_tensorboard and jax.process_index() == 0:
-                    cur_step = epoch * (len(train_dataset) // train_batch_size)
-                    write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
+            # if step % int(training_args.logging_steps) == 0:
+            #     # summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
+            #     train_time += time.time() - train_start
+            #     # Save metrics
+            #     if has_tensorboard and jax.process_index() == 0:
+            #         cur_step = epoch * (len(train_dataset) // train_batch_size)
+            #         write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
             
 
         train_time += time.time() - train_start
