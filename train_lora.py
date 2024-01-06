@@ -44,7 +44,6 @@ from flax import jax_utils, traverse_util
 from flax.training import train_state, checkpoints
 from flax.training.common_utils import shard_prng_key, stack_forest
 from huggingface_hub import Repository, create_repo
-from flax.serialization import msgpack_restore, to_bytes
 import zlib
 from tqdm import tqdm
 import wandb
@@ -79,6 +78,8 @@ TF_CPP_MIN_LOG_LEVEL=0
 print(f"Devices: {jax.devices()}")
 
 logger = logging.getLogger(__name__)
+
+flax.config.update('flax_use_orbax_checkpointing', True)
 
 try:
     nltk.data.find("tokenizers/punkt")
