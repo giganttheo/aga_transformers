@@ -41,7 +41,8 @@ import optax
 from datasets import Dataset, load_dataset
 from filelock import FileLock
 from flax import jax_utils, traverse_util
-from flax.training import train_state, checkpoints
+from flax.training import train_state, orbax_utils
+import orbax.checkpoint
 from flax.training.common_utils import shard_prng_key, stack_forest
 from huggingface_hub import Repository, create_repo
 import zlib
@@ -821,7 +822,10 @@ def main():
     if training_args.resume_from_checkpoint:
         print(f"Resuming from checkpoint {CKPT_DIR}")
         # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
-        state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
+        # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
+        orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+        raw_restored = orbax_checkpointer.restore(CKPT_DIR)
+        state = raw_restored["model"]
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
@@ -967,7 +971,12 @@ def main():
         if jax.process_index() == 0:
             # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
             # save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
-            checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
+            # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
+            # Bundle everything together.
+            ckpt = {'model': state}
+            orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+            save_args = orbax_utils.save_args_from_target(ckpt)
+            orbax_checkpointer.save(CKPT_DIR, ckpt, save_args=save_args)
             model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:

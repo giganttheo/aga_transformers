@@ -101,7 +101,7 @@ python ./train_lora.py \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
-	--max_train_samples 120 \
+	--max_train_samples 24 \
 	--max_eval_samples 12 \
 	--gradient_checkpointing
 
