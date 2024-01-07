@@ -355,11 +355,11 @@ summarization_name_mapping = {
     "gigant/tib": ("transcript", "abstract"),
 }
 
-class TrainState(train_state.TrainState):
-    dropout_rng: jnp.ndarray
+# class TrainState(train_state.TrainState):
+#     dropout_rng: jnp.ndarray
 
-    def replicate(self):
-        return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
+#     def replicate(self):
+#         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
 
 def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuffle: bool = False, drop_last=True):
     """
@@ -816,7 +816,7 @@ def main():
 
     # Setup train state
     
-    state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
+    state = train_state.TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
     CKPT_DIR = f"{training_args.output_dir}/ckpt/"
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
@@ -824,7 +824,10 @@ def main():
         print(f"Resuming from checkpoint {CKPT_DIR}")
         # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
         # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
-        state = orbax_checkpointer.restore(CKPT_DIR)
+        ckpt = orbax_checkpointer.restore(CKPT_DIR)
+        state.params = ckpt["params"]
+        state.opt_state = ckpt["opt_state"]
+        state.step = ckpt["step"]
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
@@ -981,8 +984,10 @@ def main():
             # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
             # Bundle everything together.
             # save_args = orbax_utils.save_args_from_target(ckpt)
-            orbax_checkpointer.save(CKPT_DIR, state)
-            model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
+
+            ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step}
+            orbax_checkpointer.save(CKPT_DIR, ckpt)
+            model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
                 repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)
