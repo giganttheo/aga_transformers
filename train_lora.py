@@ -355,8 +355,8 @@ summarization_name_mapping = {
     "gigant/tib": ("transcript", "abstract"),
 }
 
-# class TrainState(train_state.TrainState):
-#     dropout_rng: jnp.ndarray
+class TrainState(train_state.TrainState):
+    dropout_rng: jnp.ndarray
 
 #     def replicate(self):
 #         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
@@ -816,7 +816,7 @@ def main():
 
     # Setup train state
     
-    state = train_state.TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
+    state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
     CKPT_DIR = f"{training_args.output_dir}/ckpt/"
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
@@ -828,6 +828,7 @@ def main():
         state.params = ckpt["params"]
         state.opt_state = ckpt["opt_state"]
         state.step = ckpt["step"]
+        state.dropout_rng = ckpt["dropout_rng"]
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
@@ -985,7 +986,7 @@ def main():
             # Bundle everything together.
             # save_args = orbax_utils.save_args_from_target(ckpt)
 
-            ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step}
+            ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
             orbax_checkpointer.save(CKPT_DIR, ckpt)
             model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
