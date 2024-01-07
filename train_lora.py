@@ -827,7 +827,7 @@ def main():
 
     #tmp
     from flax.core import FrozenDict
-    ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
+    ckpt = {"params": lorax.merge_params(state.params, destructive=False), "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
     orbax_mngr.save(state.step, FrozenDict(ckpt))
 
     if training_args.resume_from_checkpoint:
