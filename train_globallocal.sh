@@ -90,7 +90,6 @@ python ./train_lora.py \
 	--source_prefix "summarize: " \
 	--do_train \
 	--do_eval \
-	--predict_with_generate \
 	--num_train_epochs 3 \
 	--learning_rate 1e-3 \
 	--warmup_steps 100 \
@@ -105,6 +104,7 @@ python ./train_lora.py \
 	--max_eval_samples 12 \
 	--gradient_checkpointing
 
+#--predict_with_generate \
 
 python ./train_lora.py \
 	--output_dir "./lora-t5-graph-base-8k" \

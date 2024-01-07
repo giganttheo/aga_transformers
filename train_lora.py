@@ -818,12 +818,18 @@ def main():
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
-    CKPT_DIR = f"{training_args.output_dir}/ckpt/"
+    CKPT_DIR = f"{training_args.output_dir}/"
     orbax_options = orbax.checkpoint.CheckpointManagerOptions(max_to_keep=3)
     orbax_mngr = orbax.checkpoint.CheckpointManager(
                         CKPT_DIR,
-                        orbax.checkpoint.Checkpointer(orbax.checkpoint.PyTreeCheckpointHandler()),
+                        orbax.checkpoint.PyTreeCheckpointer(),
                         orbax_options)
+
+    #tmp
+    from flax.core import FrozenDict
+    ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
+    orbax_mngr.save(state.step, FrozenDict(ckpt))
+
     if training_args.resume_from_checkpoint:
         print(f"Resuming from checkpoint {CKPT_DIR}")
         # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
@@ -992,7 +998,7 @@ def main():
             # save_args = orbax_utils.save_args_from_target(ckpt)
 
             ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
-            orbax_mngr.save(state.step, ckpt)
+            orbax_mngr.save(state.step, FrozenDict(ckpt))
             model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
