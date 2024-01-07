@@ -887,7 +887,7 @@ class FlaxT5BlockCollection(nn.Module):
             self.blocks = [
                 FlaxT5CheckpointLayer(
                     self.config,
-                    has_relative_attention_bias= True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
                     dtype=self.dtype,
                     name=str(i),
                 )
@@ -897,7 +897,7 @@ class FlaxT5BlockCollection(nn.Module):
             self.blocks = [
                 FlaxT5LayerCollection(
                     self.config,
-                    has_relative_attention_bias= True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
                     dtype=self.dtype,
                     name=str(i),
                 )
