@@ -841,7 +841,7 @@ def main():
     # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
     # Write msgpack file
     with open(CKPT_DIR + "data.msgpack", "wb") as outfile:
-        packed = msgpack.packb(state)
+        packed = msgpack.packb(state.params)
         outfile.write(packed)
 
     # Read msgpack file
