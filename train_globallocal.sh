@@ -64,11 +64,11 @@ export TOKENIZERS_PARALLELISM=false
 
 
 # CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
-export TOKENIZERS_PARALLELISM=false
+# export TOKENIZERS_PARALLELISM=false
 
 # export XLA_PYTHON_CLIENT_ALLOCATOR=platform
 # export JAX_NUMPY_RANK_PROMOTION=warn
-export XLA_PYTHON_CLIENT_PREALLOCATE=false
+# export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 
 #XLA performance flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#xla-performance-flags
@@ -79,78 +79,78 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 # export XLA_FLAGS=''
 
-###
-nvidia-smi
+# ###
+# nvidia-smi
 
-python ./train_lora.py \
-	--output_dir "./lora-t5-graph-small-8k" \
-	--model_name_or_path "google/flan-t5-small" \
-	--tokenizer_name "google/flan-t5-small" \
-	--dataset_name="gigant/tib" \
-	--source_prefix "summarize: " \
-	--do_train \
-	--do_eval \
-	--num_train_epochs 3 \
-	--learning_rate 1e-3 \
-	--warmup_steps 100 \
-	--per_device_train_batch_size 12 \
-	--per_device_eval_batch_size 12 \
-	--overwrite_output_dir \
-	--dtype "bfloat16" \
-	--max_target_length 512 \
-	--max_source_length 8192 \
-	--val_max_target_length 512 \
-	--max_train_samples 24 \
-	--max_eval_samples 12 \
-	--gradient_checkpointing
+# python ./train_lora.py \
+# 	--output_dir "./lora-t5-graph-small-8k" \
+# 	--model_name_or_path "google/flan-t5-small" \
+# 	--tokenizer_name "google/flan-t5-small" \
+# 	--dataset_name="gigant/tib" \
+# 	--source_prefix "summarize: " \
+# 	--do_train \
+# 	--do_eval \
+# 	--num_train_epochs 3 \
+# 	--learning_rate 1e-3 \
+# 	--warmup_steps 100 \
+# 	--per_device_train_batch_size 12 \
+# 	--per_device_eval_batch_size 12 \
+# 	--overwrite_output_dir \
+# 	--dtype "bfloat16" \
+# 	--max_target_length 512 \
+# 	--max_source_length 8192 \
+# 	--val_max_target_length 512 \
+# 	--max_train_samples 24 \
+# 	--max_eval_samples 12 \
+# 	--gradient_checkpointing
 
-#--predict_with_generate \
+# #--predict_with_generate \
 
-python ./train_lora.py \
-	--output_dir "./lora-t5-graph-base-8k" \
-	--model_name_or_path "google/flan-t5-base" \
-	--tokenizer_name "google/flan-t5-base" \
-	--dataset_name="gigant/tib" \
-	--source_prefix "summarize: " \
-	--do_train \
-	--do_eval \
-	--do_predict \
-	--predict_with_generate \
-	--num_train_epochs 3 \
-	--learning_rate 1e-6 \
-	--warmup_steps 100 \
-	--per_device_train_batch_size 1 \
-	--per_device_eval_batch_size 1 \
-	--overwrite_output_dir \
-	--dtype "bfloat16" \
-	--max_target_length 512 \
-	--max_source_length 8192 \
-	--val_max_target_length 512
+# python ./train_lora.py \
+# 	--output_dir "./lora-t5-graph-base-8k" \
+# 	--model_name_or_path "google/flan-t5-base" \
+# 	--tokenizer_name "google/flan-t5-base" \
+# 	--dataset_name="gigant/tib" \
+# 	--source_prefix "summarize: " \
+# 	--do_train \
+# 	--do_eval \
+# 	--do_predict \
+# 	--predict_with_generate \
+# 	--num_train_epochs 3 \
+# 	--learning_rate 1e-6 \
+# 	--warmup_steps 100 \
+# 	--per_device_train_batch_size 1 \
+# 	--per_device_eval_batch_size 1 \
+# 	--overwrite_output_dir \
+# 	--dtype "bfloat16" \
+# 	--max_target_length 512 \
+# 	--max_source_length 8192 \
+# 	--val_max_target_length 512
 
 
-python ./train_lora.py \
-	--output_dir "./lora-t5-graph-small-4k" \
-	--model_name_or_path "google/flan-t5-small" \
-	--tokenizer_name "google/flan-t5-small" \
-	--dataset_name="gigant/tib" \
-	--source_prefix "summarize: " \
-	--do_train \
-	--do_eval \
-	--do_predict \
-	--predict_with_generate \
-	--num_train_epochs 3 \
-	--learning_rate 1e-6 \
-	--warmup_steps 100 \
-	--per_device_train_batch_size 2 \
-	--per_device_eval_batch_size 2 \
-	--overwrite_output_dir \
-	--dtype "bfloat16" \
-	--max_target_length 512 \
-	--max_source_length 4096 \
-	--val_max_target_length 512 \
-	--max_train_samples 100 \
-	--max_eval_samples 100 \
-	--max_predict_samples 100
+# python ./train_lora.py \
+# 	--output_dir "./lora-t5-graph-small-4k" \
+# 	--model_name_or_path "google/flan-t5-small" \
+# 	--tokenizer_name "google/flan-t5-small" \
+# 	--dataset_name="gigant/tib" \
+# 	--source_prefix "summarize: " \
+# 	--do_train \
+# 	--do_eval \
+# 	--do_predict \
+# 	--predict_with_generate \
+# 	--num_train_epochs 3 \
+# 	--learning_rate 1e-6 \
+# 	--warmup_steps 100 \
+# 	--per_device_train_batch_size 2 \
+# 	--per_device_eval_batch_size 2 \
+# 	--overwrite_output_dir \
+# 	--dtype "bfloat16" \
+# 	--max_target_length 512 \
+# 	--max_source_length 4096 \
+# 	--val_max_target_length 512 \
+# 	--max_train_samples 100 \
+# 	--max_eval_samples 100 \
+# 	--max_predict_samples 100
 
 
 python ./train_lora.py \
