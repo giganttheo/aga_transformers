@@ -50,6 +50,8 @@ import zlib
 from tqdm import tqdm
 import wandb
 
+import msgpack
+
 import transformers
 from transformers import (
     CONFIG_MAPPING,
@@ -831,12 +833,22 @@ def main():
     # ckpt = {"params": lorax.merge_params(state.params, destructive=False), "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
     # orbax_mngr.save(state.step, FrozenDict(ckpt))
 
-    from flax.training import checkpoints
-    flax.config.update('flax_use_orbax_checkpointing', False)
+    # from flax.training import checkpoints
+    # flax.config.update('flax_use_orbax_checkpointing', False)
     CKPT_DIR = f"{training_args.output_dir}/ckpts/"
-    checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
-                                overwrite=True)
-    restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
+    # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
+    #                             overwrite=True)
+    # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
+    # Write msgpack file
+    with open(CKPT_DIR + "data.msgpack", "wb") as outfile:
+        packed = msgpack.packb(state)
+        outfile.write(packed)
+
+    # Read msgpack file
+    with open(CKPT_DIR + "data.msgpack", "rb") as data_file:
+        byte_data = data_file.read()
+    
+    restored_state = msgpack.unpackb(byte_data)
     print(restored_state)
     # save
     # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
