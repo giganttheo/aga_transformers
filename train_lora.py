@@ -834,8 +834,9 @@ def main():
     from flax.training import checkpoints
     flax.config.update('flax_use_orbax_checkpointing', False)
     CKPT_DIR = f"{training_args.output_dir}/ckpts/"
-    checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=0)
-    restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
+    checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.params, step=0, ,  
+                                overwrite=True)
+    restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.params)
     print(restored_state)
     # save
     # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
