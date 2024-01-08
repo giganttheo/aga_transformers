@@ -44,7 +44,7 @@ from flax import jax_utils, traverse_util
 from flax.training import train_state
 # import orbax.checkpoint
 from flax.training.common_utils import shard_prng_key, stack_forest
-from flax.serialization import msgpack_restore, to_bytes
+from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize
 from huggingface_hub import Repository, create_repo
 import zlib
 from tqdm import tqdm
@@ -841,7 +841,7 @@ def main():
     # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
     # Write msgpack file
     with open(CKPT_DIR + "data.msgpack", "wb") as outfile:
-        packed = msgpack.packb(lorax.merge_params(state.params, destructive=False))
+        packed = msgpack.packb(msgpack_serialize(lorax.merge_params(state.params, destructive=False)))
         outfile.write(packed)
 
     # Read msgpack file
