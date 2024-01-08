@@ -830,7 +830,17 @@ def main():
     # from flax.core import FrozenDict
     # ckpt = {"params": lorax.merge_params(state.params, destructive=False), "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
     # orbax_mngr.save(state.step, FrozenDict(ckpt))
-    save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+
+    from flax.training import checkpoints
+    CKPT_DIR = f"{training_args.output_dir}/ckpts/"
+    checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=0)
+    restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
+    print(restored_state)
+    # save
+    # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
+
+    # for key in state.keys:
+    #     save_as_msgpack(state[key], save_path=training_args.output_dir + "/{key}_latest.msgpack")
 
     if training_args.resume_from_checkpoint:
         print(f"Resuming from checkpoint {training_args.output_dir}/state_latest.msgpack")
