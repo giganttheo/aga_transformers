@@ -42,8 +42,9 @@ from datasets import Dataset, load_dataset
 from filelock import FileLock
 from flax import jax_utils, traverse_util
 from flax.training import train_state, orbax_utils
-import orbax.checkpoint
+# import orbax.checkpoint
 from flax.training.common_utils import shard_prng_key, stack_forest
+from flax.serialization import msgpack_restore, to_bytes
 from huggingface_hub import Repository, create_repo
 import zlib
 from tqdm import tqdm
@@ -799,43 +800,44 @@ def main():
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
-    # def save_as_msgpack(params, save_path: str, compression = None) -> None:
-    #     msgpack_bytes: bytes = to_bytes(params)
-    #     if compression == "GZIP":
-    #         msgpack_bytes = zlib.compress(msgpack_bytes)
-    #     with open(save_path, "wb+") as file:
-    #         file.write(msgpack_bytes)
+    def save_as_msgpack(params, save_path: str, compression = None) -> None:
+        msgpack_bytes: bytes = to_bytes(params)
+        if compression == "GZIP":
+            msgpack_bytes = zlib.compress(msgpack_bytes)
+        with open(save_path, "wb+") as file:
+            file.write(msgpack_bytes)
 
-    # def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
-    #     with open(save_path, "rb+") as file:
-    #         bytes_data = file.read()
-    #     if compression == "GZIP":
-    #         bytes_data = zlib.decompress(bytes_data)
-    #     params = msgpack_restore(bytes_data)
-    #     return params
+    def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
+        with open(save_path, "rb+") as file:
+            bytes_data = file.read()
+        if compression == "GZIP":
+            bytes_data = zlib.decompress(bytes_data)
+        params = msgpack_restore(bytes_data)
+        return params
 
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
-    CKPT_DIR = f"{training_args.output_dir}/"
-    orbax_options = orbax.checkpoint.CheckpointManagerOptions(max_to_keep=3)
-    orbax_mngr = orbax.checkpoint.CheckpointManager(
-                        CKPT_DIR,
-                        orbax.checkpoint.PyTreeCheckpointer(),
-                        orbax_options)
+    # CKPT_DIR = f"{training_args.output_dir}/"
+    # orbax_options = orbax.checkpoint.CheckpointManagerOptions(max_to_keep=3)
+    # orbax_mngr = orbax.checkpoint.CheckpointManager(
+    #                     CKPT_DIR,
+    #                     orbax.checkpoint.PyTreeCheckpointer(),
+    #                     orbax_options)
 
     #tmp
-    from flax.core import FrozenDict
-    ckpt = {"params": lorax.merge_params(state.params, destructive=False), "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
-    orbax_mngr.save(state.step, FrozenDict(ckpt))
+    # from flax.core import FrozenDict
+    # ckpt = {"params": lorax.merge_params(state.params, destructive=False), "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
+    # orbax_mngr.save(state.step, FrozenDict(ckpt))
+    save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
 
     if training_args.resume_from_checkpoint:
-        print(f"Resuming from checkpoint {CKPT_DIR}")
-        # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+        print(f"Resuming from checkpoint {training_args.output_dir}/state_latest.msgpack")
+        state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
         # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
         # ckpt = {""}
-        orbax_mngr.restore(orbax_mngr.latest_step(), state)
+        # orbax_mngr.restore(orbax_mngr.latest_step(), state)
         # state.params = ckpt["params"]
         # state.opt_state = ckpt["opt_state"]
         # state.step = ckpt["step"]
@@ -992,13 +994,13 @@ def main():
         # save checkpoint after each epoch and push checkpoint to the hub
         if jax.process_index() == 0:
             # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-            # save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+            save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
             # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
             # Bundle everything together.
             # save_args = orbax_utils.save_args_from_target(ckpt)
 
-            ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
-            orbax_mngr.save(state.step, FrozenDict(ckpt))
+            # ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
+            # orbax_mngr.save(state.step, FrozenDict(ckpt))
             model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
