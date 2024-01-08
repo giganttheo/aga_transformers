@@ -41,7 +41,7 @@ import optax
 from datasets import Dataset, load_dataset
 from filelock import FileLock
 from flax import jax_utils, traverse_util
-from flax.training import train_state, orbax_utils
+from flax.training import train_state
 # import orbax.checkpoint
 from flax.training.common_utils import shard_prng_key, stack_forest
 from flax.serialization import msgpack_restore, to_bytes
@@ -81,7 +81,7 @@ print(f"Devices: {jax.devices()}")
 
 logger = logging.getLogger(__name__)
 
-flax.config.update('flax_use_orbax_checkpointing', True)
+# flax.config.update('flax_use_orbax_checkpointing', True)
 
 try:
     nltk.data.find("tokenizers/punkt")
