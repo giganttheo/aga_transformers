@@ -848,8 +848,8 @@ def main():
     with open(CKPT_DIR + "data.msgpack", "rb") as data_file:
         byte_data = data_file.read()
     
-    restored_state = msgpack.unpackb(byte_data)
-    print(restored_state)
+    restored_state = msgpack_restore(msgpack.unpackb(byte_data))
+    print(restored_state == state.params)
     # save
     # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
 
