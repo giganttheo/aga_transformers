@@ -832,6 +832,7 @@ def main():
     # orbax_mngr.save(state.step, FrozenDict(ckpt))
 
     from flax.training import checkpoints
+    flax.config.update('flax_use_orbax_checkpointing', False)
     CKPT_DIR = f"{training_args.output_dir}/ckpts/"
     checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=0)
     restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
