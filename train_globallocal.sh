@@ -151,3 +151,25 @@ python ./train_lora.py \
 	--max_train_samples 100 \
 	--max_eval_samples 100 \
 	--max_predict_samples 100
+
+
+python ./train_lora.py \
+	--output_dir "./lora-t5-graph-small-8k" \
+	--model_name_or_path "google/flan-t5-small" \
+	--tokenizer_name "google/flan-t5-small" \
+	--dataset_name="gigant/tib" \
+	--source_prefix "summarize: " \
+	--do_train \
+	--do_eval \
+	--num_train_epochs 3 \
+	--learning_rate 1e-3 \
+	--warmup_steps 100 \
+	--per_device_train_batch_size 16 \
+	--per_device_eval_batch_size 16 \
+	--overwrite_output_dir \
+	--dtype "bfloat16" \
+	--max_target_length 512 \
+	--max_source_length 8192 \
+	--val_max_target_length 512 \
+	--max_eval_samples 32 \
+	--gradient_checkpointing

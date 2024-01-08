@@ -839,18 +839,25 @@ def main():
     # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
     #                             overwrite=True)
     # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
-    # Write msgpack file
-    with open(CKPT_DIR + "data.msgpack", "wb") as outfile:
-        packed = msgpack.packb(msgpack_serialize(state.params))
-        outfile.write(packed)
 
-    # Read msgpack file
-    with open(CKPT_DIR + "data.msgpack", "rb") as data_file:
-        byte_data = data_file.read()
+    # # Write msgpack file
+    # with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
+    #     packed = msgpack.packb(msgpack_serialize(lorax.merge_params(state.params, destructive=False)))
+    #     outfile.write(packed)
+    # with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
+    #     packed = msgpack.packb(msgpack_serialize(state.opt_state))
+    #     outfile.write(packed)
+    # with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
+    #     packed = msgpack.packb(msgpack_serialize(state.step))
+    #     outfile.write(packed)
+
+    # # Read msgpack file
+    # with open(CKPT_DIR + "data.msgpack", "rb") as data_file:
+    #     byte_data = data_file.read()
     
-    restored_state = msgpack_restore(msgpack.unpackb(byte_data))
+    # restored_state = msgpack_restore(msgpack.unpackb(byte_data))
 
-    print(restored_state)
+    # print(restored_state)
     # print((restored_state == state.params).all())
     # save
     # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
@@ -1020,7 +1027,7 @@ def main():
         # save checkpoint after each epoch and push checkpoint to the hub
         if jax.process_index() == 0:
             # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-            save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+            # save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
             # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
             # Bundle everything together.
             # save_args = orbax_utils.save_args_from_target(ckpt)
