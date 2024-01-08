@@ -849,7 +849,7 @@ def main():
         byte_data = data_file.read()
     
     restored_state = msgpack_restore(msgpack.unpackb(byte_data))
-    print(restored_state == state.params)
+    print((restored_state == state.params).all())
     # save
     # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
 
