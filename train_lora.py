@@ -869,7 +869,7 @@ def main():
 
     # Write msgpack file
     with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
-        packed = msgpack.packb(msgpack_serialize(pytree_loras_to_tuple(state.params)))
+        packed = msgpack.packb(pytree_loras_to_tuple(state.params))
         outfile.write(packed)
     with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
         packed = msgpack.packb(msgpack_serialize(state.opt_state))
@@ -879,10 +879,10 @@ def main():
         outfile.write(packed)
 
     # Read msgpack file
-    with open(CKPT_DIR + "data.msgpack", "rb") as data_file:
+    with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
         byte_data = data_file.read()
     
-    restored_state = pytree_tuples_to_loras(msgpack_restore(msgpack.unpackb(byte_data)))
+    restored_state = pytree_tuples_to_loras(msgpack.unpackb(byte_data))
 
     print(restored_state)
     # print((restored_state == state.params).all())
