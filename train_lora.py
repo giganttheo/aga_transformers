@@ -840,24 +840,51 @@ def main():
     #                             overwrite=True)
     # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
 
-    # # Write msgpack file
-    # with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
-    #     packed = msgpack.packb(msgpack_serialize(lorax.merge_params(state.params, destructive=False)))
-    #     outfile.write(packed)
-    # with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
-    #     packed = msgpack.packb(msgpack_serialize(state.opt_state))
-    #     outfile.write(packed)
-    # with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
-    #     packed = msgpack.packb(msgpack_serialize(state.step))
-    #     outfile.write(packed)
 
-    # # Read msgpack file
-    # with open(CKPT_DIR + "data.msgpack", "rb") as data_file:
-    #     byte_data = data_file.read()
+    from lorax import LoraWeight
+    TAG = '_LoraWeight'
+
+    def _lora_to_tuple(x):
+        return TAG, x.w, x.a, x.b, x.alpha
+
+    def _value_is_lora_tuple(x):
+        return isinstance(x, tuple) and x[0] == TAG
+
+    def _lora_tuple_to_original(tup):
+        _, w, a, b, alpha = tup
+        return LoraWeight(w=w, a=a, b=b, alpha=alpha)
+
+    def pytree_loras_to_tuple(pytree):
+        return jax.tree_map(
+            lambda x: _lora_to_tuple(x) if isinstance(x, LoraWeight) else x,
+            pytree,
+            is_leaf=lambda x: isinstance(x, LoraWeight)
+        )
+
+    def pytree_tuples_to_loras(pytree):
+        return jax.tree_map(
+            lambda x: _lora_tuple_to_original(x) if _value_is_lora_tuple(x) else x,
+            is_leaf=_value_is_lora_tuple
+        )
+
+    # Write msgpack file
+    with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
+        packed = msgpack.packb(msgpack_serialize(pytree_loras_to_tuple(state.params)))
+        outfile.write(packed)
+    with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
+        packed = msgpack.packb(msgpack_serialize(state.opt_state))
+        outfile.write(packed)
+    with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
+        packed = msgpack.packb(msgpack_serialize(state.step))
+        outfile.write(packed)
+
+    # Read msgpack file
+    with open(CKPT_DIR + "data.msgpack", "rb") as data_file:
+        byte_data = data_file.read()
     
-    # restored_state = msgpack_restore(msgpack.unpackb(byte_data))
+    restored_state = pytree_tuples_to_loras(msgpack_restore(msgpack.unpackb(byte_data)))
 
-    # print(restored_state)
+    print(restored_state)
     # print((restored_state == state.params).all())
     # save
     # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
@@ -951,14 +978,13 @@ def main():
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
-            # if step % int(training_args.logging_steps) == 0:
-            #     # summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
-            #     train_time += time.time() - train_start
-            #     # Save metrics
-            #     if has_tensorboard and jax.process_index() == 0:
-            #         cur_step = epoch * (len(train_dataset) // train_batch_size)
-            #         write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
-            
+            if step % int(training_args.logging_steps) == 0:
+                # summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
+                train_time += time.time() - train_start
+                # Save metrics
+                if has_tensorboard and jax.process_index() == 0:
+                    cur_step = step + epoch * steps_per_epoch
+                    write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
 
         train_time += time.time() - train_start
         train_metric = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
@@ -1021,7 +1047,7 @@ def main():
 
         # Save metrics
         if has_tensorboard and jax.process_index() == 0:
-            cur_step = epoch * (len(train_dataset) // train_batch_size)
+            cur_step = steps_per_epoch + epoch * steps_per_epoch
             write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
       
         # save checkpoint after each epoch and push checkpoint to the hub
