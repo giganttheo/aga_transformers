@@ -900,7 +900,7 @@ def main():
         return state_
 
     save_state(state)
-    state.replace(load_state())
+    state.replace(**load_state())
 
     # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
     #                             overwrite=True)
