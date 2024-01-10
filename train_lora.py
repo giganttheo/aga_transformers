@@ -890,16 +890,17 @@ def main():
     #         state.step = msgpack_restore(msgpack.unpackb(data_file.read()))
 
     def save_state(state):
+        state_tosave = {"step": state.step, "params": state.params, "opt_state": state.opt_state}
         with open(CKPT_DIR + "opt_state.pickle", "wb") as outfile:
-            pickle.dump(state, outfile, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(state_tosave, outfile, protocol=pickle.HIGHEST_PROTOCOL)
     
     def load_state():
         with open(CKPT_DIR + "opt_state.pickle", "rb") as file:
-            state = pickle.load(file)
-        return state
+            state_ = pickle.load(file)
+        return state_
 
     save_state(state)
-    state = load_state()
+    state.replace(load_state())
 
     # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
     #                             overwrite=True)
