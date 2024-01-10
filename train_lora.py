@@ -44,7 +44,7 @@ from flax import jax_utils, traverse_util
 from flax.training import train_state
 # import orbax.checkpoint
 from flax.training.common_utils import shard_prng_key, stack_forest
-from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize
+from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize, to_state_dict, from_state_dict
 from huggingface_hub import Repository, create_repo
 import zlib
 from tqdm import tqdm
@@ -64,6 +64,7 @@ from transformers import (
 from transformers.utils import get_full_repo_name, is_offline_mode, send_example_telemetry
 
 import lorax
+from lorax import LoraWeight
 
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
 from aga_transformers.models.t5.t5 import load_t5
@@ -802,20 +803,20 @@ def main():
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
-    def save_as_msgpack(params, save_path: str, compression = None) -> None:
-        msgpack_bytes: bytes = to_bytes(params)
-        if compression == "GZIP":
-            msgpack_bytes = zlib.compress(msgpack_bytes)
-        with open(save_path, "wb+") as file:
-            file.write(msgpack_bytes)
+    # def save_as_msgpack(params, save_path: str, compression = None) -> None:
+    #     msgpack_bytes: bytes = to_bytes(params)
+    #     if compression == "GZIP":
+    #         msgpack_bytes = zlib.compress(msgpack_bytes)
+    #     with open(save_path, "wb+") as file:
+    #         file.write(msgpack_bytes)
 
-    def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
-        with open(save_path, "rb+") as file:
-            bytes_data = file.read()
-        if compression == "GZIP":
-            bytes_data = zlib.decompress(bytes_data)
-        params = msgpack_restore(bytes_data)
-        return params
+    # def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
+    #     with open(save_path, "rb+") as file:
+    #         bytes_data = file.read()
+    #     if compression == "GZIP":
+    #         bytes_data = zlib.decompress(bytes_data)
+    #     params = msgpack_restore(bytes_data)
+    #     return params
 
     # Setup train state
     
@@ -836,22 +837,20 @@ def main():
     # from flax.training import checkpoints
     # flax.config.update('flax_use_orbax_checkpointing', False)
     CKPT_DIR = f"{training_args.output_dir}/ckpts/"
-    # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
-    #                             overwrite=True)
-    # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
 
-
-    from lorax import LoraWeight
     TAG = '_LoraWeight'
 
     def _lora_to_tuple(x):
         return TAG, x.w, x.a, x.b, x.alpha
 
-    def _value_is_lora_tuple(x):
-        return isinstance(x, tuple) and x[0] == TAG
+    def _value_is_lora_dict(x):
+        return isinstance(x, dict) and '0' in x.keys() and x['0'] == TAG
 
-    def _lora_tuple_to_original(tup):
-        _, w, a, b, alpha = tup
+    def _lora_dict_to_original(d):
+        w = d['1']
+        a = d['2']
+        b = d['3']
+        alpha = d['4']
         return LoraWeight(w=w, a=a, b=b, alpha=alpha)
 
     def pytree_loras_to_tuple(pytree):
@@ -861,30 +860,59 @@ def main():
             is_leaf=lambda x: isinstance(x, LoraWeight)
         )
 
-    def pytree_tuples_to_loras(pytree):
+    def pytree_dict_to_loras(pytree):
         return jax.tree_map(
-            lambda x: _lora_tuple_to_original(x) if _value_is_lora_tuple(x) else x,
-            is_leaf=_value_is_lora_tuple
+            lambda x: _lora_dict_to_original(x) if _value_is_lora_dict(x) else x,
+            pytree,
+            is_leaf=_value_is_lora_dict
         )
 
-    # Write msgpack file
-    with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
-        packed = msgpack.packb(pytree_loras_to_tuple(state.params))
-        outfile.write(packed)
-    with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
-        packed = msgpack.packb(msgpack_serialize(state.opt_state))
-        outfile.write(packed)
-    with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
-        packed = msgpack.packb(msgpack_serialize(state.step))
-        outfile.write(packed)
+    # msgpack_serialize(jax.tree_util.tree_flatten(ad_lora_params))
 
-    # Read msgpack file
-    with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
-        byte_data = data_file.read()
+    def save_state(state):
+        with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
+            packed = msgpack.packb(msgpack_serialize(to_state_dict(pytree_loras_to_tuple(state.params))))
+            outfile.write(packed)
+        with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
+            packed = msgpack.packb(msgpack_serialize(to_state_dict(state.opt_state)))
+            outfile.write(packed)
+        with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
+            packed = msgpack.packb(msgpack_serialize(to_state_dict(state.step)))
+            outfile.write(packed)
     
-    restored_state = pytree_tuples_to_loras(msgpack.unpackb(byte_data))
+    def load_state(state):
+        with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
+            state.params = pytree_dict_to_loras(msgpack_restore(msgpack.unpackb(data_file.read())))
+        with open(CKPT_DIR + "opt_state.msgpack", "rb") as data_file:
+            state.opt_state = msgpack_restore(msgpack.unpackb(data_file.read()))
+        with open(CKPT_DIR + "step.msgpack", "rb") as data_file:
+            state.step = msgpack_restore(msgpack.unpackb(data_file.read()))
+        
+    save_state(state)
+    load_state(state)
 
-    print(restored_state)
+    # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
+    #                             overwrite=True)
+    # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
+            
+    # # Write msgpack file
+    # with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
+    #     packed = msgpack.packb(pytree_loras_to_tuple(state.params))
+    #     outfile.write(packed)
+    # with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
+    #     packed = msgpack.packb(msgpack_serialize(state.opt_state))
+    #     outfile.write(packed)
+    # with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
+    #     packed = msgpack.packb(msgpack_serialize(state.step))
+    #     outfile.write(packed)
+
+    # # Read msgpack file
+    # with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
+    #     byte_data = data_file.read()
+    
+    # restored_state = pytree_tuples_to_loras(msgpack.unpackb(byte_data))
+
+    # print(restored_state)
     # print((restored_state == state.params).all())
     # save
     # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
@@ -893,8 +921,9 @@ def main():
     #     save_as_msgpack(state[key], save_path=training_args.output_dir + "/{key}_latest.msgpack")
 
     if training_args.resume_from_checkpoint:
-        print(f"Resuming from checkpoint {training_args.output_dir}/state_latest.msgpack")
-        state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+        pass
+        # print(f"Resuming from checkpoint {training_args.output_dir}/state_latest.msgpack")
+        # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
         # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
         # ckpt = {""}
         # orbax_mngr.restore(orbax_mngr.latest_step(), state)
