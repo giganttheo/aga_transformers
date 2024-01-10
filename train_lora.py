@@ -134,7 +134,7 @@ class TrainingArguments:
     adafactor: bool = field(default=False, metadata={"help": "Whether or not to replace AdamW by Adafactor."})
     num_train_epochs: float = field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
     warmup_steps: int = field(default=0, metadata={"help": "Linear warmup over warmup_steps."})
-    # logging_steps: int = field(default=500, metadata={"help": "Log every X updates steps."})
+    logging_steps: int = field(default=300, metadata={"help": "Log every X updates steps."})
     save_steps: int = field(default=500, metadata={"help": "Save checkpoint every X updates steps."})
     # eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
     seed: int = field(default=42, metadata={"help": "Random seed that will be set at the beginning of training."})
