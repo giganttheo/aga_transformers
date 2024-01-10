@@ -808,90 +808,11 @@ def main():
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
-    # def save_as_msgpack(params, save_path: str, compression = None) -> None:
-    #     msgpack_bytes: bytes = to_bytes(params)
-    #     if compression == "GZIP":
-    #         msgpack_bytes = zlib.compress(msgpack_bytes)
-    #     with open(save_path, "wb+") as file:
-    #         file.write(msgpack_bytes)
-
-    # def load_from_msgpack(params, save_path: str, compression = None) -> Dict[str, Any]:
-    #     with open(save_path, "rb+") as file:
-    #         bytes_data = file.read()
-    #     if compression == "GZIP":
-    #         bytes_data = zlib.decompress(bytes_data)
-    #     params = msgpack_restore(bytes_data)
-    #     return params
-
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
-    # CKPT_DIR = f"{training_args.output_dir}/"
-    # orbax_options = orbax.checkpoint.CheckpointManagerOptions(max_to_keep=3)
-    # orbax_mngr = orbax.checkpoint.CheckpointManager(
-    #                     CKPT_DIR,
-    #                     orbax.checkpoint.PyTreeCheckpointer(),
-    #                     orbax_options)
-
-    #tmp
-    # from flax.core import FrozenDict
-    # ckpt = {"params": lorax.merge_params(state.params, destructive=False), "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
-    # orbax_mngr.save(state.step, FrozenDict(ckpt))
-
-    # from flax.training import checkpoints
-    # flax.config.update('flax_use_orbax_checkpointing', False)
     CKPT_DIR = f"{training_args.output_dir}/ckpts/"
-
-    TAG = '_LoraWeight'
-
-    def _lora_to_tuple(x):
-        return TAG, x.w, x.a, x.b, x.alpha
-
-    def _value_is_lora_dict(x):
-        return isinstance(x, dict) and '0' in x.keys() and x['0'] == TAG
-
-    def _lora_dict_to_original(d):
-        w = d['1']
-        a = d['2']
-        b = d['3']
-        alpha = d['4']
-        return LoraWeight(w=w, a=a, b=b, alpha=alpha)
-
-    def pytree_loras_to_tuple(pytree):
-        return jax.tree_map(
-            lambda x: _lora_to_tuple(x) if isinstance(x, LoraWeight) else x,
-            pytree,
-            is_leaf=lambda x: isinstance(x, LoraWeight)
-        )
-
-    def pytree_dict_to_loras(pytree):
-        return jax.tree_map(
-            lambda x: _lora_dict_to_original(x) if _value_is_lora_dict(x) else x,
-            pytree,
-            is_leaf=_value_is_lora_dict
-        )
-
-    # msgpack_serialize(jax.tree_util.tree_flatten(ad_lora_params))
-
-    # def save_state(state):
-    #     with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
-    #         packed = msgpack.packb(msgpack_serialize(to_state_dict(pytree_loras_to_tuple(state.params))))
-    #         outfile.write(packed)
-    #     with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
-    #         packed = msgpack.packb(msgpack_serialize(to_state_dict(state.opt_state)))
-    #         outfile.write(packed)
-    #     with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
-    #         packed = msgpack.packb(msgpack_serialize(to_state_dict(state.step)))
-    #         outfile.write(packed)
-    
-    # def load_state(state):
-    #     with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
-    #         state.params = pytree_dict_to_loras(msgpack_restore(msgpack.unpackb(data_file.read())))
-    #     with open(CKPT_DIR + "opt_state.msgpack", "rb") as data_file:
-    #         state.opt_state = msgpack_restore(msgpack.unpackb(data_file.read()))
-    #     with open(CKPT_DIR + "step.msgpack", "rb") as data_file:
-    #         state.step = msgpack_restore(msgpack.unpackb(data_file.read()))
 
     def save_state(state):
         state_tosave = {"step": state.step, "params": state.params, "opt_state": state.opt_state}
@@ -903,50 +824,12 @@ def main():
             state_ = pickle.load(file)
         return state_
 
-    # save_state(state)
-    # state.replace(**load_state())
-
-    # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
-    #                             overwrite=True)
-    # restored_state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state)
-            
-    # # Write msgpack file
-    # with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
-    #     packed = msgpack.packb(pytree_loras_to_tuple(state.params))
-    #     outfile.write(packed)
-    # with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
-    #     packed = msgpack.packb(msgpack_serialize(state.opt_state))
-    #     outfile.write(packed)
-    # with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
-    #     packed = msgpack.packb(msgpack_serialize(state.step))
-    #     outfile.write(packed)
-
-    # # Read msgpack file
-    # with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
-    #     byte_data = data_file.read()
-    
-    # restored_state = pytree_tuples_to_loras(msgpack.unpackb(byte_data))
-
-    # print(restored_state)
-    # print((restored_state == state.params).all())
-    # save
-    # training_state.replace(params=restored_dict["params"], step=restored_dict["step"], opt_state=restored_optimizer, ...)  
-
-    # for key in state.keys:
-    #     save_as_msgpack(state[key], save_path=training_args.output_dir + "/{key}_latest.msgpack")
-
     if training_args.resume_from_checkpoint:
-        # save_state(state)
         state.replace(**load_state())
-        print(f"Resuming from checkpoint {training_args.run_id}")
-        # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
-        # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
-        # ckpt = {""}
-        # orbax_mngr.restore(orbax_mngr.latest_step(), state)
-        # state.params = ckpt["params"]
-        # state.opt_state = ckpt["opt_state"]
-        # state.step = ckpt["step"]
-        # state.dropout_rng = ckpt["dropout_rng"]
+        print("\n\n\n")
+        print(f"==================Resuming from checkpoint {training_args.run_id}===============")
+        print(f"step: {state.step}")
+        print("\n\n\n")
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
