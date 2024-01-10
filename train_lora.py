@@ -1016,12 +1016,12 @@ def main():
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
             if step % int(training_args.logging_steps) == 0:
-                # summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
-                train_time += time.time() - train_start
-                # Save metrics
-                if has_tensorboard and jax.process_index() == 0:
-                    cur_step = step + epoch * steps_per_epoch
-                    write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
+                summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
+                # train_time += time.time() - train_start
+                # # Save metrics
+                # if has_tensorboard and jax.process_index() == 0:
+                #     cur_step = step + epoch * steps_per_epoch
+                #     write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
 
         train_time += time.time() - train_start
         train_metric = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
