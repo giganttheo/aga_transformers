@@ -995,6 +995,7 @@ def main():
     logger.info(f"  Total optimization steps = {total_train_steps}")
 
     train_time = 0
+    previous_steps = state.step
     epochs = tqdm(range(num_epochs), desc=f"Epoch ... (1/{num_epochs})", position=0)
     for epoch in epochs:
         # ======================== Training ================================
@@ -1016,7 +1017,7 @@ def main():
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
             if step % int(training_args.logging_steps) == 0:
-                summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
+                summary_writer.scalar("train loss", train_metrics[-1]["loss"], previous_steps + step + (epoch * steps_per_epoch))
                 # train_time += time.time() - train_start
                 # # Save metrics
                 # if has_tensorboard and jax.process_index() == 0:
@@ -1084,7 +1085,7 @@ def main():
 
         # Save metrics
         if has_tensorboard and jax.process_index() == 0:
-            cur_step = steps_per_epoch + epoch * steps_per_epoch
+            cur_step = previous_steps + steps_per_epoch + epoch * steps_per_epoch
             write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
       
         # save checkpoint after each epoch and push checkpoint to the hub
