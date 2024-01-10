@@ -102,7 +102,9 @@ python ./train_lora.py \
 	--val_max_target_length 512 \
 	--max_train_samples 24 \
 	--max_eval_samples 12 \
-	--gradient_checkpointing
+	--gradient_checkpointing \
+	--resume_from_checkpoint \
+	--run_id "deozg538"
 
 # #--predict_with_generate \
 

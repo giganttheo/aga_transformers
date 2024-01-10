@@ -105,6 +105,7 @@ class TrainingArguments:
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
     )
     resume_from_checkpoint: bool = field(default=False)
+    run_id: str= field(default="")
     overwrite_output_dir: bool = field(
         default=False,
         metadata={
@@ -434,7 +435,10 @@ def main():
     # Initializing a Weights & Biases Run
     # wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
     # wandb.init(project=training_args.output_dir.split("/")[-1])
-    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True, resume=training_args.resume_from_checkpoint)
+    if training_args.resume_from_checkpoint:
+        wandb.init(id=training_args.run_id, resume="must", sync_tensorboard=True)
+    else:
+        wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -930,7 +934,7 @@ def main():
     if training_args.resume_from_checkpoint:
         # save_state(state)
         state.replace(**load_state())
-        # print(f"Resuming from checkpoint {training_args.output_dir}/state_latest.msgpack")
+        print(f"Resuming from checkpoint {training_args.run_id}")
         # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
         # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
         # ckpt = {""}
