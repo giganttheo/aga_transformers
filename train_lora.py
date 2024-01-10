@@ -44,7 +44,8 @@ from flax import jax_utils, traverse_util
 from flax.training import train_state
 # import orbax.checkpoint
 from flax.training.common_utils import shard_prng_key, stack_forest
-from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize, to_state_dict, from_state_dict
+# from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize, to_state_dict, from_state_dict
+import pickle
 from huggingface_hub import Repository, create_repo
 import zlib
 from tqdm import tqdm
