@@ -421,7 +421,6 @@ def create_learning_rate_fn(
     return schedule_fn
 
 
-
 def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
@@ -438,7 +437,7 @@ def main():
     # Initializing a Weights & Biases Run
     # wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
     # wandb.init(project=training_args.output_dir.split("/")[-1])
-    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
+    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True, resume=training_args.resume_from_checkpoint)
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -899,8 +898,8 @@ def main():
             state_ = pickle.load(file)
         return state_
 
-    save_state(state)
-    state.replace(**load_state())
+    # save_state(state)
+    # state.replace(**load_state())
 
     # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
     #                             overwrite=True)
@@ -932,7 +931,8 @@ def main():
     #     save_as_msgpack(state[key], save_path=training_args.output_dir + "/{key}_latest.msgpack")
 
     if training_args.resume_from_checkpoint:
-        pass
+        # save_state(state)
+        state.replace(**load_state())
         # print(f"Resuming from checkpoint {training_args.output_dir}/state_latest.msgpack")
         # state = load_from_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
         # state = checkpoints.restore_checkpoint(ckpt_dir=CKPT_DIR, target=state)
@@ -1100,6 +1100,8 @@ def main():
 
             # ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
             # orbax_mngr.save(state.step, FrozenDict(ckpt))
+            save_state(state)
+            # state.replace(**load_state())
             model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
