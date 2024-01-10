@@ -869,27 +869,36 @@ def main():
 
     # msgpack_serialize(jax.tree_util.tree_flatten(ad_lora_params))
 
-    def save_state(state):
-        with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
-            packed = msgpack.packb(msgpack_serialize(to_state_dict(pytree_loras_to_tuple(state.params))))
-            outfile.write(packed)
-        with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
-            packed = msgpack.packb(msgpack_serialize(to_state_dict(state.opt_state)))
-            outfile.write(packed)
-        with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
-            packed = msgpack.packb(msgpack_serialize(to_state_dict(state.step)))
-            outfile.write(packed)
+    # def save_state(state):
+    #     with open(CKPT_DIR + "params.msgpack", "wb") as outfile:
+    #         packed = msgpack.packb(msgpack_serialize(to_state_dict(pytree_loras_to_tuple(state.params))))
+    #         outfile.write(packed)
+    #     with open(CKPT_DIR + "opt_state.msgpack", "wb") as outfile:
+    #         packed = msgpack.packb(msgpack_serialize(to_state_dict(state.opt_state)))
+    #         outfile.write(packed)
+    #     with open(CKPT_DIR + "step.msgpack", "wb") as outfile:
+    #         packed = msgpack.packb(msgpack_serialize(to_state_dict(state.step)))
+    #         outfile.write(packed)
     
-    def load_state(state):
-        with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
-            state.params = pytree_dict_to_loras(msgpack_restore(msgpack.unpackb(data_file.read())))
-        with open(CKPT_DIR + "opt_state.msgpack", "rb") as data_file:
-            state.opt_state = msgpack_restore(msgpack.unpackb(data_file.read()))
-        with open(CKPT_DIR + "step.msgpack", "rb") as data_file:
-            state.step = msgpack_restore(msgpack.unpackb(data_file.read()))
-        
+    # def load_state(state):
+    #     with open(CKPT_DIR + "params.msgpack", "rb") as data_file:
+    #         state.params = pytree_dict_to_loras(msgpack_restore(msgpack.unpackb(data_file.read())))
+    #     with open(CKPT_DIR + "opt_state.msgpack", "rb") as data_file:
+    #         state.opt_state = msgpack_restore(msgpack.unpackb(data_file.read()))
+    #     with open(CKPT_DIR + "step.msgpack", "rb") as data_file:
+    #         state.step = msgpack_restore(msgpack.unpackb(data_file.read()))
+
+    def save_state(state):
+        with open(CKPT_DIR + "opt_state.pickle", "wb") as outfile:
+            pickle.dump(state, outfile, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    def load_state():
+        with open(CKPT_DIR + "opt_state.pickle", "rb") as file:
+            state = pickle.load(file)
+        return state
+
     save_state(state)
-    load_state(state)
+    state = load_state()
 
     # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state.opt_state, step=0, 
     #                             overwrite=True)
