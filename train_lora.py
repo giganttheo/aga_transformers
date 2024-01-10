@@ -51,8 +51,6 @@ import zlib
 from tqdm import tqdm
 import wandb
 
-import msgpack
-
 import transformers
 from transformers import (
     CONFIG_MAPPING,
@@ -100,7 +98,6 @@ except (LookupError, OSError):
 
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-
 
 @dataclass
 class TrainingArguments:
