@@ -566,7 +566,7 @@ def main():
         attention_kwargs = {
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
-            "window_sizes": [127], # [254]*12,
+            "window_sizes": [254],#[127], # [254]*12,
             "autoregressive": False,
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
@@ -825,11 +825,9 @@ def main():
         return state_
 
     if training_args.resume_from_checkpoint:
+        state = state.replace(**load_state())
         print("\n\n\n")
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
-        state = state.replace(**load_state())
-        print(f"step: {state.step}")
-        print(load_state()["step"])
         print("\n\n\n")
 
     def train_step(state, batch):
@@ -908,13 +906,13 @@ def main():
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
-            if step % int(training_args.logging_steps) == 0:
-                summary_writer.scalar("train loss", train_metrics[-1]["loss"], previous_steps + step + (epoch * steps_per_epoch))
-                # train_time += time.time() - train_start
-                # # Save metrics
-                # if has_tensorboard and jax.process_index() == 0:
-                #     cur_step = step + epoch * steps_per_epoch
-                #     write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
+            # if step % int(training_args.logging_steps) == 0:
+            #     summary_writer.scalar("train loss", train_metrics[-1]["loss"], previous_steps + step + (epoch * steps_per_epoch))
+            #     # train_time += time.time() - train_start
+            #     # # Save metrics
+            #     # if has_tensorboard and jax.process_index() == 0:
+            #     #     cur_step = step + epoch * steps_per_epoch
+            #     #     write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
 
         train_time += time.time() - train_start
         train_metric = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
@@ -977,7 +975,7 @@ def main():
 
         # Save metrics
         if has_tensorboard and jax.process_index() == 0:
-            cur_step = previous_steps + steps_per_epoch + epoch * steps_per_epoch
+            cur_step = state.step #previous_steps + steps_per_epoch + epoch * steps_per_epoch
             write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
       
         # save checkpoint after each epoch and push checkpoint to the hub
