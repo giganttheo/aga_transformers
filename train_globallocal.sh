@@ -104,7 +104,7 @@ python ./train_lora.py \
 	--max_eval_samples 12 \
 	--gradient_checkpointing \
 	--resume_from_checkpoint \
-	--run_id "deozg538"
+	--run_id "7s1npvkg"
 
 # #--predict_with_generate \
 
