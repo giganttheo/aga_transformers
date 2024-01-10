@@ -830,7 +830,7 @@ def main():
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
         print(f"step: {state.step}")
         print(load_state().keys())      
-        print(load_state["step"])
+        print(load_state()["step"])
         print("\n\n\n")
 
     def train_step(state, batch):
