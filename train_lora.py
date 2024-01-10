@@ -825,11 +825,10 @@ def main():
         return state_
 
     if training_args.resume_from_checkpoint:
-        state.replace(**load_state())
         print("\n\n\n")
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
+        state = state.replace(**load_state())
         print(f"step: {state.step}")
-        print(load_state().keys())      
         print(load_state()["step"])
         print("\n\n\n")
 
