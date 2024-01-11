@@ -206,15 +206,15 @@ python ./train_lora.py \
 	--source_prefix "summarize: " \
 	--do_train \
 	--do_eval \
-	--num_train_epochs 2 \
+	--num_train_epochs 1 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 18 \
-	--per_device_eval_batch_size 18 \
+	--per_device_train_batch_size 20 \
+	--per_device_eval_batch_size 20 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
-	--max_eval_samples 20 \
+	--max_eval_samples 60 \
 	--gradient_checkpointing
