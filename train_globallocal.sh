@@ -175,10 +175,33 @@ export TOKENIZERS_PARALLELISM=false
 # 	--max_eval_samples 32 \
 # 	--gradient_checkpointing
 
+# python ./train_lora.py \
+# 	--output_dir "./lora-t5-graph-base-8k" \
+# 	--model_name_or_path "google/flan-t5-base" \
+# 	--tokenizer_name "google/flan-t5-base" \
+# 	--dataset_name="gigant/tib" \
+# 	--source_prefix "summarize: " \
+# 	--do_train \
+# 	--do_eval \
+# 	--num_train_epochs 2 \
+# 	--learning_rate 1e-2 \
+# 	--warmup_steps 100 \
+# 	--per_device_train_batch_size 10 \
+# 	--per_device_eval_batch_size 10 \
+# 	--overwrite_output_dir \
+# 	--dtype "bfloat16" \
+# 	--max_target_length 512 \
+# 	--max_source_length 8192 \
+# 	--val_max_target_length 512 \
+# 	--max_eval_samples 20 \
+# 	--gradient_checkpointing #\
+	# --resume_from_checkpoint \
+	# --run_id "294lkdvh"
+
 python ./train_lora.py \
-	--output_dir "./lora-t5-graph-base-8k" \
-	--model_name_or_path "google/flan-t5-base" \
-	--tokenizer_name "google/flan-t5-base" \
+	--output_dir "./lora-t5-graph-small-8k" \
+	--model_name_or_path "google/flan-t5-small" \
+	--tokenizer_name "google/flan-t5-small" \
 	--dataset_name="gigant/tib" \
 	--source_prefix "summarize: " \
 	--do_train \
@@ -186,14 +209,12 @@ python ./train_lora.py \
 	--num_train_epochs 2 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 10 \
-	--per_device_eval_batch_size 10 \
+	--per_device_train_batch_size 18 \
+	--per_device_eval_batch_size 18 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--max_eval_samples 20 \
-	--gradient_checkpointing #\
-	# --resume_from_checkpoint \
-	# --run_id "294lkdvh"
+	--gradient_checkpointing
