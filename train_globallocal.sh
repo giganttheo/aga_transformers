@@ -50,7 +50,6 @@
 
 ### works?
 
-
 conda activate train-jax
 
 export http_proxy=http://webproxy.lab-ia.fr:8080
@@ -82,29 +81,29 @@ export TOKENIZERS_PARALLELISM=false
 # ###
 # nvidia-smi
 
-python ./train_lora.py \
-	--output_dir "./lora-t5-graph-base-8k" \
-	--model_name_or_path "google/flan-t5-base" \
-	--tokenizer_name "google/flan-t5-base" \
-	--dataset_name="gigant/tib" \
-	--source_prefix "summarize: " \
-	--do_train \
-	--do_eval \
-	--num_train_epochs 3 \
-	--learning_rate 1e-3 \
-	--warmup_steps 100 \
-	--per_device_train_batch_size 2 \
-	--per_device_eval_batch_size 2 \
-	--overwrite_output_dir \
-	--dtype "bfloat16" \
-	--max_target_length 512 \
-	--max_source_length 8192 \
-	--val_max_target_length 512 \
-	--max_train_samples 24 \
-	--max_eval_samples 12 \
-	--gradient_checkpointing \
-	--resume_from_checkpoint \
-	--run_id "294lkdvh"
+# python ./train_lora.py \
+# 	--output_dir "./lora-t5-graph-base-16k" \
+# 	--model_name_or_path "google/flan-t5-base" \
+# 	--tokenizer_name "google/flan-t5-base" \
+# 	--dataset_name="gigant/tib" \
+# 	--source_prefix "summarize: " \
+# 	--do_train \
+# 	--do_eval \
+# 	--num_train_epochs 3 \
+# 	--learning_rate 1e-3 \
+# 	--warmup_steps 100 \
+# 	--per_device_train_batch_size 2 \
+# 	--per_device_eval_batch_size 2 \
+# 	--overwrite_output_dir \
+# 	--dtype "bfloat16" \
+# 	--max_target_length 512 \
+# 	--max_source_length 16384 \
+# 	--val_max_target_length 512 \
+# 	--max_train_samples 24 \
+# 	--max_eval_samples 12 \
+# 	--gradient_checkpointing #\
+# 	--resume_from_checkpoint \
+# 	--run_id "294lkdvh"
 
 # #--predict_with_generate \
 
@@ -155,23 +154,45 @@ python ./train_lora.py \
 # 	--max_predict_samples 100
 
 
+# python ./train_lora.py \
+# 	--output_dir "./lora-t5-graph-small-8k" \
+# 	--model_name_or_path "google/flan-t5-small" \
+# 	--tokenizer_name "google/flan-t5-small" \
+# 	--dataset_name="gigant/tib" \
+# 	--source_prefix "summarize: " \
+# 	--do_train \
+# 	--do_eval \
+# 	--num_train_epochs 3 \
+# 	--learning_rate 1e-3 \
+# 	--warmup_steps 100 \
+# 	--per_device_train_batch_size 16 \
+# 	--per_device_eval_batch_size 16 \
+# 	--overwrite_output_dir \
+# 	--dtype "bfloat16" \
+# 	--max_target_length 512 \
+# 	--max_source_length 8192 \
+# 	--val_max_target_length 512 \
+# 	--max_eval_samples 32 \
+# 	--gradient_checkpointing
+
 python ./train_lora.py \
-	--output_dir "./lora-t5-graph-small-8k" \
-	--model_name_or_path "google/flan-t5-small" \
-	--tokenizer_name "google/flan-t5-small" \
+	--output_dir "./lora-t5-graph-base-16k" \
+	--model_name_or_path "google/flan-t5-base" \
+	--tokenizer_name "google/flan-t5-base" \
 	--dataset_name="gigant/tib" \
 	--source_prefix "summarize: " \
 	--do_train \
 	--do_eval \
-	--num_train_epochs 3 \
+	--num_train_epochs 2 \
 	--learning_rate 1e-3 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 16 \
-	--per_device_eval_batch_size 16 \
+	--per_device_train_batch_size 2 \
+	--per_device_eval_batch_size 2 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
-	--max_source_length 8192 \
+	--max_source_length 16384 \
 	--val_max_target_length 512 \
-	--max_eval_samples 32 \
-	--gradient_checkpointing
+	--gradient_checkpointing #\
+	# --resume_from_checkpoint \
+	# --run_id "294lkdvh"
