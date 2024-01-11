@@ -572,7 +572,7 @@ class FlaxT5Attention(nn.Module):
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
             def _scaled_dot_product_attention_bcoo(q, k, v, bias=None):
                 dtype = q.dtype
-                bucket_size=1024 #was 10_000
+                bucket_size=100_000
                 q_len, depth = q.shape
                 k_len = k.shape[0]
                 indices = jnp.stack([senders, receivers], axis=-1)
