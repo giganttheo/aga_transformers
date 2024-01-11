@@ -566,7 +566,7 @@ def main():
         attention_kwargs = {
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
-            "window_sizes": [127], # [254]*12,
+            "window_sizes": [254], #[127], # [254]*12,
             "autoregressive": False,
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
