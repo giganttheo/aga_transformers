@@ -184,7 +184,7 @@ python ./train_lora.py \
 	--do_train \
 	--do_eval \
 	--num_train_epochs 2 \
-	--learning_rate 1e-3 \
+	--learning_rate 1e-2 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 2 \
 	--per_device_eval_batch_size 2 \
