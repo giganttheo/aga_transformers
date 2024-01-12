@@ -790,11 +790,6 @@ def main():
     optimizer = optax.adafactor(
         learning_rate=linear_decay_lr_schedule_fn,
         dtype_momentum=dtype,
-        # b1=training_args.adam_beta1,
-        # b2=training_args.adam_beta2,
-        # eps=training_args.adam_epsilon,
-        # weight_decay=training_args.weight_decay,
-        # mask=decay_mask_fn,
     )
 
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
