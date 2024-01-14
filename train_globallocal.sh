@@ -218,6 +218,6 @@ python ./train_lora.py \
 	--val_max_target_length 512 \
 	--max_eval_samples 60 \
 	--gradient_checkpointing \
-	--seed 43 \
+	--seed 44 \
 	--resume_from_checkpoint \
 	--run_id "qoftnzim"
