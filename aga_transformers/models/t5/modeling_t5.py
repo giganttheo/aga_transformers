@@ -554,6 +554,7 @@ class FlaxT5Attention(nn.Module):
                 w = segment_softmax(attn_logits,
                                     segment_ids=senders,
                                     num_segments=seq_len,
+                                    indices_are_sorted=True,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
                 #attention weights applied to the values for every edge:
                 values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
@@ -562,7 +563,7 @@ class FlaxT5Attention(nn.Module):
                                     segment_ids=senders,
                                     num_segments=seq_len,
                                     unique_indices=False,
-                                    indices_are_sorted=False,
+                                    indices_are_sorted=True,
                                     bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
                 return values, w
 
@@ -594,7 +595,7 @@ class FlaxT5Attention(nn.Module):
                 values = attn(w, v)
                 return values, w.data
 
-            attn_output, attn_weights = _scaled_dot_product_attention_bcoo(
+            attn_output, attn_weights = _scaled_dot_product_attention_graph(
                 query_states,
                 key_states,
                 value_states,

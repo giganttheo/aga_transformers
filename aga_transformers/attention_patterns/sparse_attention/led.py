@@ -37,7 +37,7 @@ class LongformerAttentionPattern(AttentionPattern):
       
     receivers = np.array(layer_receivers, dtype=np.uint16)
     senders = np.array(layer_senders, dtype=np.uint16)
-    
+
     #sort senders for more efficient segment_ operations
     idces = np.argsort(senders)
     senders=senders[idces]
@@ -89,13 +89,6 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
         # and are thus remapped to position 0 in the query
         # (which has length 1)
 
-        # For autoregressive decoding (ie during inference), we use
-        # a dense one-to-many attention pattern.
-        # This is because in huggingface implementation of T5,
-        # during autoregressive decoding, the tokens are fed one by one,
-        # and are thus remapped to position 0 in the query
-        # (which has length 1)
-
         #Decoder self attention pattern
         dec_self_attn = VanillaAttentionPattern(
                                         seq_len_q=1,
@@ -103,8 +96,6 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
                                         ).get_attention_graph()
           
         #Encoder-Decoder cross attention pattern
-        #kv is the receivers (the encoder output in cross attention)
-        #q is the senders (the decoder input in cross attention)
         #kv is the receivers (the encoder output in cross attention)
         #q is the senders (the decoder input in cross attention)
         encdec_attn = VanillaAttentionPattern(
@@ -123,7 +114,6 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
       
         # Decoder self attention pattern
         dec_self_attn = {}
-        # Encoder-Decoder cross attention pattern
         # Encoder-Decoder cross attention pattern
         encdec_attn = {}
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
