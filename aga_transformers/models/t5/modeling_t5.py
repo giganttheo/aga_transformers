@@ -533,7 +533,7 @@ class FlaxT5Attention(nn.Module):
 
             receivers, senders = receivers[0], senders[0]
 
-            # @partial(jax.jit)
+            @partial(jax.jit)
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
             def _scaled_dot_product_attention_graph(q, k, v, bias=None):
@@ -572,7 +572,7 @@ class FlaxT5Attention(nn.Module):
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
             def _scaled_dot_product_attention_bcoo(q, k, v, bias=None):
                 dtype = q.dtype
-                bucket_size=100_000
+                bucket_size=1_000 #was 100_000
                 q_len, depth = q.shape
                 k_len = k.shape[0]
                 indices = jnp.stack([senders, receivers], axis=-1)
@@ -594,7 +594,7 @@ class FlaxT5Attention(nn.Module):
                 values = attn(w, v)
                 return values, w.data
 
-            attn_output, attn_weights = _scaled_dot_product_attention_graph(
+            attn_output, attn_weights = _scaled_dot_product_attention_bcoo(
                 query_states,
                 key_states,
                 value_states,
