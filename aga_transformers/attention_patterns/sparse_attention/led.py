@@ -37,6 +37,12 @@ class LongformerAttentionPattern(AttentionPattern):
       
     receivers = np.array(layer_receivers, dtype=np.uint16)
     senders = np.array(layer_senders, dtype=np.uint16)
+    
+    #sort senders for more efficient segment_ operations
+    idces = np.argsort(senders)
+    senders=senders[idces]
+    receivers=receivers[idces]
+
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
     receivers = np.array(receivers, dtype=np.uint16)
     senders = np.array(senders, dtype=np.uint16)
