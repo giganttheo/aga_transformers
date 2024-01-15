@@ -56,8 +56,6 @@ def test():
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
-        "n_heads": model.config.num_heads,
-        "batch_size": 4,
         "autoregressive":False,
     }
     graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
@@ -65,8 +63,6 @@ def test():
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
-        "n_heads": model.config.num_heads,
-        "batch_size": 4,
         "autoregressive":True,
     }
     graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
@@ -103,23 +99,26 @@ def test():
     # We need decoder_attention_mask so we can ignore pad tokens from loss
     training_inputs["decoder_attention_mask"] = labels["attention_mask"]
 
+    print("Computing outputs in training mode...")
     output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
+    print(" * output for tested model: Done")
     output_reference = ref_model.__call__(params=ref_model.params, **training_inputs)
+    print(" * output for reference model: Done")
 
     ## Encoder part
 
     try:
         assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state, **allclose_kwargs)
-        print("Test passed for encoder")
+        print("===Test passed for encoder===")
     except:
-        print("Error: ", np.mean(np.abs(output_training.encoder_last_hidden_state - output_reference.encoder_last_hidden_state)))
+        print("/!\ Error: ", np.mean(np.abs(output_training.encoder_last_hidden_state - output_reference.encoder_last_hidden_state)))
         print(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state)
 
     ## Decoder part
 
     assert np.allclose(output_training.logits, output_reference.logits, **allclose_kwargs)
 
-    print("Test passed for decoder (training mode)")
+    print("===Test passed for decoder (training mode)===")
 
     ## Autoregressive decoding with greedy search
 
@@ -179,15 +178,18 @@ def test():
 
     n = 5
 
+    print("Computing outputs in generate mode...")
     ar_inputs = get_ar_inputs()
     input_ids = ar_inputs.pop("input_ids")
     greedy_outputs_reference, _ = greedy_search(ref_model, ref_model.params, input_ids, ar_inputs, n=n)
+    print(" * output for reference model: Done")
 
     ar_inputs = get_ar_inputs()
     input_ids = ar_inputs.pop("input_ids")
     greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
+    print(" * output for tested model: Done")
 
     for i in range(n):
         assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
 
-    print(f"Test passed for decoder ({n} tokens greedy search autoregressive)")
+    print(f"===Test passed for decoder ({n} tokens greedy search autoregressive)===")

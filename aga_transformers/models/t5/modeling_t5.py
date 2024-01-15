@@ -583,7 +583,7 @@ class FlaxT5Attention(nn.Module):
                 w = segment_softmax(attn_logits,
                                     segment_ids=senders,
                                     num_segments=q_len,
-                                    indices_are_sorted=False, #True,
+                                    indices_are_sorted=True,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
                 w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]))
 
