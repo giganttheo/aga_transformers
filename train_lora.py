@@ -28,7 +28,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 import datasets
 import evaluate
@@ -42,8 +42,12 @@ from datasets import Dataset, load_dataset
 from filelock import FileLock
 from flax import jax_utils, traverse_util
 from flax.training import train_state
+# import orbax.checkpoint
 from flax.training.common_utils import shard_prng_key, stack_forest
+# from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize, to_state_dict, from_state_dict
+import pickle
 from huggingface_hub import Repository, create_repo
+import zlib
 from tqdm import tqdm
 import wandb
 
@@ -59,6 +63,7 @@ from transformers import (
 from transformers.utils import get_full_repo_name, is_offline_mode, send_example_telemetry
 
 import lorax
+from lorax import LoraWeight
 
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
 from aga_transformers.models.t5.t5 import load_t5
@@ -78,6 +83,8 @@ print(f"Devices: {jax.devices()}")
 
 logger = logging.getLogger(__name__)
 
+# flax.config.update('flax_use_orbax_checkpointing', True)
+
 try:
     nltk.data.find("tokenizers/punkt")
 except (LookupError, OSError):
@@ -92,12 +99,13 @@ except (LookupError, OSError):
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
-
 @dataclass
 class TrainingArguments:
     output_dir: str = field(
         metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
     )
+    resume_from_checkpoint: bool = field(default=False)
+    run_id: str= field(default="")
     overwrite_output_dir: bool = field(
         default=False,
         metadata={
@@ -127,9 +135,9 @@ class TrainingArguments:
     adafactor: bool = field(default=False, metadata={"help": "Whether or not to replace AdamW by Adafactor."})
     num_train_epochs: float = field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
     warmup_steps: int = field(default=0, metadata={"help": "Linear warmup over warmup_steps."})
-    logging_steps: int = field(default=500, metadata={"help": "Log every X updates steps."})
+    logging_steps: int = field(default=300, metadata={"help": "Log every X updates steps."})
     save_steps: int = field(default=500, metadata={"help": "Save checkpoint every X updates steps."})
-    eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
+    # eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
     seed: int = field(default=42, metadata={"help": "Random seed that will be set at the beginning of training."})
     push_to_hub: bool = field(
         default=False, metadata={"help": "Whether or not to upload the trained model to the model hub after training."}
@@ -353,8 +361,8 @@ summarization_name_mapping = {
 class TrainState(train_state.TrainState):
     dropout_rng: jnp.ndarray
 
-    def replicate(self):
-        return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
+#     def replicate(self):
+#         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
 
 def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuffle: bool = False, drop_last=True):
     """
@@ -401,6 +409,7 @@ def create_learning_rate_fn(
     train_ds_size: int, train_batch_size: int, num_train_epochs: int, num_warmup_steps: int, learning_rate: float
 ) -> Callable[[int], jnp.array]:
     """Returns a linear warmup, linear_decay learning rate function."""
+    num_train_epochs = 10 #
     steps_per_epoch = train_ds_size // train_batch_size
     num_train_steps = steps_per_epoch * num_train_epochs
     warmup_fn = optax.linear_schedule(init_value=0.0, end_value=learning_rate, transition_steps=num_warmup_steps)
@@ -409,7 +418,6 @@ def create_learning_rate_fn(
     )
     schedule_fn = optax.join_schedules(schedules=[warmup_fn, decay_fn], boundaries=[num_warmup_steps])
     return schedule_fn
-
 
 
 def main():
@@ -428,7 +436,14 @@ def main():
     # Initializing a Weights & Biases Run
     # wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
     # wandb.init(project=training_args.output_dir.split("/")[-1])
-    wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
+    if training_args.resume_from_checkpoint:
+        wandb.init(project=training_args.output_dir.split("/")[-1], id=training_args.run_id, resume="must", sync_tensorboard=True)
+    else:
+        wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
+        print("\n\n\n")
+        print(f"==================== Run id: {wandb.run.id} ==========================")
+        print(f"==================== Run name: {wandb.run.name} ==========================")
+        print("\n\n\n")
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -552,13 +567,17 @@ def main():
         attention_kwargs = {
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
-            "window_sizes": [127], # [254]*12,
+            "window_sizes": [254], #[127], # [254]*12,
             "autoregressive": False,
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
+        print(attention_kwargs)
         tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
 
     if training_args.gradient_checkpointing:
+        print("=============================")
+        print("Enabling gradient checkpointing")
+        print("=============================")
         model.enable_gradient_checkpointing()
 
     if model.config.decoder_start_token_id is None:
@@ -772,11 +791,6 @@ def main():
     optimizer = optax.adafactor(
         learning_rate=linear_decay_lr_schedule_fn,
         dtype_momentum=dtype,
-        # b1=training_args.adam_beta1,
-        # b2=training_args.adam_beta2,
-        # eps=training_args.adam_epsilon,
-        # weight_decay=training_args.weight_decay,
-        # mask=decay_mask_fn,
     )
 
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
@@ -794,6 +808,24 @@ def main():
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
+
+    CKPT_DIR = f"{training_args.output_dir}/ckpts/"
+
+    def save_state(state):
+        state_tosave = {"step": state.step, "params": state.params, "opt_state": state.opt_state}
+        with open(CKPT_DIR + "opt_state.pickle", "wb") as outfile:
+            pickle.dump(state_tosave, outfile, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    def load_state():
+        with open(CKPT_DIR + "opt_state.pickle", "rb") as file:
+            state_ = pickle.load(file)
+        return state_
+
+    if training_args.resume_from_checkpoint:
+        state = state.replace(**load_state())
+        print("\n\n\n")
+        print(f"==================Resuming from checkpoint {training_args.run_id}===============")
+        print("\n\n\n")
 
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
@@ -813,6 +845,7 @@ def main():
         return new_state, metrics
 
     # Define eval fn
+    @jax.jit
     def eval_step(params, batch):
         labels = batch.pop("labels")
         loss, _ = loss_fn(apply_fn, params, graph, train=False, **batch)
@@ -824,6 +857,7 @@ def main():
         metrics = {"loss": loss}
         return metrics
 
+    @jax.jit
     def generate_step(params, batch):
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
@@ -848,6 +882,7 @@ def main():
     logger.info(f"  Total optimization steps = {total_train_steps}")
 
     train_time = 0
+    previous_steps = state.step
     epochs = tqdm(range(num_epochs), desc=f"Epoch ... (1/{num_epochs})", position=0)
     for epoch in epochs:
         # ======================== Training ================================
@@ -863,15 +898,20 @@ def main():
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
-            with jax.profiler.trace(str(Path(training_args.output_dir))):
-                state, train_metric = train_step(state, batch)
-            wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
+            # with jax.profiler.trace(str(Path(training_args.output_dir))):
+            state, train_metric = train_step(state, batch)
+            # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
-            print(train_metrics[-1])
-            summary_writer.scalar("train loss", train_metrics[-1]["loss"], step + (epoch * steps_per_epoch))
+            # print(train_metrics[-1])
+            # if step % int(training_args.logging_steps) == 0:
+            #     summary_writer.scalar("train loss", train_metrics[-1]["loss"], previous_steps + step + (epoch * steps_per_epoch))
+            #     # train_time += time.time() - train_start
+            #     # # Save metrics
+            #     # if has_tensorboard and jax.process_index() == 0:
+            #     #     cur_step = step + epoch * steps_per_epoch
+            #     #     write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
 
         train_time += time.time() - train_start
-
         train_metric = jax.tree_util.tree_map(jnp.mean, stack_forest(train_metrics))
 
         epochs.write(
@@ -910,6 +950,14 @@ def main():
         # eval_metrics = get_metrics(eval_metrics)
         eval_metrics = jax.tree_util.tree_map(jnp.mean, stack_forest(eval_metrics))
 
+        print("============Eval preds===========")
+        for i in range(len(eval_preds)):
+            print("\n\n\n")
+            print("Pred: ")
+            print(eval_preds[i])
+            print("Label: ")
+            print(eval_labels[i])
+
         # compute ROUGE metrics
         rouge_desc = ""
         if data_args.predict_with_generate:
@@ -924,14 +972,22 @@ def main():
 
         # Save metrics
         if has_tensorboard and jax.process_index() == 0:
-            cur_step = epoch * (len(train_dataset) // train_batch_size)
+            cur_step = state.step #previous_steps + steps_per_epoch + epoch * steps_per_epoch
             write_metric(summary_writer, train_metrics, eval_metrics, train_time, cur_step) #<U13 type error l378
       
-
         # save checkpoint after each epoch and push checkpoint to the hub
         if jax.process_index() == 0:
             # params = jax.device_get(jax.tree_util.tree_map(lambda x: x[0], state.params))
-            model.save_pretrained(training_args.output_dir, params= lorax.merge_params(state.params, destructive=False))
+            # save_as_msgpack(state, save_path=training_args.output_dir + "/state_latest.msgpack")
+            # checkpoints.save_checkpoint(ckpt_dir=CKPT_DIR, target=state, step=epoch+1, keep=3)
+            # Bundle everything together.
+            # save_args = orbax_utils.save_args_from_target(ckpt)
+
+            # ckpt = {"params": state.params, "opt_state": state.opt_state, "step": state.step, "dropout_rng": state.dropout_rng}
+            # orbax_mngr.save(state.step, FrozenDict(ckpt))
+            save_state(state)
+            # state.replace(**load_state())
+            model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
                 repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)

@@ -2,9 +2,10 @@
 
 import jax
 import lorax
-import optax
 
-from functools import partial
+# import optax
+
+# from functools import partial
 
 #LORA utils
 LORA_FREEZE = 0
@@ -43,7 +44,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
         if 'embedding' in path:
             # print(f'Fully finetuning param {path}')
             return LORA_FULL
-        dim = 4
+        dim = 64
         # print(f'Using LoRA with dim={dim} for param {path}')
         return dim
 
@@ -54,7 +55,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # - k > 0: The parameter will be LoRA tuned with a rank k update
 
     # Simple_spec is a helper to do this, but you can also create the label pytree yourself
-    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=False)
+    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=True)
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
@@ -71,7 +72,5 @@ def create_lora(model, optimizer, dtype="bfloat16"):
     # the wrapped function can handle other qax types as well)
     lora_model = lorax.lora(model)
     apply_fn = lora_model.__call__
-
-    # print(lora_params)
-
+    
     return apply_fn, lora_params, lora_optimizer

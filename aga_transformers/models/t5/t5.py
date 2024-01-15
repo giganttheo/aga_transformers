@@ -19,7 +19,7 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
         dtype=dtype,
     )
     if dtype == "bfloat16":
-        print("adapted to bfloat16")
+        print("adapting parameters to bfloat16...")
         model.params = model.to_bf16(model.params)
 
     #tieing the graph so it is defined for first layer only

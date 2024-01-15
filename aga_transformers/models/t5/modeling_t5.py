@@ -29,6 +29,7 @@ from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
 from jax.random import PRNGKey
+from jax.experimental import sparse
 from functools import partial
 
 import einops
@@ -350,7 +351,7 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
-        relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0) #was [receivers]
+        relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0)
         relative_position_bucket = self._relative_position_bucket(
             relative_position[..., None],
             bidirectional=(not self.causal),
@@ -532,40 +533,67 @@ class FlaxT5Attention(nn.Module):
 
             receivers, senders = receivers[0], senders[0]
 
-            # @partial(jax.jit)
+            # # @partial(jax.jit)
+            # @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
+            # @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
+            # def _scaled_dot_product_attention_graph(q, k, v, bias=None):
+            #     """
+            #     Computes the dot product attention according to the attention pattern specified by the graph defined
+            #     by the adjacency list (senders, receivers)
+            #     """
+            #     dtype = q.dtype
+            #     bucket_size=10_000
+            #     seq_len, depth = q.shape
+            #     #compute attention logits: <Q,K> / sqrt(d_q)
+            #     q = q / jnp.sqrt(depth).astype(dtype)
+            #     # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
+            #     attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
+            #     if bias is not None:
+            #         attn_logits = attn_logits + bias
+            #     #softmax over receiver nodes
+            #     w = segment_softmax(attn_logits,
+            #                         segment_ids=senders,
+            #                         num_segments=seq_len,
+            #                         bucket_size=bucket_size).astype(dtype) #(num_edges,)
+            #     #attention weights applied to the values for every edge:
+            #     values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
+            #     #summing over the nodes
+            #     values = jax.ops.segment_sum(values,
+            #                         segment_ids=senders,
+            #                         num_segments=seq_len,
+            #                         unique_indices=False,
+            #                         indices_are_sorted=False,
+            #                         bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
+            #     return values, w
+
+            #BCOO attention
+            @jax.jit
             @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
             @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
-            def _scaled_dot_product_attention_graph(q, k, v, bias=None):
-                """
-                Computes the dot product attention according to the attention pattern specified by the graph defined
-                by the adjacency list (senders, receivers)
-                """
+            def _scaled_dot_product_attention_bcoo(q, k, v, bias=None):
                 dtype = q.dtype
-                bucket_size=10000
-                seq_len, depth = q.shape
-                #compute attention logits: <Q,K> / sqrt(d_q)
+                bucket_size=100_000
+                q_len, depth = q.shape
+                k_len = k.shape[0]
+                indices = jnp.stack([senders, receivers], axis=-1)
                 q = q / jnp.sqrt(depth).astype(dtype)
-                # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
-                attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
+                attn_logits = sparse.bcoo_dot_general_sampled(q[None], jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
                 if bias is not None:
                     attn_logits = attn_logits + bias
-                #softmax over receiver nodes
                 w = segment_softmax(attn_logits,
                                     segment_ids=senders,
-                                    num_segments=seq_len,
+                                    num_segments=q_len,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
-                #attention weights applied to the values for every edge:
-                values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
-                #summing over the nodes
-                values = jax.ops.segment_sum(values,
-                                    segment_ids=senders,
-                                    num_segments=seq_len,
-                                    unique_indices=False,
-                                    indices_are_sorted=False,
-                                    bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
-                return values, w
+                w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]))
 
-            attn_output, attn_weights = _scaled_dot_product_attention_graph(
+                @sparse.sparsify
+                def attn(w, v):
+                    return jnp.einsum("...qk,...kd->...qd", w, v).astype(dtype)
+                
+                values = attn(w, v)
+                return values, w.data
+
+            attn_output, attn_weights = _scaled_dot_product_attention_bcoo(
                 query_states,
                 key_states,
                 value_states,
@@ -858,7 +886,7 @@ class FlaxT5BlockCollection(nn.Module):
             self.blocks = [
                 FlaxT5CheckpointLayer(
                     self.config,
-                    has_relative_attention_bias= True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
                     dtype=self.dtype,
                     name=str(i),
                 )
@@ -868,7 +896,7 @@ class FlaxT5BlockCollection(nn.Module):
             self.blocks = [
                 FlaxT5LayerCollection(
                     self.config,
-                    has_relative_attention_bias= True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
                     dtype=self.dtype,
                     name=str(i),
                 )
