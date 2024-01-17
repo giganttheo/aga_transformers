@@ -122,11 +122,12 @@ def test():
 
     ## Encoder part
 
+    assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
+    print("==local attn are close==")
+    assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
+    print("==global attn are close==")
+
     try:
-        assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
-        print("==local attn are close==")
-        assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
-        print("==global attn are close==")
         assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state, **allclose_kwargs)
         print("===Test passed for encoder===")
     except:
