@@ -212,7 +212,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
 
-    return mask_local, mask_global
+    return mask_local, mask_global.swapaxes(1, 2)
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
