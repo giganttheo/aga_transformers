@@ -206,7 +206,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
     def _update_mask_global(mask, graph_mask, senders, receivers):
-        return mask.at[receivers, senders].set(graph_mask, mode="drop", unique_indices=True)
+        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
     block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
@@ -613,7 +613,7 @@ class FlaxT5Attention(nn.Module):
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
         block_len= 16 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 512 #TODO: add in config
+        n_global_tokens = 0 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
 

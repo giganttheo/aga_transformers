@@ -67,18 +67,18 @@ def test():
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
-        "window_sizes": [16],
+        "window_sizes": [4],
         "autoregressive":False,
-        "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        "sentence_tokens": [0]# list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
     graph_training = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
-        "window_sizes": [16],
+        "window_sizes": [4],
         "autoregressive":True,
-        "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        "sentence_tokens": [0]#list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
     graph_ar = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
