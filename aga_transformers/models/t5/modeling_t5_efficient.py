@@ -701,11 +701,18 @@ class FlaxT5Attention(nn.Module):
 
             global_attn_weights = dot_product_attention_weights(
                 query_states[:, :n_global_tokens, ...],
-                key_states
+                key_states,
+                bias=position_bias,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
             )
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
             
             # bring back to (batch_size, seq_length, d_model)
+            jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
             attn_output = attn_output[:, :seq_length, ...]
             attn_output = self._merge_heads(attn_output)
