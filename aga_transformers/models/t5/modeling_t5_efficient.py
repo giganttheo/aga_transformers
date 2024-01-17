@@ -17,7 +17,7 @@
 
 import copy
 from dataclasses import field
-from typing import Any, Callable, Iterable, Mapping, Optional, Union, Tuple
+from typing import Any, Callable, Iterable, Mapping, Optional, Union, Tuple, List
 
 import flax.linen as nn
 import jax
@@ -62,6 +62,139 @@ _CONFIG_FOR_DOC = "T5Config"
 
 remat = nn_partitioning.remat
 
+
+
+
+def _pad_to_multiple(x: jnp.ndarray, block_len: int, axis: int, pad_value: int = 0) -> jnp.ndarray:
+    """Pad an array so that a sequence length will be a multiple of `block_len`"""
+    pad_len = -x.shape[axis] % block_len
+    pad = [(0, 0)] * x.ndim
+    pad[axis] = (0, pad_len)
+    x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
+    return x
+
+def _split_into_blocks(x: jnp.ndarray, block_len: int, axis: int) -> jnp.ndarray:
+    """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
+    is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
+    """
+    # pad tensor to multiple of block_len
+    if x.shape[axis] % block_len != 0:
+        x = _pad_to_multiple(x, block_len, axis, pad_value=0)
+    num_blocks = x.shape[axis] // block_len
+    output_shape = x.shape[:axis] + (num_blocks, block_len) + x.shape[(axis + 1) :]
+    return x.reshape(output_shape)
+
+def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_len: int, axis: int) -> jnp.ndarray:
+    """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
+    is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
+    """
+    x_global = x[:, None, :n_global_tokens, ...] #[..., 1, n_global_tokens, ...]
+    x_local = _split_into_blocks(x[:, n_global_tokens:, ...], block_len, axis) # [..., num_blocks, block_len, ...]
+    return x_local, x_global
+
+def _concatenate_3_blocks(x: jnp.ndarray, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
+    """Concatenate three consecutive blocks for each input block for local attentiont.
+    For more information, see: https://arxiv.org/pdf/2112.07916.pdf.
+    """
+    num_blocks = x.shape[block_axis]
+
+    pad = [(0, 0)] * x.ndim
+    pad[block_axis] = (1, 1)
+    # [batch_size, num_blocks, block_len] -> [batch_size, num_blocks + 2, block_len]
+    x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
+
+    blocks_list: List[np.array] = []
+    for i in range(3):
+        # We use indexing approach here:
+        # https://numpy.org/doc/stable/user/basics.indexing.html#dealing-with-variable-numbers-of-indices-within-programs
+        indices = [slice(0, None)] * x.ndim
+        indices[block_axis] = slice(i, i + num_blocks)
+        indices = tuple(indices)
+        blocks_list.append(x[indices])
+    return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len, ...]
+
+def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
+    """Concatenate three consecutive blocks for each input block for local attentiont.
+    For more information, see: https://arxiv.org/pdf/2112.07916.pdf.
+    """
+    num_blocks = x.shape[block_axis]
+    block_len = x.shape[sequence_axis]
+
+    pad = [(0, 0)] * x.ndim
+    pad[block_axis] = (1, 1)
+    # [..., num_blocks, block_len] -> [..., num_blocks + 2, block_len]
+    x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
+    x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
+
+    blocks_list: List[np.array] = []
+    for i in range(3):
+        # We use indexing approach here:
+        # https://numpy.org/doc/stable/user/basics.indexing.html#dealing-with-variable-numbers-of-indices-within-programs
+        indices = [slice(0, None)] * x.ndim
+        indices[block_axis] = slice(i, i + num_blocks)
+        indices = tuple(indices)
+        blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
+    blocks_list.append(x_global)
+    return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
+
+
+def _make_3block_relative_position_ids(block_len: int) -> jnp.ndarray:
+    """Makes 3-blocked relative position ids for local attention."""
+    position_ids = jnp.arange(3 * block_len, dtype=jnp.int32)
+    center_position_ids = position_ids[block_len:-block_len]
+    relative_position_ids = position_ids[None, :] - center_position_ids[:, None]  # [block_len, 3 * block_len]
+    return relative_position_ids
+
+def _mask_local_attention_mask(local_attention_mask: np.ndarray, block_len: int) -> jnp.ndarray:
+    """Mask local attention mask to enforce that tokens are not allowed to attend tokens farther than ``local_radius."""
+    relative_position_ids = _make_3block_relative_position_ids(block_len)
+    locality_mask = jnp.abs(relative_position_ids) < block_len
+    locality_mask = locality_mask[None, None, :, :]
+    return jnp.logical_and(local_attention_mask, locality_mask)
+
+def _get_local_attention_mask(attention_mask: np.ndarray, block_len: int) -> jnp.ndarray:
+    """Prepare attention mask to be applied for a local attention."""
+    # [batch_size, num_blocks, block_len]
+    _blocked_attention_mask = _split_into_blocks(attention_mask, block_len, axis=1)
+    # [batch_size, num_block, 3 * block_len]
+    _3blocked_attention_mask = _concatenate_3_blocks(_blocked_attention_mask, block_axis=1, sequence_axis=2)
+
+    _blocked_attention_mask = _blocked_attention_mask[..., None]
+    _3blocked_attention_mask = _3blocked_attention_mask[..., None, :]
+    # [batch_size, num_block, block_len, 3 * block_len]
+    local_attention_mask = jnp.logical_and(_blocked_attention_mask, _3blocked_attention_mask)
+    local_attention_mask = _mask_local_attention_mask(local_attention_mask, block_len)
+    # [batch_size, 1, num_block, block_len, 3 * block_len]
+    return local_attention_mask[:, None, ...]
+
+
+def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int):
+  #senders, receivers & graph_mask are of shape [b, h, seq_len]
+  mask_shape = tuple(senders.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
+  mask = jnp.zeros(mask_shape, dtype=bool)
+
+  def setup_mask(mask, senders, receivers, graph_mask):
+    def _inner_loop(mask, state):
+      senders, receivers, graph_mask = state[0], state[1], state[2]
+      # block_id_q = (sender - n_global_tokens) // block_len
+
+      #position within the block q
+      block_pos_q = jax.lax.select(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000)
+
+      #block id
+      block_id = (senders - n_global_tokens) // block_len
+      block_id = jax.lax.select(block_id >= 0, block_id, 1_000_000)
+      
+      #position within the block k
+      block_pos_k = jax.lax.select(receivers >= n_global_tokens, ((receivers - n_global_tokens) % block_len) + n_global_tokens, receivers)
+
+      # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
+      mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+      return mask, None
+    f=jax.vmap(lambda senders, receivers, graph_mask, mask : jax.lax.scan(_inner_loop, init=mask, xs=jnp.stack([senders, receivers, graph_mask])))
+    return f(senders, receivers, graph_mask, mask)[0]
+
+  return setup_mask(mask, senders, receivers, graph_mask)
 
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
@@ -459,6 +592,9 @@ class FlaxT5Attention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
+        block_len=254+1  #TODO: add in config (radius + 1)
+        n_global_tokens = 3 #TODO: add in config
+        
         batch_size, seq_length = hidden_states.shape[:2]
 
         # q, k, v projections
@@ -479,6 +615,18 @@ class FlaxT5Attention(nn.Module):
             receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
             senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
             graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
+
+            # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
+            query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
+            key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
+            value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
+
+            num_blocks = query_states_blocks.shape[1]
+
+            # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
+            key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
@@ -525,103 +673,39 @@ class FlaxT5Attention(nn.Module):
                 position_bias = position_bias + graph_mask[:, None, :]
                 del graph_mask
 
+
+            #adapt graph attention to block efficient attn
+            position_bias = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks)
+
             # create dropout rng
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
-            receivers, senders = receivers[0], senders[0]
+            # Softmax(QK^T)
+            attn_weights = dot_product_attention_weights(
+                query_states_blocks,
+                key_states_blocks,
+                bias=position_bias,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+            # multiply with value states
+            attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
+            attn_output_blocks = self._merge_heads(attn_output)
 
-            @partial(jax.jit)
-            @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
-            @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
-            def _scaled_dot_product_attention_graph(q, k, v, bias=None):
-                """
-                Computes the dot product attention according to the attention pattern specified by the graph defined
-                by the adjacency list (senders, receivers)
-                """
-                dropout_rate=self.dropout
-                dtype = q.dtype
-                bucket_size=100_000
-                seq_len, depth = q.shape
-                #compute attention logits: <Q,K> / sqrt(d_q)
-                q = q / jnp.sqrt(depth).astype(dtype)
-                # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
-                attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
-                if bias is not None:
-                    attn_logits = attn_logits + bias
-                #softmax over receiver nodes
-                w = segment_softmax(attn_logits,
-                                    segment_ids=senders,
-                                    num_segments=seq_len,
-                                    indices_are_sorted=True,
-                                    bucket_size=bucket_size).astype(dtype) #(num_edges,)
-                
-                # apply attention dropout
-                if not deterministic and dropout_rate > 0.0:
-                    keep_prob = 1.0 - dropout_rate
-                    # dropout is broadcast across the batch + head dimensions (with vmap)
-                    dropout_shape = tuple(w.shape[-1])
-                    keep = random.bernoulli(dropout_rng, keep_prob, dropout_shape)  # type: ignore
-                    multiplier = keep.astype(dtype) / jnp.asarray(keep_prob, dtype=dtype)
-                    w = w * multiplier
-
-                #attention weights applied to the values for every edge:
-                values = jnp.einsum('e,ed->ed', w, v.take(receivers, axis=0)) #(num_edges, d_v)
-                #summing over the nodes
-                values = jax.ops.segment_sum(values,
-                                    segment_ids=senders,
-                                    num_segments=seq_len,
-                                    unique_indices=False,
-                                    indices_are_sorted=True,
-                                    bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
-                return values, w
-
-            #BCOO attention
-            @jax.jit
-            @partial(jax.vmap, in_axes=(-2,-2,-2,1), out_axes=(-2))  #vectorize over heads
-            @partial(jax.vmap, in_axes=(0,0,0,0)) #vectorize over batches
-            def _scaled_dot_product_attention_bcoo(q, k, v, bias=None):
-                dropout_rate=self.dropout
-                dtype = q.dtype
-                bucket_size=100_000
-                q_len, depth = q.shape
-                k_len = k.shape[0]
-                indices = jnp.stack([senders, receivers], axis=-1)
-                q = q / jnp.sqrt(depth).astype(dtype)
-                attn_logits = sparse.bcoo_dot_general_sampled(q[None], jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
-                if bias is not None:
-                    attn_logits = attn_logits + bias
-                w = segment_softmax(attn_logits,
-                                    segment_ids=senders,
-                                    num_segments=q_len,
-                                    indices_are_sorted=True,
-                                    bucket_size=bucket_size).astype(dtype) #(num_edges,)
-                # apply attention dropout
-                if not deterministic and dropout_rate > 0.0:
-                    keep_prob = 1.0 - dropout_rate
-                    # dropout is broadcast across the batch + head dimensions (with vmap)
-                    dropout_shape = tuple(w.shape[-1])
-                    keep = random.bernoulli(dropout_rng, keep_prob, dropout_shape)  # type: ignore
-                    multiplier = keep.astype(dtype) / jnp.asarray(keep_prob, dtype=dtype)
-                    w = w * multiplier
-                w = sparse.BCOO((w, indices), shape=np.array([q_len, k_len]))
-
-                @sparse.sparsify
-                def attn(w, v):
-                    return jnp.einsum("...qk,...kd->...qd", w, v).astype(dtype)
-                
-                values = attn(w, v)
-                return values, w.data
-
-            attn_output, attn_weights = _scaled_dot_product_attention_graph(
-                query_states,
-                key_states,
-                value_states,
-                position_bias)
+            global_attn_weights = dot_product_attention_weights(
+                query_states[:, :n_global_tokens, ...],
+                key_states
+            )
+            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
             
-            #we don't need this in memory anymore.
-            # del receivers
-            # del senders
+            # bring back to (batch_size, seq_length, d_model)
+            attn_output_global = self._merge_heads(attn_output_global)
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
+            attn_output = attn_output_blocks[:, :seq_length, :]
 
         else:
             # regular attention (for decoder during training)
@@ -700,8 +784,8 @@ class FlaxT5Attention(nn.Module):
             # multiply with value states
             attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
 
-        # bring back to (batch_size, seq_length, d_model)
-        attn_output = self._merge_heads(attn_output)
+            # bring back to (batch_size, seq_length, d_model)
+            attn_output = self._merge_heads(attn_output)
 
         # apply output matrix
         attn_output = self.o(attn_output)
