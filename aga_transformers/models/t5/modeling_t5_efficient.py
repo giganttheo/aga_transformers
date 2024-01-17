@@ -177,8 +177,11 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
   mask_global = jnp.zeros(mask_global_shape, dtype=graph_mask.dtype)
 
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
-    def _inner_loop_local(mask, state):
-      senders, receivers, graph_mask = state[0], state[1], state[2]
+
+    @jax.vmap #batch
+    @jax.vmap #heads
+    @jax.vmap #num_edges
+    def _get_ids_in_blocks(senders, receivers):
       # block_id_q = (sender - n_global_tokens) // block_len
 
       #position within the block q
@@ -192,20 +195,25 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
       block_pos_k = jnp.where(receivers >= n_global_tokens, ((receivers - n_global_tokens) % block_len) + n_global_tokens, receivers).astype("int16")
 
       # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
+      return block_id, block_pos_q, block_pos_k
+    #   mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+    #   return mask, None
 
-      mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
-      return mask, None
-    
-    def _inner_loop_global(mask, state):
-      senders, receivers, graph_mask = state[0], state[1], state[2]
-      mask = mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
-      return mask, None
-    
-    loop_local=jax.vmap(jax.vmap(lambda senders, receivers, graph_mask, mask : jax.lax.scan(_inner_loop_local, init=mask, xs=jnp.stack([senders, receivers, graph_mask])), in_axes=[None, None, 0, 0])) #change here for head-wise senders/receivers
-    loop_global=jax.vmap(jax.vmap(lambda senders, receivers, graph_mask, mask: jax.lax.scan(_inner_loop_global, init=mask, xs=jnp.stack([senders, receivers, graph_mask])), in_axes=[None, None, 0, 0]))
-    result_local, _ = loop_local(senders, receivers, graph_mask, mask_local)
-    result_global, _ = loop_global(senders, receivers, graph_mask, mask_global)
-    return result_local.swapaxes(1, 2), result_global.swapaxes(1, 2)
+    @jax.vmap #batch
+    @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+    @jax.vmap #batch
+    @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+    def _update_mask_global(mask, graph_mask, senders, receivers):
+        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+    mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
+    mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+
+    return mask_local.swapaxes(1, 2), mask_global.swapaxes(1, 2)
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
