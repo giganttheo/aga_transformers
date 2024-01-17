@@ -201,12 +201,12 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
     def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
-        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+        return mask.at[block_ids, block_pos_k, block_pos_q].set(graph_mask, mode="drop", unique_indices=True)
 
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
     def _update_mask_global(mask, graph_mask, senders, receivers):
-        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+        return mask.at[receivers, senders].set(graph_mask, mode="drop", unique_indices=True)
 
     block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
