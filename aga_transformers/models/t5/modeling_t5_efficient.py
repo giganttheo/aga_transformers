@@ -191,7 +191,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
       # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
       mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
       return mask, None
-    f=jax.vmap(jax.vmap(lambda senders, receivers, graph_mask, mask : jax.lax.scan(_inner_loop, init=mask, xs=jnp.stack([senders, receivers, graph_mask]))), in_axes=[None, None, 0, 0]) #change here for head-wise senders/receivers
+    f=jax.vmap(jax.vmap(lambda senders, receivers, graph_mask, mask : jax.lax.scan(_inner_loop, init=mask, xs=jnp.stack([senders, receivers, graph_mask])), in_axes=[None, None, 0, 0])) #change here for head-wise senders/receivers
     result, _ = f(senders, receivers, graph_mask, mask)
     return result
 
