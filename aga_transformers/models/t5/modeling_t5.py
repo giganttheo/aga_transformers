@@ -526,6 +526,7 @@ class FlaxT5Attention(nn.Module):
                 del graph_mask
 
             # create dropout rng
+            dropout_rng = None
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
@@ -682,6 +683,7 @@ class FlaxT5Attention(nn.Module):
                 )
 
             # create dropout rng
+            dropout_rng = None
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 

@@ -678,6 +678,7 @@ class FlaxT5Attention(nn.Module):
             position_bias = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks)
 
             # create dropout rng
+            dropout_rng = None
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
@@ -766,6 +767,7 @@ class FlaxT5Attention(nn.Module):
                 )
 
             # create dropout rng
+            dropout_rng = None
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
