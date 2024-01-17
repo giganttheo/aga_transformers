@@ -703,6 +703,7 @@ class FlaxT5Attention(nn.Module):
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
+            jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             # Softmax(QK^T)
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
