@@ -179,14 +179,14 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
       # block_id_q = (sender - n_global_tokens) // block_len
 
       #position within the block q
-      block_pos_q = jax.lax.select(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, int(1_000_000))
+      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int16")
 
       #block id
       block_id = (senders - n_global_tokens) // block_len
-      block_id = jax.lax.select(block_id >= 0, block_id, 1_000_000)
+      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int16")
       
       #position within the block k
-      block_pos_k = jax.lax.select(receivers >= n_global_tokens, ((receivers - n_global_tokens) % block_len) + n_global_tokens, receivers)
+      block_pos_k = jnp.where(receivers >= n_global_tokens, ((receivers - n_global_tokens) % block_len) + n_global_tokens, receivers).astype("int16")
 
       # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
       mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
