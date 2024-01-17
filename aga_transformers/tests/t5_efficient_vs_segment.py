@@ -18,7 +18,8 @@ from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration as ReferenceM
 from ..models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
 from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
-from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
+# from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
+from ..attention_patterns.sparse_attention.led import create_led_attn_patterns
 
 
 allclose_kwargs = {
@@ -66,16 +67,20 @@ def test():
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
+        "window_sizes": [16],
         "autoregressive":False,
+        "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
-    graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
+    graph_training = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
+        "window_sizes": [16],
         "autoregressive":True,
+        "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
-    graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
+    graph_ar = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
     shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
