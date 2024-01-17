@@ -88,9 +88,9 @@ def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_l
     """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
     is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
     """
-    x_global = x[:, None, :n_global_tokens, ...] #[..., 1, n_global_tokens, ...]
+    x_global = x[:, :n_global_tokens, ...]
     x_local = _split_into_blocks(x[:, n_global_tokens:, ...], block_len, axis) # [..., num_blocks, block_len, ...]
-    return x_local, x_global
+    return x_local, x_global[:, None, ...]
 
 def _concatenate_3_blocks(x: jnp.ndarray, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
     """Concatenate three consecutive blocks for each input block for local attentiont.
@@ -612,7 +612,7 @@ class FlaxT5Attention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
-        block_len= 1 #254+1  #TODO: add in config (radius + 1)
+        block_len= 3 #254+1  #TODO: add in config (radius + 1)
         n_global_tokens = 0 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
