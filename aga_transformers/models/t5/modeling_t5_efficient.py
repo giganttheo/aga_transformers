@@ -126,7 +126,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
     x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
     x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
 
-    blocks_list: List[np.array] = []
+    blocks_list: List[np.array] = [x_global]
     for i in range(3):
         # We use indexing approach here:
         # https://numpy.org/doc/stable/user/basics.indexing.html#dealing-with-variable-numbers-of-indices-within-programs
@@ -134,7 +134,6 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
         indices[block_axis] = slice(i, i + num_blocks)
         indices = tuple(indices)
         blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
-    blocks_list.append(x_global)
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
 
 
@@ -641,8 +640,11 @@ class FlaxT5Attention(nn.Module):
             num_blocks = query_states_blocks.shape[1]
 
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-            key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+            # key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
+            # value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+
+            key_states_blocks = _concatenate_3_blocks(key_states_blocks, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks(value_states_blocks, block_axis=1, sequence_axis=2)
 
             # counter-act scaling in dot_product_attention_weights function
             query_states_blocks *= jnp.sqrt(query_states_blocks.shape[-1]).astype(self.dtype)
