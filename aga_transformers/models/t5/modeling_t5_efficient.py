@@ -627,9 +627,6 @@ class FlaxT5Attention(nn.Module):
         key_states = self._split_heads(key_states)
         value_states = self._split_heads(value_states)
 
-        # counter-act scaling in dot_product_attention_weights function
-        query_states *= jnp.sqrt(query_states.shape[-1]).astype(self.dtype)
-
         if self.has_variable("graph", "receivers"):
             #Graph attention
             receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
@@ -647,6 +644,9 @@ class FlaxT5Attention(nn.Module):
             key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
             value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
+            # counter-act scaling in dot_product_attention_weights function
+            query_states_blocks *= jnp.sqrt(query_states_blocks.shape[-1]).astype(self.dtype)
+            query_states *= jnp.sqrt(query_states.shape[-1]).astype(self.dtype)
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
@@ -741,6 +741,8 @@ class FlaxT5Attention(nn.Module):
 
 
         else:
+            # counter-act scaling in dot_product_attention_weights function
+            query_states *= jnp.sqrt(query_states.shape[-1])
             # regular attention (for decoder during training)
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
