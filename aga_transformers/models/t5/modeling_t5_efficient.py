@@ -611,7 +611,7 @@ class FlaxT5Attention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
-        block_len= 255 #254+1  #TODO: add in config (radius + 1)
+        block_len= 1 #254+1  #TODO: add in config (radius + 1)
         n_global_tokens = 0 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
@@ -633,9 +633,12 @@ class FlaxT5Attention(nn.Module):
             graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
 
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
-            query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
-            key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
-            value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
+            # query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
+            # key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
+            # value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
+            query_states_blocks = _split_into_blocks(query_states, block_len, axis=1)
+            key_states_blocks = _split_into_blocks(key_states, block_len, axis=1)
+            value_states_blocks = _split_into_blocks(value_states, block_len, axis=1)
 
             num_blocks = query_states_blocks.shape[1]
 
