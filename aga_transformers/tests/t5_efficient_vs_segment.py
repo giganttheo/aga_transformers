@@ -69,7 +69,7 @@ def test():
         "max_target_length": 256,
         "window_sizes": [16],
         "autoregressive":False,
-        "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
     graph_training = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
@@ -123,9 +123,9 @@ def test():
     ## Encoder part
     print(output_training.encoder_last_hidden_state[0, 3:10, :6])
     print(output_reference.encoder_last_hidden_state[0, 3:10, :6])
-    print("attn:")
-    print(output_reference.encoder_attentions[0, 3:10, :6])
-    print(output_training.encoder_attentions[0, 3:10, :6])
+    # print("attn:")
+    # print(output_reference.encoder_attentions[0, 3:10, :6])
+    # print(output_training.encoder_attentions[0, 3:10, :6])
     assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
     print("==local attn are close==")
     assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
