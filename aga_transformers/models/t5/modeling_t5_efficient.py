@@ -708,7 +708,9 @@ class FlaxT5Attention(nn.Module):
             # bring back to (batch_size, seq_length, d_model)
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
             attn_output = attn_output[:, :seq_length, ...]
-            attn_output_global = self._merge_heads(attn_output_global)
+            attn_output = self._merge_heads(attn_output)
+            jax.debug.print("output shape: {attn_output.shape}")
+
 
         else:
             # regular attention (for decoder during training)
