@@ -676,14 +676,14 @@ class FlaxT5Attention(nn.Module):
 
 
             #adapt graph attention to block efficient attn
-            jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
+            # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             position_bias = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks)
 
             # create dropout rng
             dropout_rng = None
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
-
+            position_bias=None
             # Softmax(QK^T)
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
@@ -709,7 +709,7 @@ class FlaxT5Attention(nn.Module):
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
             attn_output = attn_output[:, :seq_length, ...]
             attn_output = self._merge_heads(attn_output)
-            jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
+            # jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
 
 
         else:
