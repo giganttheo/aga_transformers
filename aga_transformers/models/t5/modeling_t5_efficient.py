@@ -179,7 +179,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
       # block_id_q = (sender - n_global_tokens) // block_len
 
       #position within the block q
-      block_pos_q = jax.lax.select(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000)
+      block_pos_q = jax.lax.select(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, int(1_000_000))
 
       #block id
       block_id = (senders - n_global_tokens) // block_len
