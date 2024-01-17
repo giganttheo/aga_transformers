@@ -179,7 +179,6 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
 
     @jax.vmap #batch
-    @jax.vmap #heads
     @jax.vmap #num_edges
     def _get_ids_in_blocks(senders, receivers):
       # block_id_q = (sender - n_global_tokens) // block_len
