@@ -719,7 +719,9 @@ class FlaxT5Attention(nn.Module):
                 dtype=self.dtype,
             )
             # multiply with value states
-            attn_output_blocks = jnp.einsum("... t h q k , ... b k h d ->... q h d", attn_weights, value_states_blocks)
+            jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
+            jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
+            attn_output_blocks = jnp.einsum("... h q k , ... k h d ->... q h d", attn_weights, value_states_blocks)
             # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
             global_attn_weights = dot_product_attention_weights(
