@@ -613,7 +613,7 @@ class FlaxT5Attention(nn.Module):
                 
                 values = attn(w, v)
                 return values, w.data
-
+            position_bias=None
             attn_output, attn_weights = _scaled_dot_product_attention_graph(
                 query_states,
                 key_states,
