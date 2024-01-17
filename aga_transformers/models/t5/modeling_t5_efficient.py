@@ -182,18 +182,26 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     def _get_ids_in_blocks(senders, receivers):
       # block_id_q = (sender - n_global_tokens) // block_len
 
-      #position within the block q
-      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int16")
-
       #block id
       block_id = (senders - n_global_tokens) // block_len
       block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int16")
       
-      block_id_k = (senders - n_global_tokens) // block_len
+      block_id_k = (receivers - n_global_tokens) // block_len
       block_id_k = jnp.where(block_id_k >= 0, block_id, 1_000_000).astype("int16")
 
-      #position within the block k
-      block_pos_k = jnp.where(receivers >= n_global_tokens, ((receivers - n_global_tokens) % block_len) + n_global_tokens + block_id_k * block_len, receivers).astype("int16")
+      #position within the block q
+      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int16")
+
+      offset_k = block_id_k - block_id
+      jax.debug.print("offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+      block_pos_k = jnp.where((receivers >= n_global_tokens), ((receivers - n_global_tokens) % block_len) + n_global_tokens + (1 + offset_k) * block_len, receivers)
+      block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+      # block_pos_k_s = []
+      # for offset_k in [-1, 0, 1]:
+      #   #position within the block k
+      #   block_pos_k = jnp.where(block_id == block_id_k + offset_k, ((receivers - n_global_tokens) % block_len) + n_global_tokens + offset_k * block_len, 1_000_000).astype("int16")
+      #   block_pos_k = jnp.where(block_pos_k >= 0, block_pos_k, 1_000_000).astype("int16")
+      #   block_pos_k_s.append(jnp.where(receivers >= n_global_tokens, block_pos_k, receivers).astype("int16"))
 
       # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
       return block_id, block_pos_q, block_pos_k
@@ -202,7 +210,9 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
-    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k_):
+        # mask=mask.at[block_ids, block_pos_q, block_pos_k_0].set(graph_mask, mode="drop", unique_indices=True)
+        # mask=mask.at[block_ids, block_pos_q, block_pos_k_1].set(graph_mask, mode="drop", unique_indices=True)
         return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
 
     @jax.vmap #batch
