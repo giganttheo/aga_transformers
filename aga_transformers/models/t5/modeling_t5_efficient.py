@@ -709,7 +709,7 @@ class FlaxT5Attention(nn.Module):
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
             attn_output = attn_output[:, :seq_length, ...]
             attn_output = self._merge_heads(attn_output)
-            jax.debug.print("output shape: {attn_output.shape}")
+            jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
 
 
         else:
