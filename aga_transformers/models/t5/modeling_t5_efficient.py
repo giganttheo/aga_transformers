@@ -696,8 +696,8 @@ class FlaxT5Attention(nn.Module):
                 dtype=self.dtype,
             )
             # multiply with value states
-            attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
-            attn_output_blocks = self._merge_heads(attn_output)
+            attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
+            attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
             global_attn_weights = dot_product_attention_weights(
                 query_states[:, :n_global_tokens, ...],
@@ -706,9 +706,9 @@ class FlaxT5Attention(nn.Module):
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
             
             # bring back to (batch_size, seq_length, d_model)
-            attn_output_global = self._merge_heads(attn_output_global)
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
-            attn_output = attn_output_blocks[:, :seq_length, :]
+            attn_output = attn_output[:, :seq_length, ...]
+            attn_output_global = self._merge_heads(attn_output_global)
 
         else:
             # regular attention (for decoder during training)
