@@ -121,7 +121,7 @@ def test():
     print(" * output for reference model: Done")
 
     ## Encoder part
-
+    print(f"shape: {output_training.encoder_last_hidden_state.shape}")
     assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
     print("==local attn are close==")
     assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
