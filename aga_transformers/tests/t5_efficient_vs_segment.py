@@ -123,6 +123,9 @@ def test():
     ## Encoder part
     print(output_training.encoder_last_hidden_state[0, 3:10, :6])
     print(output_reference.encoder_last_hidden_state[0, 3:10, :6])
+    print("attn:")
+    print(output_training.cross_attentions[0, 3:10, :6])
+    print(output_reference.cross_attentions[0, 3:10, :6])
     assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
     print("==local attn are close==")
     assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
