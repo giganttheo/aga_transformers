@@ -618,7 +618,7 @@ class FlaxT5Attention(nn.Module):
                 query_states,
                 key_states,
                 value_states,
-                None,#position_bias,
+                position_bias,
                 )
             
             #we don't need this in memory anymore.

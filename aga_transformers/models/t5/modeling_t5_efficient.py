@@ -709,7 +709,7 @@ class FlaxT5Attention(nn.Module):
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
                 key_states_blocks,
-                bias=None, #position_bias_local,
+                bias=position_bias_local,
                 dropout_rng=dropout_rng,
                 dropout_rate=self.dropout,
                 broadcast_dropout=True,
