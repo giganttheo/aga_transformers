@@ -722,7 +722,7 @@ class FlaxT5Attention(nn.Module):
             jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
             jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
             attn_output_blocks = jnp.einsum("... h q k , ... k h d ->... q h d", attn_weights, value_states_blocks)
-            shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[2:]
+            shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output)[:, :seq_length, ...]
             # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
