@@ -201,7 +201,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
     def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
-        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+        return mask.at[block_ids, block_pos_k, block_pos_q].set(graph_mask, mode="drop", unique_indices=True)
 
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
@@ -705,7 +705,7 @@ class FlaxT5Attention(nn.Module):
 
             jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             # Softmax(QK^T)
-            
+
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
                 key_states_blocks,
