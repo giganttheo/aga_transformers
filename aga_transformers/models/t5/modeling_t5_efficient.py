@@ -168,13 +168,16 @@ def _get_local_attention_mask(attention_mask: np.ndarray, block_len: int) -> jnp
     return local_attention_mask[:, None, ...]
 
 
-def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int):
-  #senders, receivers & graph_mask are of shape [b, h, seq_len]
-  mask_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  mask = jnp.zeros(mask_shape, dtype=bool)
+def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int):
+  
+  mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
+  mask_local = jnp.zeros(mask_local_shape, dtype=graph_mask.dtype)
 
-  def setup_mask(mask, senders, receivers, graph_mask):
-    def _inner_loop(mask, state):
+  mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
+  mask_global = jnp.zeros(mask_global_shape, dtype=graph_mask.dtype)
+
+  def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
+    def _inner_loop_local(mask, state):
       senders, receivers, graph_mask = state[0], state[1], state[2]
       # block_id_q = (sender - n_global_tokens) // block_len
 
@@ -189,13 +192,22 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
       block_pos_k = jnp.where(receivers >= n_global_tokens, ((receivers - n_global_tokens) % block_len) + n_global_tokens, receivers).astype("int16")
 
       # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
+
       mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
       return mask, None
-    f=jax.vmap(jax.vmap(lambda senders, receivers, graph_mask, mask : jax.lax.scan(_inner_loop, init=mask, xs=jnp.stack([senders, receivers, graph_mask])), in_axes=[None, None, 0, 0])) #change here for head-wise senders/receivers
-    result, _ = f(senders, receivers, graph_mask, mask)
-    return result.swapaxes(1, 2)
+    
+    def _inner_loop_global(mask, state):
+      senders, receivers, graph_mask = state[0], state[1], state[2]
+      mask = mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+      return mask, None
+    
+    loop_local=jax.vmap(jax.vmap(lambda senders, receivers, graph_mask, mask : jax.lax.scan(_inner_loop_local, init=mask, xs=jnp.stack([senders, receivers, graph_mask])), in_axes=[None, None, 0, 0])) #change here for head-wise senders/receivers
+    loop_global=jax.vmap(jax.vmap(lambda senders, receivers, graph_mask, mask: jax.lax.scan(_inner_loop_global, init=mask, xs=jnp.stack([senders, receivers, graph_mask])), in_axes=[None, None, 0, 0]))
+    result_local, _ = loop_local(senders, receivers, graph_mask, mask_local)
+    result_global, _ = loop_global(senders, receivers, graph_mask, mask_global)
+    return result_local.swapaxes(1, 2), result_global.swapaxes(1, 2)
 
-  return setup_mask(mask, senders, receivers, graph_mask)
+  return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
@@ -677,18 +689,18 @@ class FlaxT5Attention(nn.Module):
 
             #adapt graph attention to block efficient attn
             # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
-            position_bias = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks)
+            position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length)
 
             # create dropout rng
             dropout_rng = None
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
-            position_bias=None
+
             # Softmax(QK^T)
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
                 key_states_blocks,
-                bias=position_bias,
+                bias=position_bias_local,
                 dropout_rng=dropout_rng,
                 dropout_rate=self.dropout,
                 broadcast_dropout=True,
@@ -702,7 +714,7 @@ class FlaxT5Attention(nn.Module):
             global_attn_weights = dot_product_attention_weights(
                 query_states[:, :n_global_tokens, ...],
                 key_states,
-                bias=position_bias,
+                bias=position_bias_global,
                 dropout_rng=dropout_rng,
                 dropout_rate=self.dropout,
                 broadcast_dropout=True,
