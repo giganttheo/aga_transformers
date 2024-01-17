@@ -734,8 +734,8 @@ class FlaxT5Attention(nn.Module):
             
             # bring back to (batch_size, seq_length, d_model)
             jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks.shape}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
-            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
-            attn_output = attn_output[:, :seq_length, ...]
+            # attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
+            attn_output = attn_output_blocks[:, :seq_length, ...]
             attn_output = self._merge_heads(attn_output)
             # jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
 

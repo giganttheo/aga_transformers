@@ -18,7 +18,7 @@ class LongformerAttentionPattern(AttentionPattern):
     layer_receivers = []
     layer_senders = []
 
-    print(f"global tokens: {global_tokens}")
+    # print(f"global tokens: {global_tokens}")
     # global attention
     for i in global_tokens:
       for j in seq_q:
@@ -32,7 +32,7 @@ class LongformerAttentionPattern(AttentionPattern):
     #local window attention
     for i in seq_kv - global_tokens:
       window = set([i + offset * 1 for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * 1 >= 0])
-      print(f"window: {window - global_tokens}")
+      # print(f"window: {window - global_tokens}")
       for j in window - global_tokens:
         layer_receivers.append(i)
         layer_senders.append(j)
