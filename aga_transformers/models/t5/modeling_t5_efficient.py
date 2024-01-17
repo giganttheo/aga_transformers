@@ -190,9 +190,10 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 
       # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
       mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
-      return mask, None
+      return mask, mask
     f=jax.vmap(lambda senders, receivers, graph_mask, mask : jax.lax.scan(_inner_loop, init=mask, xs=jnp.stack([senders, receivers, graph_mask])))
-    return f(senders, receivers, graph_mask, mask)[0]
+    _, result = f(senders, receivers, graph_mask, mask)
+    return result[-1]
 
   return setup_mask(mask, senders, receivers, graph_mask)
 
@@ -675,6 +676,7 @@ class FlaxT5Attention(nn.Module):
 
 
             #adapt graph attention to block efficient attn
+            jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             position_bias = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks)
 
             # create dropout rng
