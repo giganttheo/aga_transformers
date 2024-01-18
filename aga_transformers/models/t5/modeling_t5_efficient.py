@@ -643,7 +643,7 @@ class FlaxT5Attention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1])
 
-        if self.has_variable("graph", "receivers") and not key_value_states:
+        if self.has_variable("graph", "receivers") and key_value_states is None:
             #Graph attention
             receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
             senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
