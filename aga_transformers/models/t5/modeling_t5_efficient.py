@@ -624,7 +624,7 @@ class FlaxT5Attention(nn.Module):
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
         block_len=512//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 0 #TODO: add in config
+        n_global_tokens = 100 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
 
@@ -650,19 +650,19 @@ class FlaxT5Attention(nn.Module):
             graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
 
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
-            # query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
-            # key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
-            # value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
-            query_states_blocks = _split_into_blocks(query_states, block_len, axis=1)
-            key_states_blocks = _split_into_blocks(key_states, block_len, axis=1)
-            value_states_blocks = _split_into_blocks(value_states, block_len, axis=1)
+            query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
+            key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
+            value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
+            # query_states_blocks = _split_into_blocks(query_states, block_len, axis=1)
+            # key_states_blocks = _split_into_blocks(key_states, block_len, axis=1)
+            # value_states_blocks = _split_into_blocks(value_states, block_len, axis=1)
 
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-            # key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
-            # value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+            key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
-            key_states_blocks = _concatenate_3_blocks(key_states_blocks, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks(value_states_blocks, block_axis=1, sequence_axis=2)
+            # key_states_blocks = _concatenate_3_blocks(key_states_blocks, block_axis=1, sequence_axis=2)
+            # value_states_blocks = _concatenate_3_blocks(value_states_blocks, block_axis=1, sequence_axis=2)
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
@@ -741,30 +741,29 @@ class FlaxT5Attention(nn.Module):
             attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             # jax.debug.print("shape_output:{shape_output}", shape_output=shape_output)
-            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")[:, :seq_length, ...]
+            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")[:, :(seq_length-n_global_tokens), ...]
             # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
             # # return attn_output_blocks
-            # global_attn_weights = dot_product_attention_weights(
-            #     query_states[:, :n_global_tokens, ...],
-            #     key_states,
-            #     bias=position_bias_global,
-            #     dropout_rng=dropout_rng,
-            #     dropout_rate=self.dropout,
-            #     broadcast_dropout=True,
-            #     deterministic=deterministic,
-            #     dtype=self.dtype,
-            # )
-            # attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+            global_attn_weights = dot_product_attention_weights(
+                query_states[:, :n_global_tokens, ...],
+                key_states,
+                bias=position_bias_global,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
             # # bring back to (batch_size, seq_length, d_model)
             # jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks.shape}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
-            # # attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
             
-            attn_output = self._merge_heads(attn_output_blocks)
+            attn_output = self._merge_heads(attn_output)
             # attn_output = attn_output_blocks#[:, :seq_length, ...]
             # jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
-
 
         else:
             # regular attention (for decoder during training)
