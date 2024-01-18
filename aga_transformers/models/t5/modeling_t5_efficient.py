@@ -31,6 +31,7 @@ from flax.traverse_util import flatten_dict, unflatten_dict
 from jax.random import PRNGKey
 from jax.experimental import sparse
 from functools import partial
+import math
 
 import einops
 
@@ -84,6 +85,7 @@ def _split_into_blocks(x: jnp.ndarray, block_len: int, axis: int) -> jnp.ndarray
     output_shape = x.shape[:axis] + (num_blocks, block_len) + x.shape[(axis + 1) :]
     return x.reshape(output_shape, order="C")
 
+
 def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_len: int, axis: int) -> jnp.ndarray:
     """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
     is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
@@ -112,6 +114,7 @@ def _concatenate_3_blocks(x: jnp.ndarray, block_axis: int, sequence_axis: int, p
         indices = tuple(indices)
         blocks_list.append(x[indices])
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len, ...]
+
 
 def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
     """Concatenate three consecutive blocks for each input block for local attentiont.
@@ -620,10 +623,12 @@ class FlaxT5Attention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
-        block_len= 16 #254+1  #TODO: add in config (radius + 1)
+        block_len=16 #254+1  #TODO: add in config (radius + 1)
         n_global_tokens = 0 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
+
+        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
 
         # q, k, v projections
         query_states = self.q(hidden_states)  # (batch_size, n_heads, seq_length, dim_per_head)
@@ -634,6 +639,9 @@ class FlaxT5Attention(nn.Module):
         query_states = self._split_heads(query_states)
         key_states = self._split_heads(key_states)
         value_states = self._split_heads(value_states)
+
+        # counter-act scaling in dot_product_attention_weights function
+        query_states *= jnp.sqrt(query_states.shape[-1])
 
         if self.has_variable("graph", "receivers"):
             #Graph attention
@@ -649,18 +657,12 @@ class FlaxT5Attention(nn.Module):
             key_states_blocks = _split_into_blocks(key_states, block_len, axis=1)
             value_states_blocks = _split_into_blocks(value_states, block_len, axis=1)
 
-            num_blocks = query_states_blocks.shape[1]
-
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
             # key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
             # value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
             key_states_blocks = _concatenate_3_blocks(key_states_blocks, block_axis=1, sequence_axis=2)
             value_states_blocks = _concatenate_3_blocks(value_states_blocks, block_axis=1, sequence_axis=2)
-
-            # counter-act scaling in dot_product_attention_weights function
-            query_states_blocks *= jnp.sqrt(query_states_blocks.shape[-1]).astype(self.dtype)
-            query_states *= jnp.sqrt(query_states.shape[-1]).astype(self.dtype)
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
@@ -706,7 +708,6 @@ class FlaxT5Attention(nn.Module):
             if graph_mask is not None:
                 position_bias = position_bias + graph_mask[:, None, :]
                 del graph_mask
-
 
             #adapt graph attention to block efficient attn
             jax.debug.print("position_bias shape: {position_bias.shape}", position_bias=position_bias)
@@ -766,8 +767,6 @@ class FlaxT5Attention(nn.Module):
 
 
         else:
-            # counter-act scaling in dot_product_attention_weights function
-            query_states *= jnp.sqrt(query_states.shape[-1])
             # regular attention (for decoder during training)
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
