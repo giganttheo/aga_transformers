@@ -927,126 +927,200 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
             graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
 
-        else:
-            receivers=np.zeros((batch_size, 1), dtype="i4")
-            senders=np.zeros((batch_size, 1), dtype="i4")
-            graph_mask=np.zeros((batch_size, 1), dtype=bool)
+            # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
+            query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
+            key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
+            value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
+            # query_states_blocks = _split_into_blocks(query_states, block_len, axis=1)
+            # key_states_blocks = _split_into_blocks(key_states, block_len, axis=1)
+            # value_states_blocks = _split_into_blocks(value_states, block_len, axis=1)
 
-        # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
-        query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
-        key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
-        value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
-        # query_states_blocks = _split_into_blocks(query_states, block_len, axis=1)
-        # key_states_blocks = _split_into_blocks(key_states, block_len, axis=1)
-        # value_states_blocks = _split_into_blocks(value_states, block_len, axis=1)
+            # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
+            key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
-        # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-        key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
-        value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+            # key_states_blocks = _concatenate_3_blocks(key_states_blocks, block_axis=1, sequence_axis=2)
+            # value_states_blocks = _concatenate_3_blocks(value_states_blocks, block_axis=1, sequence_axis=2)
 
-        # key_states_blocks = _concatenate_3_blocks(key_states_blocks, block_axis=1, sequence_axis=2)
-        # value_states_blocks = _concatenate_3_blocks(value_states_blocks, block_axis=1, sequence_axis=2)
+            if attention_mask is not None:
+                # merge the input attention mask with the graph mask
+                graph_mask = jnp.logical_and(graph_mask, attn_mask_2_graph_mask(attention_mask, receivers))
 
-        if attention_mask is not None:
-            # merge the input attention mask with the graph mask
-            graph_mask = jnp.logical_and(graph_mask, attn_mask_2_graph_mask(attention_mask, receivers))
-
-        # for fast decoding causal attention mask should be shifted
-        causal_attention_mask_shift = (
-            self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
-        )
-
-        if self.causal:
-            # fast decoding for generate requires special attention_mask
-            if self.has_variable("cache", "cached_key"):
-                # during autoregressive decoding, the current query token was remapped
-                # to sender 0, but should really be causal_attention_mask_shift
-                # senders = jnp.full(senders.shape, 0)
-                causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
-            else:
-                causal_mask = jnp.less_equal(receivers, senders)
-            graph_mask = jnp.logical_and(graph_mask, causal_mask)
-            del causal_mask
-
-        # During fast autoregressive decoding, we feed one position at a time,
-        # and cache the keys and values step by step.
-        if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
-            key_states, value_states = self._concatenate_to_cache(
-                key_states, value_states, query_states
+            # for fast decoding causal attention mask should be shifted
+            causal_attention_mask_shift = (
+                self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
             )
 
-        # replace masked positions with -10_000
-        mask_value = jnp.finfo(self.dtype).min
-        graph_mask = jax.lax.select(
-            graph_mask > 0,
-            jnp.full(graph_mask.shape, 0.0).astype(self.dtype),
-            jnp.full(graph_mask.shape, mask_value).astype(self.dtype),
-        )
+            if self.causal:
+                # fast decoding for generate requires special attention_mask
+                if self.has_variable("cache", "cached_key"):
+                    # during autoregressive decoding, the current query token was remapped
+                    # to sender 0, but should really be causal_attention_mask_shift
+                    # senders = jnp.full(senders.shape, 0)
+                    causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
+                else:
+                    causal_mask = jnp.less_equal(receivers, senders)
+                graph_mask = jnp.logical_and(graph_mask, causal_mask)
+                del causal_mask
 
-        # compute position bias
-        position_bias = self._create_position_bias_sparse(
-            key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
-        )
+            # During fast autoregressive decoding, we feed one position at a time,
+            # and cache the keys and values step by step.
+            if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
+                key_states, value_states = self._concatenate_to_cache(
+                    key_states, value_states, query_states
+                )
 
-        if graph_mask is not None:
-            position_bias = position_bias + graph_mask[:, None, :]
-            del graph_mask
+            # replace masked positions with -10_000
+            mask_value = jnp.finfo(self.dtype).min
+            graph_mask = jax.lax.select(
+                graph_mask > 0,
+                jnp.full(graph_mask.shape, 0.0).astype(self.dtype),
+                jnp.full(graph_mask.shape, mask_value).astype(self.dtype),
+            )
 
-        #adapt graph attention to block efficient attn
-        # jax.debug.print("position_bias shape: {position_bias.shape}", position_bias=position_bias)
-        # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
-        position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
+            # compute position bias
+            position_bias = self._create_position_bias_sparse(
+                key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
+            )
 
-        # create dropout rng
-        dropout_rng = None
-        if not deterministic and self.dropout > 0.0:
-            dropout_rng = self.make_rng("dropout")
+            if graph_mask is not None:
+                position_bias = position_bias + graph_mask[:, None, :]
+                del graph_mask
 
-        # jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
-        # Softmax(QK^T)
+            #adapt graph attention to block efficient attn
+            # jax.debug.print("position_bias shape: {position_bias.shape}", position_bias=position_bias)
+            # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
+            position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
 
-        attn_weights = dot_product_attention_weights(
-            query_states_blocks,
-            key_states_blocks,
-            bias=position_bias_local,
-            dropout_rng=dropout_rng,
-            dropout_rate=self.dropout,
-            broadcast_dropout=True,
-            deterministic=deterministic,
-            dtype=self.dtype,
-        )
-        # multiply with value states
-        
-        # jax.debug.print("bias shape: {bias.shape}", bias=position_bias_local)
-        # jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
-        # jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
-        #multiply with value states
-        attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
-        shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
-        # jax.debug.print("shape_output:{shape_output}", shape_output=shape_output)
-        attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
-        # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
+            # create dropout rng
+            dropout_rng = None
+            if not deterministic and self.dropout > 0.0:
+                dropout_rng = self.make_rng("dropout")
 
-        # # return attn_output_blocks
-        global_attn_weights = dot_product_attention_weights(
-            query_states[:, :n_global_tokens, ...],
-            key_states,
-            bias=position_bias_global,
-            dropout_rng=dropout_rng,
-            dropout_rate=self.dropout,
-            broadcast_dropout=True,
-            deterministic=deterministic,
-            dtype=self.dtype,
-        )
-        attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+            # jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
+            # Softmax(QK^T)
 
-        # # bring back to (batch_size, seq_length, d_model)
-        # jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks.shape}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
-        attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)[:, :seq_length, ...]
-        
+            attn_weights = dot_product_attention_weights(
+                query_states_blocks,
+                key_states_blocks,
+                bias=position_bias_local,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+            # multiply with value states
+            
+            # jax.debug.print("bias shape: {bias.shape}", bias=position_bias_local)
+            # jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
+            # jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
+            #multiply with value states
+            attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
+            shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
+            # jax.debug.print("shape_output:{shape_output}", shape_output=shape_output)
+            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
+            # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
+
+            # # return attn_output_blocks
+            global_attn_weights = dot_product_attention_weights(
+                query_states[:, :n_global_tokens, ...],
+                key_states,
+                bias=position_bias_global,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+
+            # # bring back to (batch_size, seq_length, d_model)
+            # jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks.shape}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)[:, :seq_length, ...]
+            
+        else:
+            # regular attention (for decoder during training)
+            # for fast decoding causal attention mask should be shifted
+            causal_attention_mask_shift = (
+                self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
+            )
+            # create causal attention_mask; attention_mask has to be defined when model is causal
+            if self.causal:
+                causal_attention_mask = make_causal_mask(attention_mask, dtype="bool")
+                # fast decoding for generate requires special attention_mask
+                if self.has_variable("cache", "cached_key"):
+                    max_decoder_length = self.variables["cache"]["cached_key"].shape[1]
+                    causal_attention_mask = jax.lax.dynamic_slice(
+                        causal_attention_mask,
+                        (0, 0, causal_attention_mask_shift, 0),
+                        (1, 1, seq_length, max_decoder_length),
+                    )
+                # broadcast causal attention mask & attention mask to fit for merge
+                causal_attention_mask = jnp.broadcast_to(
+                    causal_attention_mask, (batch_size,) + causal_attention_mask.shape[1:]
+                )
+                attention_mask = jnp.broadcast_to(
+                    jnp.expand_dims(attention_mask, axis=(-3, -2)), causal_attention_mask.shape
+                )
+                attention_mask = combine_masks(attention_mask, causal_attention_mask)
+            elif attention_mask is not None:
+                attention_mask = jnp.expand_dims(attention_mask, axis=(-3, -2))
+
+            # During fast autoregressive decoding, we feed one position at a time,
+            # and cache the keys and values step by step.
+            if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
+                key_states, value_states = self._concatenate_to_cache(
+                    key_states, value_states, query_states
+                )
+
+            # replace masked positions with -10_000
+            if attention_mask is not None:
+                mask_value = jnp.finfo(self.dtype).min
+                attention_mask = jax.lax.select(
+                    attention_mask > 0,
+                    jnp.full(attention_mask.shape, 0.0).astype(self.dtype),
+                    jnp.full(attention_mask.shape, mask_value).astype(self.dtype),
+                )
+
+            if position_bias is None:
+                # compute position bias (only for first layer)
+                position_bias = self._create_position_bias(
+                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
+                )
+
+                if attention_mask is not None:
+                    position_bias = position_bias + attention_mask
+            else:
+                #for initialization
+                _ = self._create_position_bias(
+                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
+                )
+
+            # create dropout rng
+            dropout_rng = None
+            if not deterministic and self.dropout > 0.0:
+                dropout_rng = self.make_rng("dropout")
+
+            # Softmax(QK^T)
+            attn_weights = dot_product_attention_weights(
+                query_states,
+                key_states,
+                bias=position_bias,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+
+            # multiply with value states
+            attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
+
         attn_output = self._merge_heads(attn_output)
         # attn_output = attn_output_blocks#[:, :seq_length, ...]
         # jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
+
 
 
         # apply output matrix
