@@ -213,9 +213,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
-    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k_):
-        # mask=mask.at[block_ids, block_pos_q, block_pos_k_0].set(graph_mask, mode="drop", unique_indices=True)
-        # mask=mask.at[block_ids, block_pos_q, block_pos_k_1].set(graph_mask, mode="drop", unique_indices=True)
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
         return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
 
     @jax.vmap #batch

@@ -114,7 +114,7 @@ def test():
     # We need decoder_attention_mask so we can ignore pad tokens from loss
     training_inputs["decoder_attention_mask"] = labels["attention_mask"]
 
-    # print(graph_training["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"])
+    print(graph_training["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"])
     print("Computing outputs in training mode...")
     output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
     print(" * output for tested model: Done")
