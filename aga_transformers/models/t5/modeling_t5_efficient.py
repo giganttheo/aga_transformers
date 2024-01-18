@@ -710,7 +710,7 @@ class FlaxT5Attention(nn.Module):
                 del graph_mask
 
             #adapt graph attention to block efficient attn
-            jax.debug.print("position_bias shape: {position_bias.shape}", position_bias=position_bias)
+            # jax.debug.print("position_bias shape: {position_bias.shape}", position_bias=position_bias)
             # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
 
@@ -719,7 +719,7 @@ class FlaxT5Attention(nn.Module):
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
-            jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
+            # jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             # Softmax(QK^T)
 
             attn_weights = dot_product_attention_weights(
@@ -734,13 +734,13 @@ class FlaxT5Attention(nn.Module):
             )
             # multiply with value states
             
-            jax.debug.print("bias shape: {bias.shape}", bias=position_bias_local)
-            jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
-            jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
+            # jax.debug.print("bias shape: {bias.shape}", bias=position_bias_local)
+            # jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
+            # jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
             #multiply with value states
             attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
-            jax.debug.print("shape_output:{shape_output}", shape_output=shape_output)
+            # jax.debug.print("shape_output:{shape_output}", shape_output=shape_output)
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")[:, :seq_length, ...]
             # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
