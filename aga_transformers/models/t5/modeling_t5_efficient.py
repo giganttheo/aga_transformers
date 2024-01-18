@@ -723,19 +723,19 @@ class FlaxT5Attention(nn.Module):
             jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             # Softmax(QK^T)
 
-            attn_weights = jnp.einsum(
-                '...qhd,...khd->...hqk', query_states_blocks, key_states_blocks
-            ) + position_bias_local
-            # attn_weights = dot_product_attention_weights(
-            #     query_states_blocks,
-            #     key_states_blocks,
-            #     bias=position_bias_local,
-            #     dropout_rng=dropout_rng,
-            #     dropout_rate=self.dropout,
-            #     broadcast_dropout=True,
-            #     deterministic=deterministic,
-            #     dtype=self.dtype,
-            # )
+            # attn_weights = jnp.einsum(
+            #     '...qhd,...khd->...hqk', query_states_blocks, key_states_blocks
+            # ) + position_bias_local
+            attn_weights = dot_product_attention_weights(
+                query_states_blocks,
+                key_states_blocks,
+                bias=position_bias_local,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
             # multiply with value states
             jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
             jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)

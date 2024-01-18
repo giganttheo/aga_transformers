@@ -551,11 +551,11 @@ class FlaxT5Attention(nn.Module):
                 if bias is not None:
                     attn_logits = attn_logits + bias
                 #softmax over receiver nodes
-                # w = segment_softmax(attn_logits,
-                #                     segment_ids=senders,
-                #                     num_segments=seq_len,
-                #                     indices_are_sorted=True,
-                #                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
+                w = segment_softmax(attn_logits,
+                                    segment_ids=senders,
+                                    num_segments=seq_len,
+                                    indices_are_sorted=True,
+                                    bucket_size=bucket_size).astype(dtype) #(num_edges,)
                 w=attn_logits
                 
                 # apply attention dropout
