@@ -632,7 +632,7 @@ class FlaxT5Attention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
-        block_len= 1 #254+1  #TODO: add in config (radius + 1)
+        block_len= 16 #254+1  #TODO: add in config (radius + 1)
         n_global_tokens = 0 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
@@ -721,6 +721,7 @@ class FlaxT5Attention(nn.Module):
 
 
             #adapt graph attention to block efficient attn
+            jax.debug.print("position_bias shape: {position_bias.shape}", position_bias=position_bias)
             # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
 
