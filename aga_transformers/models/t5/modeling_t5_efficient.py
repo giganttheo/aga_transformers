@@ -170,10 +170,10 @@ def _get_local_attention_mask(attention_mask: np.ndarray, block_len: int) -> jnp
 def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
 
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  mask_local = jnp.full(mask_local_shape, mask_value, dtype=graph_mask.dtype)
+  mask_local = jnp.full(mask_local_shape, mask_value).astype(graph_mask.dtype)
 
   mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
-  mask_global = jnp.full(mask_global_shape, mask_value, dtype=graph_mask.dtype)
+  mask_global = jnp.full(mask_global_shape, mask_value).astype(graph_mask.dtype)
 
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
 
