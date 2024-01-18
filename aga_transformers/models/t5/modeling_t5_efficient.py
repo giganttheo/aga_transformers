@@ -220,7 +220,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     def _update_mask_global(mask, graph_mask, senders, receivers):
         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
-    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(receivers, senders)
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
 
