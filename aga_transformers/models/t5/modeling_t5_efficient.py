@@ -190,26 +190,16 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
       block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
 
       #position within the block q
-      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int16")
+      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int32")
 
       offset_k = block_id_k - block_id
-    #   jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+      # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
       
       block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
       block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
       block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int32")
 
-      # block_pos_k_s = []
-      # for offset_k in [-1, 0, 1]:
-      #   #position within the block k
-      #   block_pos_k = jnp.where(block_id == block_id_k + offset_k, ((receivers - n_global_tokens) % block_len) + n_global_tokens + offset_k * block_len, 1_000_000).astype("int16")
-      #   block_pos_k = jnp.where(block_pos_k >= 0, block_pos_k, 1_000_000).astype("int16")
-      #   block_pos_k_s.append(jnp.where(receivers >= n_global_tokens, block_pos_k, receivers).astype("int16"))
-
-      # jax.debug.print("position {block_id} {block_pos_q} (sender is {sender}), {block_pos_k} (receiver is {receiver}) set to {graph_mask_}", block_id=block_id, receiver=receivers, sender=senders, block_pos_q=block_pos_q, block_pos_k=block_pos_k, graph_mask_=graph_mask)
       return block_id, block_pos_q, block_pos_k
-    #   mask = mask.at[block_id, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
-    #   return mask, None
 
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
@@ -225,8 +215,8 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
 
-    # mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.astype(0, graph_mask.dtype))
-    # mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.astype(0, graph_mask.dtype))
+    mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.astype(0, graph_mask.dtype))
+    mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.astype(0, graph_mask.dtype))
 
     return mask_local.swapaxes(1, 2), mask_global
 
@@ -742,31 +732,36 @@ class FlaxT5Attention(nn.Module):
                 dtype=self.dtype,
             )
             # multiply with value states
+            
+            jax.debug.print("bias shape: {bias.shape}", bias=position_bias_local)
             jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
             jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
-            attn_output_blocks = jnp.einsum("... h q k , ... k h d ->... q h d", attn_weights, value_states_blocks)
+            #multiply with value states
+            attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
+            jax.debug.print("shape_output:{shape_output}", shape_output=shape_output)
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")[:, :seq_length, ...]
             # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
-            global_attn_weights = dot_product_attention_weights(
-                query_states[:, :n_global_tokens, ...],
-                key_states,
-                bias=position_bias_global,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
-            )
-            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+            # # return attn_output_blocks
+            # global_attn_weights = dot_product_attention_weights(
+            #     query_states[:, :n_global_tokens, ...],
+            #     key_states,
+            #     bias=position_bias_global,
+            #     dropout_rng=dropout_rng,
+            #     dropout_rate=self.dropout,
+            #     broadcast_dropout=True,
+            #     deterministic=deterministic,
+            #     dtype=self.dtype,
+            # )
+            # attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
-            # bring back to (batch_size, seq_length, d_model)
-            jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks.shape}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
-            # attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
+            # # bring back to (batch_size, seq_length, d_model)
+            # jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks.shape}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
+            # # attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)
             
-            attn_output_blocks = self._merge_heads(attn_output_blocks)
-            attn_output = attn_output_blocks#[:, :seq_length, ...]
+            attn_output = self._merge_heads(attn_output_blocks)
+            # attn_output = attn_output_blocks#[:, :seq_length, ...]
             # jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
 
 
