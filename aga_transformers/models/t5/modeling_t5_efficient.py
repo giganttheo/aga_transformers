@@ -1063,12 +1063,21 @@ class FlaxT5LayerSelfAttention(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
-        self.SelfAttention = FlaxT5EfficientBlockGraphSelfAttention(
-            self.config,
-            has_relative_attention_bias=self.has_relative_attention_bias,
-            causal=self.config.causal,
-            dtype=self.dtype,
-        )
+        if self.config.causal:
+            self.SelfAttention = FlaxT5Attention(
+                self.config,
+                has_relative_attention_bias=self.has_relative_attention_bias,
+                causal=self.config.causal,
+                dtype=self.dtype,
+            )
+        else:
+            #Encoder Self-Attention, with Efficient Block Graph attn, inspired by LongT5
+            self.SelfAttention = FlaxT5EfficientBlockGraphSelfAttention(
+                self.config,
+                has_relative_attention_bias=self.has_relative_attention_bias,
+                causal=self.config.causal,
+                dtype=self.dtype,
+            )
         self.layer_norm = FlaxT5LayerNorm(self.config.d_model, eps=self.config.layer_norm_epsilon, dtype=self.dtype)
         self.dropout = nn.Dropout(self.config.dropout_rate)
 
