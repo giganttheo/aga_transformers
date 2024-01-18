@@ -51,7 +51,7 @@ def test():
         repo_path,
     )
 
-    ref_model.params = model.params
+    # ref_model.params = model.params
 
     attention_kwargs = {
         "max_source_length": 512,
