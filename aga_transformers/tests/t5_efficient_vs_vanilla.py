@@ -44,7 +44,7 @@ def test():
     model.params = model.to_bf16(model.params)
 
     #tieing the graph so it is defined for first layer only
-    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)
+    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
     # Closeness with ref T5 model:
     ref_model = ReferenceModel.from_pretrained(
