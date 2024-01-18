@@ -1044,7 +1044,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
 
         else:
-            attn_output=jnp.zeros_like(value_states)
+            attn_output=jnp.zeros_like(hidden_states)
 
         # apply output matrix
         attn_output = self.o(attn_output)
