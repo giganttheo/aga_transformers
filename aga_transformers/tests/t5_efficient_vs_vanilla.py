@@ -201,7 +201,8 @@ def test():
     print(" * output for tested model: Done")
 
     for i in range(n):
-        assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
+        print(greedy_outputs[i][0].logits[:6], greedy_outputs_reference[i][0].logits[:6])
+        assert np.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
         print(f"token {i+1}/{n}: ok")
 
     print(f"===Test passed for decoder ({n} tokens greedy search autoregressive)===")
