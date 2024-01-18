@@ -44,7 +44,7 @@ def test():
     model.params = model.to_bf16(model.params)
 
     #tieing the graph so it is defined for first layer only
-    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
+    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)
 
     # Closeness with ref T5 model:
     ref_model = ReferenceModel.from_pretrained(
@@ -197,7 +197,7 @@ def test():
 
     ar_inputs = get_ar_inputs()
     input_ids = ar_inputs.pop("input_ids")
-    greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_training), input_ids, ar_inputs, n=n)
+    greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
     print(" * output for tested model: Done")
 
     for i in range(n):
