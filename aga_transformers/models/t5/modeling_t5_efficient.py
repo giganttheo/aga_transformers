@@ -221,7 +221,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
     mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
 
-    return mask_local.swapaxes(1, 2), mask_global
+    return mask_local.swapaxes(1, 2), mask_global.swapaxes(1, 2)
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
