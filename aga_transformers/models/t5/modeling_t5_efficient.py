@@ -82,7 +82,7 @@ def _split_into_blocks(x: jnp.ndarray, block_len: int, axis: int) -> jnp.ndarray
         x = _pad_to_multiple(x, block_len, axis, pad_value=0)
     num_blocks = x.shape[axis] // block_len
     output_shape = x.shape[:axis] + (num_blocks, block_len) + x.shape[(axis + 1) :]
-    return x.reshape(output_shape, order="F")
+    return x.reshape(output_shape, order="C")
 
 def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_len: int, axis: int) -> jnp.ndarray:
     """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
@@ -170,10 +170,10 @@ def _get_local_attention_mask(attention_mask: np.ndarray, block_len: int) -> jnp
 def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
 
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  mask_local = jnp.full(mask_local_shape, mask_value).astype(graph_mask.dtype)
+  mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
   mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
-  mask_global = jnp.full(mask_global_shape, mask_value).astype(graph_mask.dtype)
+  mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
 
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
 
@@ -184,18 +184,21 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 
       #block id
       block_id = (senders - n_global_tokens) // block_len
-      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int16")
+      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
 
       block_id_k = (receivers - n_global_tokens) // block_len
-      block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int16")
+      block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
 
       #position within the block q
       block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int16")
 
       offset_k = block_id_k - block_id
-      #   jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
-      block_pos_k = jnp.where((receivers >= n_global_tokens), ((receivers - n_global_tokens) % block_len) + n_global_tokens + (1 + offset_k) * block_len, receivers)
-      block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+    #   jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+      
+      block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
+      block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
+      block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int32")
+
       # block_pos_k_s = []
       # for offset_k in [-1, 0, 1]:
       #   #position within the block k
@@ -210,7 +213,7 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
-    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k_):
         # mask=mask.at[block_ids, block_pos_q, block_pos_k_0].set(graph_mask, mode="drop", unique_indices=True)
         # mask=mask.at[block_ids, block_pos_q, block_pos_k_1].set(graph_mask, mode="drop", unique_indices=True)
         return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
@@ -218,15 +221,21 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     @jax.vmap #batch
     @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
     def _update_mask_global(mask, graph_mask, senders, receivers):
-        return mask.at[receivers, senders].set(graph_mask, mode="drop", unique_indices=True)
+        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
-    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(receivers, senders)
+    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+
+    # mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.astype(0, graph_mask.dtype))
+    # mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.astype(0, graph_mask.dtype))
 
     return mask_local.swapaxes(1, 2), mask_global
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
+
+
+
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
 # @jax.jit
@@ -723,9 +732,6 @@ class FlaxT5Attention(nn.Module):
             jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             # Softmax(QK^T)
 
-            # attn_weights = jnp.einsum(
-            #     '...qhd,...khd->...hqk', query_states_blocks, key_states_blocks
-            # ) + position_bias_local
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
                 key_states_blocks,
@@ -741,7 +747,7 @@ class FlaxT5Attention(nn.Module):
             jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
             attn_output_blocks = jnp.einsum("... h q k , ... k h d ->... q h d", attn_weights, value_states_blocks)
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
-            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="F")[:, :seq_length, ...]
+            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")[:, :seq_length, ...]
             # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
             global_attn_weights = dot_product_attention_weights(
