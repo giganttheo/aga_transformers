@@ -167,13 +167,13 @@ def _get_local_attention_mask(attention_mask: np.ndarray, block_len: int) -> jnp
     return local_attention_mask[:, None, ...]
 
 
-def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int):
+def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
 
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  mask_local = jnp.zeros(mask_local_shape, dtype=graph_mask.dtype)
+  mask_local = jnp.full(mask_local_shape, mask_value, dtype=graph_mask.dtype)
 
   mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
-  mask_global = jnp.zeros(mask_global_shape, dtype=graph_mask.dtype)
+  mask_global = jnp.full(mask_global_shape, mask_value, dtype=graph_mask.dtype)
 
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
 
@@ -713,7 +713,7 @@ class FlaxT5Attention(nn.Module):
 
             #adapt graph attention to block efficient attn
             # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
-            position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length)
+            position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
 
             # create dropout rng
             dropout_rng = None
