@@ -913,7 +913,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             #adapt graph attention to block efficient attn
             position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
-            del position_bias
 
             # create dropout rng
             dropout_rng = None
