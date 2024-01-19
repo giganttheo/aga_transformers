@@ -70,8 +70,8 @@ def tie_relative_pos_bias(module_class, repo_path):
 
 def tie_graph_layers(module_class, repo_path, autoregressive=False):
   """
-  tie the relative position bias in consecutive layer to the first one
-  (without copying the weights)
+  tie the graphs in consecutive layer to the first one
+  (without copying the values)
   """
   n_blocks = AutoConfig.from_pretrained(repo_path).num_layers
   modules = ['encoder'] if autoregressive else ['encoder', 'decoder']

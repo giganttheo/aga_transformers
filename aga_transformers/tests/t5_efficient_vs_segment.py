@@ -1,5 +1,5 @@
-# Test if the GraphT5 model with a fully connected attention graph
-# gives the same results as the Vanilla T5 model
+# Test if the GraphT5 model with a block-efficient attention
+# gives the same results as the graph local-global T5 model
 # 3 tests are performed:
 #  * encoder
 #  * decoder (non-autoregressive ie training mode)
@@ -13,17 +13,18 @@ from jax import lax
 from transformers.generation import FlaxLogitsProcessorList
 from transformers.generation.flax_utils import GreedyState
 from transformers import AutoTokenizer
-from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
+from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration as ReferenceModel
 
-from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
+from ..models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
 from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
-from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
+# from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
+from ..attention_patterns.sparse_attention.led import create_led_attn_patterns
 
 
 allclose_kwargs = {
-                "rtol": 1e-03,
-                "atol": 1e-05,
+                "rtol": 1e-02,
+                "atol": 1e-04,
                 }
 
 def test():
@@ -45,27 +46,41 @@ def test():
     #tieing the graph so it is defined for first layer only
     model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
-    # Closeness with vanilla T5 model:
+    # Closeness with ref T5 model:
+    ref_module_class = ReferenceModel.module_class
+    ref_module_class = tie_relative_pos_bias(ref_module_class, repo_path)
+    ReferenceModel.module_class = ref_module_class
+    ref_model = ReferenceModel.from_pretrained(
+        repo_path,
+    )
+    ref_model.params = ref_model.to_bf16(ref_model.params)
+
+    #tieing the graph so it is defined for first layer only
+    ref_model.module_class = tie_graph_layers(ref_module_class, repo_path, autoregressive=False)
 
     ref_model = ReferenceModel.from_pretrained(
         repo_path,
     )
 
-    ref_model.params = model.params
+    # ref_model.params = model.params
 
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
+        "window_sizes": [16],
         "autoregressive":False,
+        "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
-    graph_training = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
+    graph_training = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     attention_kwargs = {
         "max_source_length": 512,
         "max_target_length": 256,
+        "window_sizes": [16],
         "autoregressive":True,
+        "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
-    graph_ar = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=False)
+    graph_ar = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
 
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
     shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
@@ -99,13 +114,23 @@ def test():
     # We need decoder_attention_mask so we can ignore pad tokens from loss
     training_inputs["decoder_attention_mask"] = labels["attention_mask"]
 
+    # print(graph_training["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"])
     print("Computing outputs in training mode...")
     output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
     print(" * output for tested model: Done")
-    output_reference = ref_model.__call__(params=ref_model.params, **training_inputs)
+    output_reference = ref_model.__call__(params=add_graph_to_params(ref_model.params, graph_training), **training_inputs)
     print(" * output for reference model: Done")
 
     ## Encoder part
+    # print(output_training.encoder_last_hidden_state[0, :3, :3])
+    # print(output_reference.encoder_last_hidden_state[0, :3, :3])
+    # print("attn:")
+    # print(output_reference.encoder_attentions[0, 3:10, :6])
+    # print(output_training.encoder_attentions[0, 3:10, :6])
+    assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
+    print("==local attn are close==")
+    assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
+    print("==global attn are close==")
 
     try:
         assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state, **allclose_kwargs)
@@ -181,7 +206,7 @@ def test():
     print("Computing outputs in generate mode...")
     ar_inputs = get_ar_inputs()
     input_ids = ar_inputs.pop("input_ids")
-    greedy_outputs_reference, _ = greedy_search(ref_model, ref_model.params, input_ids, ar_inputs, n=n)
+    greedy_outputs_reference, _ = greedy_search(ref_model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
     print(" * output for reference model: Done")
 
     ar_inputs = get_ar_inputs()

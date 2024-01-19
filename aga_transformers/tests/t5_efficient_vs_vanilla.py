@@ -1,5 +1,5 @@
-# Test if the GraphT5 model with a fully connected attention graph
-# gives the same results as the Vanilla T5 model
+# Test if the GraphT5 model with a block-efficient attention
+# gives the same results as the graph local-global T5 model
 # 3 tests are performed:
 #  * encoder
 #  * decoder (non-autoregressive ie training mode)
@@ -15,10 +15,11 @@ from transformers.generation.flax_utils import GreedyState
 from transformers import AutoTokenizer
 from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 
-from ..models.t5.modeling_t5 import FlaxT5ForConditionalGeneration
+from ..models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
 from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
+from ..attention_patterns.sparse_attention.led import create_led_attn_patterns
 
 
 allclose_kwargs = {
@@ -45,13 +46,12 @@ def test():
     #tieing the graph so it is defined for first layer only
     model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
-    # Closeness with vanilla T5 model:
-
+    # Closeness with ref T5 model:
     ref_model = ReferenceModel.from_pretrained(
         repo_path,
     )
 
-    ref_model.params = model.params
+    # ref_model.params = model.params
 
     attention_kwargs = {
         "max_source_length": 512,
@@ -99,6 +99,7 @@ def test():
     # We need decoder_attention_mask so we can ignore pad tokens from loss
     training_inputs["decoder_attention_mask"] = labels["attention_mask"]
 
+    # print(graph_training["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"])
     print("Computing outputs in training mode...")
     output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
     print(" * output for tested model: Done")
@@ -190,6 +191,8 @@ def test():
     print(" * output for tested model: Done")
 
     for i in range(n):
-        assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
+        # print(greedy_outputs[i][0].logits[0,0:6], greedy_outputs_reference[i][0].logits[0,0,:6])
+        assert np.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
+        # print(f"token {i+1}/{n}: ok")
 
     print(f"===Test passed for decoder ({n} tokens greedy search autoregressive)===")
