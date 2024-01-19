@@ -833,7 +833,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
-        block_len=512//2 + 1 #254+1  #TODO: add in config (radius + 1)
+        block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
         n_global_tokens = 3 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
@@ -882,12 +882,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 if self.has_variable("cache", "cached_key"):
                     # during autoregressive decoding, the current query token was remapped
                     # to sender 0, but should really be causal_attention_mask_shift
-                    # senders = jnp.full(senders.shape, 0)
                     causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
                 else:
                     causal_mask = jnp.less_equal(receivers, senders)
                 graph_mask = jnp.logical_and(graph_mask, causal_mask)
-                del causal_mask
 
             # During fast autoregressive decoding, we feed one position at a time,
             # and cache the keys and values step by step.
@@ -914,18 +912,15 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 del graph_mask
 
             #adapt graph attention to block efficient attn
-            # jax.debug.print("position_bias shape: {position_bias.shape}", position_bias=position_bias)
-            # jax.debug.print("s:{senders.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", senders=senders, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
+            del position_bias
 
             # create dropout rng
             dropout_rng = None
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
-            # jax.debug.print("query_states_blocks:{query_states_blocks.shape}, key_states_blocks:{key_states_blocks.shape}, pos_bias:{position_bias.shape}; n_global_tokens:{n_global_tokens}, block_len:{block_len} ,num_blocks:{num_blocks}", query_states_blocks=query_states_blocks, key_states_blocks=key_states_blocks, position_bias=position_bias, n_global_tokens=n_global_tokens, block_len=block_len, num_blocks=num_blocks)
             # Softmax(QK^T)
-
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
                 key_states_blocks,
@@ -955,7 +950,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             )
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
-            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)[:, :seq_length, ...]
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
             
         else:
             # regular attention (for decoder during training)
