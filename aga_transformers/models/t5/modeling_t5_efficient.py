@@ -29,7 +29,6 @@ from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
 from jax.random import PRNGKey
-from jax.experimental import sparse
 from functools import partial
 import math
 
@@ -231,73 +230,6 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 @jax.vmap
 def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
     return mask.astype(bool).take(ids, axis=-1) #[..., ids]
-
-# @partial(jax.jit, static_argnames=['indices_are_sorted', 'unique_indices', 'bucket_size', 'num_segments'])
-def segment_softmax(logits: jax.Array,
-                    segment_ids: jax.Array,
-                    num_segments: Optional[int] = None,
-                    indices_are_sorted: bool = False,
-                    unique_indices: bool = False,
-                    bucket_size: Optional[int] =None) -> ArrayTree:
-  """
-  segment_softmax inspired by jraph's implementation, but fixed to give the same results as jax.nn.softmax by using jax.ops segment functions
-  """
-  # First, subtract the segment max for numerical stability
-  maxs = jax.ops.segment_max(logits, segment_ids, num_segments, indices_are_sorted,
-                     unique_indices, bucket_size=bucket_size)
-  logits = logits - maxs[segment_ids]
-  # Then take the exp
-  logits = jnp.exp(logits)
-  # Then calculate the normalizers
-  normalizers = jax.ops.segment_sum(logits, segment_ids=segment_ids, num_segments=num_segments, indices_are_sorted=indices_are_sorted, unique_indices=unique_indices, bucket_size=bucket_size)
-  normalizers = normalizers[segment_ids]
-  softmax = logits / normalizers
-  return softmax
-
-# ==> to change for optimization, in this version the graph is the same for the batch & heads
-# @partial(jax.vmap, in_axes=(0,0,0,0,None,None,None)) #vectorize over batches
-# @partial(jax.vmap, in_axes=(-2,-2,-2,0,None,None,None), out_axes=(-2))  #vectorize over heads
-
-# @partial(jax.vmap, in_axes=(0,0,0,0,0,0,None)) #vectorize over batches
-# @partial(jax.vmap, in_axes=(-2,-2,-2,0,0,0,None), out_axes=(-2))  #vectorize over heads
-
-#the order is important, otherwise the RAM usage explodes for some reason?
-#mb check if netket.jax.vmap_chunked works better?
-
-# @partial(jax.jit, static_argnames=['dtype'])
-@partial(jax.vmap, in_axes=(-2,-2,-2,None,None,1,None), out_axes=(-2))  #vectorize over heads
-@partial(jax.vmap, in_axes=(0,0,0,None,None,0,None)) #vectorize over batches
-def scaled_dot_product_attention_graph(q, k, v, receivers, senders, bias=None, dtype=None):
-  """
-  Computes the dot product attention according to the attention pattern specified by the graph defined
-  by the adjacency list (senders, receivers)
-  """
-  #   q, k = nn.dtypes.promote_dtype(q, k, dtype=dtype) #is it necessary?
-  # //!\\ this one is not used, please check _scaled_dot_product_attention_graph
-  dtype = q.dtype
-  bucket_size=1000 #previously 10000
-  seq_len, depth = q.shape
-  #compute attention logits: <Q,K> / sqrt(d_q)
-  q =  q / jnp.sqrt(depth).astype(dtype)
-  attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
-  if bias is not None:
-    attn_logits = attn_logits + bias
-  #softmax over receiver nodes
-  w = segment_softmax(attn_logits,
-                      segment_ids=senders,
-                      num_segments = seq_len,
-                      bucket_size=bucket_size).astype(dtype) #(num_edges,)
-  #attention weights applied to the values for every edge:
-  values = jnp.einsum('e,ed->ed', w, v[receivers]) #(num_edges, d_v)
-  #summing over the nodes
-  values = jax.ops.segment_sum(values,
-                       segment_ids=senders,
-                       num_segments=seq_len,
-                       unique_indices=False,
-                       indices_are_sorted=False,
-                       bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)
-  return values, w
-
 
 # Copied from transformers.models.bart.modeling_flax_bart.shift_tokens_right
 def shift_tokens_right(input_ids: np.array, pad_token_id: int, decoder_start_token_id: int) -> np.ndarray:
@@ -902,7 +834,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
         block_len=512//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 16 #TODO: add in config
+        n_global_tokens = 3 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
 
@@ -931,16 +863,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
             key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
             value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
-            # query_states_blocks = _split_into_blocks(query_states, block_len, axis=1)
-            # key_states_blocks = _split_into_blocks(key_states, block_len, axis=1)
-            # value_states_blocks = _split_into_blocks(value_states, block_len, axis=1)
 
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
             key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
             value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
-
-            # key_states_blocks = _concatenate_3_blocks(key_states_blocks, block_axis=1, sequence_axis=2)
-            # value_states_blocks = _concatenate_3_blocks(value_states_blocks, block_axis=1, sequence_axis=2)
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
@@ -1011,18 +937,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 dtype=self.dtype,
             )
             # multiply with value states
-            
-            # jax.debug.print("bias shape: {bias.shape}", bias=position_bias_local)
-            # jax.debug.print("attn_weights:{attn_weights.shape}", attn_weights=attn_weights)
-            # jax.debug.print("value_states_blocks:{value_states_blocks.shape}", value_states_blocks=value_states_blocks)
-            #multiply with value states
             attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
-            shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
-            # jax.debug.print("shape_output:{shape_output}", shape_output=shape_output)
-            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
-            # attn_output_blocks = einops.rearrange(attn_output_blocks, "... b q h d ->... (b q) h d") #unblock
 
-            # # return attn_output_blocks
+            # merge blocks
+            shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
+            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
+
             global_attn_weights = dot_product_attention_weights(
                 query_states[:, :n_global_tokens, ...],
                 key_states,
@@ -1035,8 +955,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             )
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
-            # # bring back to (batch_size, seq_length, d_model)
-            # jax.debug.print("global shape: {attn_output_global.shape}, local shape: {attn_output_blocks.shape}", attn_output_global=attn_output_global, attn_output_blocks=attn_output_blocks)
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1)[:, :seq_length, ...]
             
         else:
@@ -1118,10 +1036,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
 
         attn_output = self._merge_heads(attn_output)
-        # attn_output = attn_output_blocks#[:, :seq_length, ...]
-        # jax.debug.print("output shape: {attn_output.shape}", attn_output=attn_output)
-
-
 
         # apply output matrix
         attn_output = self.o(attn_output)

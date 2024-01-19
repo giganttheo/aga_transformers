@@ -66,7 +66,7 @@ import lorax
 from lorax import LoraWeight
 
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
-from aga_transformers.models.t5.t5 import load_t5
+from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 
@@ -572,7 +572,7 @@ def main():
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
-        tokenizer, model, graph, graph_ar = load_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
 
     if training_args.gradient_checkpointing:
         print("=============================")
