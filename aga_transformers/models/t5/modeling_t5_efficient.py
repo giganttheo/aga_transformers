@@ -902,7 +902,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
         block_len=512//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 100 #TODO: add in config
+        n_global_tokens = 16 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
 

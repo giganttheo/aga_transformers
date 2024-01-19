@@ -108,16 +108,6 @@ def test():
 
     ## Encoder part
 
-    # print(output_training.encoder_last_hidden_state[0, :3, :3])
-    # print(output_reference.encoder_last_hidden_state[0, :3, :3])
-    # # print("attn:")
-    # # print(output_reference.encoder_attentions[0, 3:10, :6])
-    # # print(output_training.encoder_attentions[0, 3:10, :6])
-    # assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
-    # print("==local attn are close==")
-    # assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
-    # print("==global attn are close==")
-
     try:
         assert np.allclose(output_training.encoder_last_hidden_state, output_reference.encoder_last_hidden_state, **allclose_kwargs)
         print("===Test passed for encoder===")
@@ -201,8 +191,8 @@ def test():
     print(" * output for tested model: Done")
 
     for i in range(n):
-        print(greedy_outputs[i][0].logits[0,0:6], greedy_outputs_reference[i][0].logits[0,0,:6])
+        # print(greedy_outputs[i][0].logits[0,0:6], greedy_outputs_reference[i][0].logits[0,0,:6])
         assert np.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
-        print(f"token {i+1}/{n}: ok")
+        # print(f"token {i+1}/{n}: ok")
 
     print(f"===Test passed for decoder ({n} tokens greedy search autoregressive)===")
