@@ -543,7 +543,7 @@ class FlaxT5Attention(nn.Module):
                 dropout_rate=self.dropout
                 dtype = q.dtype
                 bucket_size=100_000
-                seq_len, depth = q.shape
+                q_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
                 q = q / jnp.sqrt(depth).astype(dtype)
                 # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
@@ -553,10 +553,9 @@ class FlaxT5Attention(nn.Module):
                 #softmax over receiver nodes
                 w = segment_softmax(attn_logits,
                                     segment_ids=senders,
-                                    num_segments=seq_len,
+                                    num_segments=q_len,
                                     indices_are_sorted=True,
                                     bucket_size=bucket_size).astype(dtype) #(num_edges,)
-                w=attn_logits
                 
                 # apply attention dropout
                 if not deterministic and dropout_rate > 0.0:
@@ -572,7 +571,7 @@ class FlaxT5Attention(nn.Module):
                 #summing over the nodes
                 values = jax.ops.segment_sum(values,
                                     segment_ids=senders,
-                                    num_segments=seq_len,
+                                    num_segments=q_len,
                                     unique_indices=False,
                                     indices_are_sorted=True,
                                     bucket_size=bucket_size).astype(dtype) #(seq_len, d_v)

@@ -114,7 +114,7 @@ def test():
     # We need decoder_attention_mask so we can ignore pad tokens from loss
     training_inputs["decoder_attention_mask"] = labels["attention_mask"]
 
-    print(graph_training["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"])
+    # print(graph_training["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"])
     print("Computing outputs in training mode...")
     output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
     print(" * output for tested model: Done")
@@ -122,8 +122,8 @@ def test():
     print(" * output for reference model: Done")
 
     ## Encoder part
-    print(output_training.encoder_last_hidden_state[0, :3, :3])
-    print(output_reference.encoder_last_hidden_state[0, :3, :3])
+    # print(output_training.encoder_last_hidden_state[0, :3, :3])
+    # print(output_reference.encoder_last_hidden_state[0, :3, :3])
     # print("attn:")
     # print(output_reference.encoder_attentions[0, 3:10, :6])
     # print(output_training.encoder_attentions[0, 3:10, :6])
