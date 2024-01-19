@@ -546,11 +546,9 @@ class FlaxT5Attention(nn.Module):
                 q_len, depth = q.shape
                 #compute attention logits: <Q,K> / sqrt(d_q)
                 q = q / jnp.sqrt(depth).astype(dtype)
-                # attn_logits = jnp.einsum('ed, ed -> e', q[senders], k[receivers]) # (num_edges,)
-                attn_logits = jnp.einsum('ed, ed -> e', q.take(senders, axis=0), k.take(receivers, axis=0)) # (num_edges,)
+                attn_logits = sparse.bcoo_dot_general_sampled(q[None], jnp.swapaxes(k, -2, -1)[None], indices=indices[None], dimension_numbers=((2, 1), (0, 0)))[0]
                 if bias is not None:
                     attn_logits = attn_logits + bias
-                #softmax over receiver nodes
                 w = segment_softmax(attn_logits,
                                     segment_ids=senders,
                                     num_segments=q_len,
