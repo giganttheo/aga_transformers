@@ -39,7 +39,7 @@ references = []
 params=add_graph_to_params(repeat_relative_pos_bias(model.params), graph)
 decoder_start_token_id = model.config.decoder_start_token_id
 
-@partial(jax.jit, static_argnums=[2])
+@partial(jax.jit)
 def generate(input_ids, attention_mask, params):
     return model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
 
