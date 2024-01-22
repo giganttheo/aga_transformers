@@ -1,5 +1,5 @@
 from aga_transformers.models.t5.t5 import load_efficient_t5
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from aga_transformers.models.utils import repeat_relative_pos_bias, add_graph_to_params
 
 import transformers
