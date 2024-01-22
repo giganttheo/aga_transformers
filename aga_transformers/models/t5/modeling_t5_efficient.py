@@ -138,37 +138,6 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
         blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
 
-
-def _make_3block_relative_position_ids(block_len: int) -> jnp.ndarray:
-    """Makes 3-blocked relative position ids for local attention."""
-    position_ids = jnp.arange(3 * block_len, dtype=jnp.int32)
-    center_position_ids = position_ids[block_len:-block_len]
-    relative_position_ids = position_ids[None, :] - center_position_ids[:, None]  # [block_len, 3 * block_len]
-    return relative_position_ids
-
-def _mask_local_attention_mask(local_attention_mask: np.ndarray, block_len: int) -> jnp.ndarray:
-    """Mask local attention mask to enforce that tokens are not allowed to attend tokens farther than ``local_radius."""
-    relative_position_ids = _make_3block_relative_position_ids(block_len)
-    locality_mask = jnp.abs(relative_position_ids) < block_len
-    locality_mask = locality_mask[None, None, :, :]
-    return jnp.logical_and(local_attention_mask, locality_mask)
-
-def _get_local_attention_mask(attention_mask: np.ndarray, block_len: int) -> jnp.ndarray:
-    """Prepare attention mask to be applied for a local attention."""
-    # [batch_size, num_blocks, block_len]
-    _blocked_attention_mask = _split_into_blocks(attention_mask, block_len, axis=1)
-    # [batch_size, num_block, 3 * block_len]
-    _3blocked_attention_mask = _concatenate_3_blocks(_blocked_attention_mask, block_axis=1, sequence_axis=2)
-
-    _blocked_attention_mask = _blocked_attention_mask[..., None]
-    _3blocked_attention_mask = _3blocked_attention_mask[..., None, :]
-    # [batch_size, num_block, block_len, 3 * block_len]
-    local_attention_mask = jnp.logical_and(_blocked_attention_mask, _3blocked_attention_mask)
-    local_attention_mask = _mask_local_attention_mask(local_attention_mask, block_len)
-    # [batch_size, 1, num_block, block_len, 3 * block_len]
-    return local_attention_mask[:, None, ...]
-
-
 def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
 
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
@@ -221,8 +190,6 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
     return mask_local.swapaxes(1, 2), mask_global
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
-
-
 
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
