@@ -5,6 +5,8 @@ from aga_transformers.models.utils import repeat_relative_pos_bias, add_graph_to
 import transformers
 from datasets import load_dataset
 
+from functools import partial
+
 import jax
 
 test_dataset = load_dataset("gigant/tib", split="test")
@@ -37,12 +39,17 @@ references = []
 params=add_graph_to_params(repeat_relative_pos_bias(model.params), graph)
 decoder_start_token_id = model.config.decoder_start_token_id
 
+@partial(jax.jit, static_argnums=[2])
+def generate(input_ids, attention_mask, params):
+    return model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
+
+
 for rec in tqdm(test_dataset):
     text = "summarize: " + rec["transcript"]
     label = rec["abstract"]
     inputs = tokenizer(text, return_tensors="np", truncation=True, max_length=attention_kwargs["max_source_length"])
     # label_ids = tokenizer(label, return_tensors="pt").input_ids
-    pred_ids = jax.jit(model.generate)(inputs["input_ids"], generation_config=generation_config, attention_mask=inputs["attention_mask"], decoder_start_token_id=decoder_start_token_id, params=params)
+    pred_ids = generate(inputs["input_ids"], inputs["attention_mask"], params)
     predictions.append(tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True))
     references.append(label)
 
