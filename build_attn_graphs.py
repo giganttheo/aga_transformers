@@ -3,6 +3,10 @@ from datasets import load_dataset
 import pickle
 from tqdm import tqdm
 
+import concurrent.futures
+import time
+import requests as r
+
 from aga_transformers.attention_patterns.sparse_attention.global_dependency import prepare_global_dependency_attn_patterns
 
 
@@ -10,10 +14,11 @@ def main():
 
     dataset = load_dataset('gigant/tib')
     tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
-    graphs = {"train": [], "valid": [], "test": []}
+    graphs = {"train": {}, "valid": {}, "test": {}}
 
     for split in ["train", "valid", "test"]:
-        for data_point in tqdm(dataset[split]):
+        def get_graph(input):
+            data_point, i = input
             text = data_point["transcript"]
             tokens = tokenizer(data_point["transcript"]).tokens()
 
@@ -25,7 +30,14 @@ def main():
                 "tokens": tokens,
             }
             graph = prepare_global_dependency_attn_patterns(**attention_kwargs)
-            graphs[split].append(graph)
+            graphs[split][i] = graph
+            print(f"{i} processed, / TOTAL={len(graphs[split])}")
+        # for i, data_point in tqdm(enumerate(dataset[split])):
+        #     get_graph(data_point, i, split)
+        inputs = enumerate(dataset[split])
+        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+            executor.map(get_graph, inputs)
+
 
     with open("graphs_tib.pickle", "wb") as outfile:
         pickle.dump(graphs, outfile, protocol=pickle.HIGHEST_PROTOCOL)

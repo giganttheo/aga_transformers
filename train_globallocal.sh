@@ -32,6 +32,8 @@
 
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 https://storage.googleapis.com/jax-releases/cuda11/jaxlib-0.4.19+cuda11.cudnn86-cp310-cp310-manylinux2014_x86_64.whl
 
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 en_core_web_trf spacy
+
 # # CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* jax=0.4.15 cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 # # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade numpy wheel build
 # # conda install cudnn=8.9 cudatoolkit=11.2.142 -c nvidia
