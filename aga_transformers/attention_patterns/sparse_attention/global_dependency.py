@@ -63,7 +63,7 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     self.graph_mask = graph_mask
     self.size = (len(graph["nodes"]), len(graph["nodes"]))
 
-def create_global_dependency_attn_patterns(model, max_source_length, max_target_length, text, tokens, autoregressive=False, layer_wise=False, bidirectional=False, global_tokens=[0], **kwargs):
+def create_global_dependency_attn_patterns(model, max_source_length, max_target_length, text, tokens, autoregressive=False, layer_wise=False, bidirectional=False, self_edge=False, global_tokens=[0], **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
     #Encoder self attention pattern
@@ -72,6 +72,7 @@ def create_global_dependency_attn_patterns(model, max_source_length, max_target_
                                 tokens=tokens,
                                 bidirectional=bidirectional,
                                 global_tokens=global_tokens,
+                                self_edge=self_edge,
                                 ).get_attention_graph()
     if autoregressive:
         # For autoregressive decoding (ie during inference), we use
