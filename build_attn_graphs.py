@@ -36,7 +36,7 @@ def main():
         #     get_graph(data_point, i, split)
         inputs = list(enumerate(dataset[split]))
         print(len(inputs))
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             executor.map(get_graph, inputs)
 
 
