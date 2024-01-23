@@ -1,6 +1,7 @@
 import numpy as np
 import en_core_web_trf
 import benepar
+from spacy.tokens import Doc
 
 from ..attention_pattern import AttentionPattern
 from ..vanilla_attention.vanilla import VanillaAttentionPattern
@@ -10,11 +11,8 @@ nlp = en_core_web_trf.load()
 benepar.download('benepar_en3')
 nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
 
-def dependency_parser(sentences):
-  return [nlp(sentence) for sentence in sentences]
-
-def normalize(string):
-  return string.lower().replace("▁", "").replace(" ", "")
+sentencizer = en_core_web_trf.load()
+sentencizer.add_pipe('sentencizer')
 
 class GlobalDependencyAttentionPattern(AttentionPattern):
   #Attention pattern constructed from the dependency graph, using the Berkeley Neural Parser model
@@ -23,7 +21,13 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     # text is the text (one big string)
     # tokens is the tokenized text
     def dependency_parser(text):
-      return nlp(text)
+      sents = sentencizer(text, disable=['parser'])
+      sents_spliced = []
+      for sent in sents:
+        for splice_start in range(0, len(sent), 500):
+          #splice sentences that are too long
+          sents_spliced.append(nlp(sent[splice_start:min(splice_start+500, len(sent))].text))
+      return Doc.from_docs(list(nlp.pipe(sents_spliced)))
     def construct_dependency_graph(doc):
       """
       docs is a the output of the SpaCy dependency parser
