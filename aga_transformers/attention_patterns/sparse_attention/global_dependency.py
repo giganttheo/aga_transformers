@@ -26,7 +26,7 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
       for sent in sents:
         for splice_start in range(0, len(sent), 500):
           #splice sentences that are too long
-          sents_spliced.append(nlp(sent[splice_start:min(splice_start+500, len(sent))].text))
+          sents_spliced.append(sent[splice_start:min(splice_start+500, len(sent))].text)
       return Doc.from_docs(list(nlp.pipe(sents_spliced)))
     def construct_dependency_graph(doc):
       """
