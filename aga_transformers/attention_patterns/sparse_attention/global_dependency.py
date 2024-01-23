@@ -19,7 +19,7 @@ def normalize(string):
 class GlobalDependencyAttentionPattern(AttentionPattern):
   #Attention pattern constructed from the dependency graph, using the Berkeley Neural Parser model
   # https://github.com/nikitakit/self-attentive-parser
-  def __init__(self, text, tokens, global_tokens=[0], bidirectional=False, **kwargs):
+  def __init__(self, text, tokens, self_edge=False, global_tokens=[0], bidirectional=False, **kwargs):
     # text is the text (one big string)
     # tokens is the tokenized text
     def dependency_parser(text):
@@ -46,6 +46,8 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     new_edges = set([(new_id_s, new_id_r) for (id_s, id_r) in graph["edges"] for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]])
     if bidirectional:
        new_edges.update(set([(edge[1], edge[0]) for edge in new_edges]))
+    if self_edge:
+       new_edges.update(set([(token_id, token_id) for token_id in range(len(tokens))]))
     #global tokens
     new_edges.update(set([(global_token, token_id) for token_id in range(len(tokens)) for global_token in global_tokens]))
     new_edges.update(set([(token_id, global_token) for token_id in range(len(tokens)) for global_token in global_tokens]))
