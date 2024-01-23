@@ -13,7 +13,7 @@ test_dataset = load_dataset("gigant/tib", split="test")
 
 
 generation_config = {
-    "num_beams": 2,
+    "num_beams": 3, #instead of 2?
     "max_new_tokens": 512,
     "min_length": 1,
     "length_penalty": -1.0,
