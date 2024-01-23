@@ -24,7 +24,6 @@ class DependencyAttentionPattern(AttentionPattern):
       sents = sentencizer(text, disable=['parser']).sents
       sents_spliced = []
       for sent in sents:
-        print(sent)
         for splice_start in range(0, len(sent), 500):
           #splice sentences that are too long
           sents_spliced.append(sent[splice_start:min(splice_start+500, len(sent))].text)
