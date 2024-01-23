@@ -47,8 +47,8 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     if bidirectional:
        new_edges.update(set([(edge[1], edge[0]) for edge in new_edges]))
     #global tokens
-    new_edges.update(set([(global_token, token_id) for token_id in new_token_ids for global_token in global_tokens]))
-    new_edges.update(set([(token_id, global_token) for token_id in new_token_ids for global_token in global_tokens]))
+    new_edges.update(set([(global_token, token_id) for token_id in range(len(tokens)) for global_token in global_tokens]))
+    new_edges.update(set([(token_id, global_token) for token_id in range(len(tokens)) for global_token in global_tokens]))
 
     receivers = np.array([edge[1] for edge in new_edges], dtype=np.uint16)
     senders = np.array([edge[0] for edge in new_edges], dtype=np.uint16)
