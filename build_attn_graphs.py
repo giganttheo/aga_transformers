@@ -35,7 +35,7 @@ def main():
         # for i, data_point in tqdm(enumerate(dataset[split])):
         #     get_graph(data_point, i, split)
         inputs = enumerate(dataset[split])
-        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             executor.map(get_graph, inputs)
 
 
