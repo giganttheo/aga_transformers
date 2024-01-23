@@ -18,7 +18,7 @@ def main():
 
     for split in ["train", "valid", "test"]:
         def get_graph(input):
-            data_point, i = input
+            i, data_point = input
             text = data_point["transcript"]
             tokens = tokenizer(data_point["transcript"]).tokens()
 
@@ -34,7 +34,8 @@ def main():
             print(f"{i} processed, / TOTAL={len(graphs[split])}")
         # for i, data_point in tqdm(enumerate(dataset[split])):
         #     get_graph(data_point, i, split)
-        inputs = enumerate(dataset[split])
+        inputs = list(enumerate(dataset[split]))
+        print(len(inputs))
         with concurrent.futures.ThreadPoolExecutor() as executor:
             executor.map(get_graph, inputs)
 
