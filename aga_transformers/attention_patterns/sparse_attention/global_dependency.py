@@ -21,12 +21,13 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     # text is the text (one big string)
     # tokens is the tokenized text
     def dependency_parser(text):
+      splice_size=400
       sents = sentencizer(text, disable=['parser']).sents
       sents_spliced = []
       for sent in sents:
-        for splice_start in range(0, len(sent), 500):
+        for splice_start in range(0, len(sent), splice_size):
           #splice sentences that are too long
-          sents_spliced.append(sent[splice_start:min(splice_start+500, len(sent))].text)
+          sents_spliced.append(sent[splice_start:min(splice_start+splice_size, len(sent))].text)
       return Doc.from_docs(list(nlp.pipe(sents_spliced)))
     def construct_dependency_graph(doc):
       """
