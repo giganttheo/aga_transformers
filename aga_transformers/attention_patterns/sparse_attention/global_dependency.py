@@ -107,7 +107,6 @@ def create_global_dependency_attn_patterns(model, max_source_length, max_target_
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
 
-
 def prepare_global_dependency_attn_patterns(text, tokens, bidirectional=False, self_edge=False, global_tokens=[0], **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
