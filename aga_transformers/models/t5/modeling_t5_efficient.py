@@ -688,6 +688,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
+    @partial(jax.vmap, in_axes=[None, None, 1, 1]) #to parallelize over the heads
     def compute_bias_sparse(self, query_length, key_length, receivers, senders):
         """Compute binned relative position bias"""
         context_position = jnp.arange(query_length, dtype="i4")
@@ -703,7 +704,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         heads = jnp.arange(self.n_heads)
-        return jnp.transpose(values[:, heads, :, 0, heads], (0, 2, 1)) #TODO:
+        return jnp.transpose(values[:, :, 0, heads], (0, 2, 1))
         # output has shape [bs, heads, seq_len]
 
     def compute_bias(self, query_length, key_length):
@@ -766,8 +767,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #works for 1 token at a time decoding only (ie seq_length==1)
             current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender)
+            heads = jnp.arange(self.n_heads)
+            position_bias = position_bias[:, heads, heads]
         elif self.has_relative_attention_bias:
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
+            heads = jnp.arange(self.n_heads)
+            position_bias = position_bias[:, heads, heads]
         else: #attention_mask is never None
             bs, seq_len = attention_mask.shape
             position_bias = jnp.zeros((bs, self.n_heads, seq_len), dtype=self.dtype)
