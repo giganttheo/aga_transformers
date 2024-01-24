@@ -768,10 +768,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender)
             heads = jnp.arange(self.n_heads)
+            jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
             position_bias = position_bias[:, heads, heads]
         elif self.has_relative_attention_bias:
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
             heads = jnp.arange(self.n_heads)
+            jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
             position_bias = position_bias[:, heads, heads]
         else: #attention_mask is never None
             bs, seq_len = attention_mask.shape
