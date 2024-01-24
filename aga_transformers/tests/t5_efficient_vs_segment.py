@@ -215,7 +215,7 @@ def test():
     print(" * output for tested model: Done")
 
     for i in range(n):
-        print(greedy_outputs[i][0].logits[0,0:6], greedy_outputs_reference[i][0].logits[0,0,:6])
+        print(greedy_outputs[i][0].logits[0,0,:6], greedy_outputs_reference[i][0].logits[0,0,:6])
         assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
         print(f"token {i+1}/{n}: ok")
 
