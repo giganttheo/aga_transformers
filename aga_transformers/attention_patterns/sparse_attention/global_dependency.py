@@ -5,6 +5,7 @@ from spacy.tokens import Doc
 
 from ..attention_pattern import AttentionPattern
 from ..vanilla_attention.vanilla import VanillaAttentionPattern
+from .led import LongformerAttentionPattern
 from ..utils import graph_from_path, get_new_token_ids
 
 nlp = en_core_web_trf.load()
@@ -112,6 +113,37 @@ def create_global_dependency_attn_patterns(model, max_source_length, max_target_
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
 
+
+def stitch_patterns_together(list_attentions_per_head):
+    receivers_heads = [attn_pattern["receivers"] for attn_pattern in list_attentions_per_head]
+    senders_heads = [attn_pattern["senders"] for attn_pattern in list_attentions_per_head]
+    graph_mask_heads = [attn_pattern["graph_mask"] for attn_pattern in list_attentions_per_head]      
+
+    def pad_to(mat, padding):
+      padded_mat = np.zeros((padding), dtype=np.uint16)
+      padded_mat[:mat.shape[0]] = mat
+      return padded_mat
+    def get_mask(padding, previous_mask):
+      graph_mask = np.zeros((padding), dtype="i4")
+      graph_mask[:previous_mask.shape[0]] = previous_mask
+      return graph_mask
+
+    max_graph_len = max([receivers.shape[0] for receivers in receivers_heads])
+    r, s, m = [], [], []
+    h = []
+    m_h = []
+    for i_head, receivers in enumerate(receivers_heads):
+        h.append(pad_to(receivers, max_graph_len))
+        m_h.append(get_mask(max_graph_len, graph_mask_heads[i_head]))
+    r = h
+    h = []
+    for senders in senders_heads:
+        h.append(pad_to(senders, max_graph_len))
+    m = m_h
+    s = h
+    return np.array(r, dtype=np.uint16), np.array(s, dtype=np.uint16), np.array(m, dtype="i4")
+   
+
 def prepare_global_dependency_attn_patterns(text, tokens, bidirectional=False, self_edge=False, global_tokens=[0], **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
@@ -123,3 +155,64 @@ def prepare_global_dependency_attn_patterns(text, tokens, bidirectional=False, s
                                 global_tokens=global_tokens,
                                 self_edge=self_edge,
                                 ).get_attention_graph()
+
+def create_global_dependency_attn_patterns_from_prepared(dependency_attention_graph, model, max_source_length, max_target_length, heads_graph=3, heads_window=9,window_sizes=[32], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
+    if len(kwargs.keys()) > 0:
+      print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
+    #Encoder self attention pattern
+    if layer_wise:
+      #in this mode, the attention pattern can be different for every layer
+      enc_self_attn = [LongformerAttentionPattern(
+                                    seq_len_q=max_source_length,
+                                    seq_len_kv=max_source_length,
+                                    window_size=window_size,
+                                    sentence_tokens=sentence_tokens,
+                                    ).get_attention_graph() for window_size in window_sizes]
+    else:
+      #in this mode, the attention pattern is the same for every layer
+      enc_self_attn = LongformerAttentionPattern(
+                                    seq_len_q=max_source_length,
+                                    seq_len_kv=max_source_length,
+                                    window_size=window_sizes[0],
+                                    sentence_tokens=sentence_tokens,
+                                    ).get_attention_graph()
+    if autoregressive:
+        # For autoregressive decoding (ie during inference), we use
+        # a dense one-to-many attention pattern.
+        # This is because in huggingface implementation of T5,
+        # during autoregressive decoding, the tokens are fed one by one,
+        # and are thus remapped to position 0 in the query
+        # (which has length 1)
+
+        #Decoder self attention pattern
+        dec_self_attn = VanillaAttentionPattern(
+                                        seq_len_q=1,
+                                        seq_len_kv=max_target_length,
+                                        ).get_attention_graph()
+          
+        #Encoder-Decoder cross attention pattern
+        #kv is the receivers (the encoder output in cross attention)
+        #q is the senders (the decoder input in cross attention)
+        encdec_attn = VanillaAttentionPattern(
+                                        seq_len_q=1,
+                                        seq_len_kv=max_source_length,
+                                        ).get_attention_graph()
+    else:
+        # For non-autoregressive decoding (for instance for training), we use
+        # the vanilla T5 behaviour. It is equivalent to use a dense many-to-many
+        # attention pattern using VanillaAttentionPattern, but more efficient.
+      
+        # Decoder self attention pattern
+        # For non-autoregressive decoding (for instance for training), we use
+        # the vanilla T5 behaviour. It is equivalent to use a dense many-to-many
+        # attention pattern using VanillaAttentionPattern, but more efficient.
+      
+        # Decoder self attention pattern
+        dec_self_attn = {}
+        # Encoder-Decoder cross attention pattern
+        encdec_attn = {}
+    
+
+    heads_enc_self_attn = stitch_patterns_together([dependency_attention_graph]*heads_graph + [enc_self_attn]*heads_window)
+    graph = graph_from_path(model.params, heads_enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
+    return graph

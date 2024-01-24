@@ -500,7 +500,7 @@ def main():
         # Downloading and loading a dataset from the hub.
         dataset = load_dataset(
             data_args.dataset_name,
-            data_args.dataset_config_name,
+            data_args.dataset_config_name, #TODO: add config
             cache_dir=model_args.cache_dir,
             keep_in_memory=False,
             use_auth_token=True if model_args.use_auth_token else None,

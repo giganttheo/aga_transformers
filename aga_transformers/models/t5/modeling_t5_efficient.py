@@ -194,7 +194,8 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 # attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
 
 # @jax.jit
-@jax.vmap
+@jax.vmap #batch
+@partial(jax.vmap, in_axes=[None, 0]) #head
 def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
     return mask.astype(bool).take(ids, axis=-1) #[..., ids]
 
@@ -822,9 +823,25 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         if self.has_variable("graph", "receivers"):
             #Graph attention
-            receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
-            senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
-            graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
+            if len(self.variables["graph"]["receivers"].shape) == 3:
+                receivers =self.variables["graph"]["receivers"]
+                senders = self.variables["graph"]["senders"]
+                graph_mask = self.variables["graph"]["graph_mask"]
+            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == batch_size:
+                #graph attention pattern is copied head-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == self.n_heads:
+                #graph attention pattern is copied batch-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+            else:            
+                #graph attention pattern is copied batch and head-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
 
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
             query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
@@ -875,8 +892,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask[:, None, :]
-                del graph_mask
+                position_bias = position_bias + graph_mask
 
             #adapt graph attention to block efficient attn
             position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
