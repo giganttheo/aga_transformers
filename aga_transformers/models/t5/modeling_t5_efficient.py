@@ -816,31 +816,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         values = values.transpose((2, 0, 1))[None, None, :, :, :]
         return values
 
-    def compute_side_bias(self, attention_mask: np.ndarray, global_segment_ids: np.ndarray) -> np.ndarray:
-        # (batch_size, 1, 1, seq_len, global_seq_len)
-        side_attention_mask = jnp.equal(attention_mask[..., None], global_segment_ids[:, None, :])[:, None, ...]
-        attention_side_bias = jax.lax.select(
-            side_attention_mask > 0,
-            jnp.full(side_attention_mask.shape, 0.0).astype(self.dtype),
-            jnp.full(side_attention_mask.shape, -1e10).astype(self.dtype),
-        )
-        # (batch_size, seq_len, global_seq_len)
-        side_relative_position = _make_side_relative_position_ids(attention_mask, self.global_block_size)
-        side_relative_position_bucket = self._relative_position_bucket(
-            side_relative_position,
-            bidirectional=True,
-            num_buckets=self.relative_attention_num_buckets,
-            max_distance=self.relative_attention_max_distance,
-        )
-        # (batch_size, seq_len, global_seq_len, num_heads)
-        side_bias = self.global_relative_attention_bias(side_relative_position_bucket)
-
-        # (batch_size, 1, num_heads, seq_len, global_seq_len)
-        side_bias = jnp.transpose(side_bias, (0, 3, 1, 2))
-        # (batch_size, num_heads, seq_len, global_seq_len)
-        attention_side_bias = attention_side_bias + side_bias
-        return attention_side_bias
-
     def _split_heads(self, hidden_states):
         return hidden_states.reshape(hidden_states.shape[:2] + (self.n_heads, self.key_value_proj_dim))
 
@@ -886,12 +861,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias = jnp.zeros((1, self.n_heads, query_length, key_length), dtype=self.dtype)
         return position_bias
 
-    def _create_block_position_bias(self, block_len: int) -> np.ndarray:
-        # position_bias shape: # (1, 1, n_heads, block_len, 3 * block_len)
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int) -> np.ndarray:
+        # position_bias shape: # (1, 1, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_relative_attention_bias:
-            position_bias = self.compute_block_bias(block_len)
+            position_bias = jnp.concatenate(self.compute_bias(block_len, n_global_tokens), self.compute_block_bias(block_len), axis=4)
         else:
-            position_bias = jnp.zeros((1, 1, self.n_heads, block_len, 3 * block_len), dtype=self.dtype)
+            position_bias = jnp.zeros((1, 1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
 
     def __call__(
