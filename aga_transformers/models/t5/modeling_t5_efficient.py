@@ -239,7 +239,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 
 #   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
-def merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
+def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
@@ -960,7 +960,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                     key_states, value_states, query_states
                 )
             
-            mask_local, mask_global = merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
 
             # replace masked positions with -10_000
             mask_value = jnp.finfo(self.dtype).min
@@ -987,8 +987,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             #adapt graph attention to block efficient attn
             position_bias = None #compat
-            position_bias_local = position_bias_local + mask_local
-            position_bias_global = position_bias_global + mask_global
+            position_bias_local = 0 * position_bias_local + mask_local
+            position_bias_global = 0 * position_bias_global + mask_global
 
             # create dropout rng
             dropout_rng = None
