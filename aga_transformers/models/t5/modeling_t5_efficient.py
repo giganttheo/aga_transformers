@@ -851,9 +851,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
             else:            
                 #graph attention pattern is copied batch and head-wise
-                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                # receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                # senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                # graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
 
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
             query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
@@ -866,7 +869,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                graph_mask = jnp.logical_and(graph_mask, attn_mask_2_graph_mask(attention_mask, receivers))
+                graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))#attn_mask_2_graph_mask(attention_mask, receivers))
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
@@ -904,7 +907,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask
+                position_bias = position_bias + graph_mask[:, None]
 
             #adapt graph attention to block efficient attn
             position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
