@@ -688,7 +688,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    @partial(jax.vmap, in_axes=[None, None, None, 1, 1, 0], out_axes=1) #to parallelize over the heads
+    # @partial(jax.vmap, in_axes=[None, None, None, 1, 1, 0], out_axes=1) #to parallelize over the heads
     def compute_bias_sparse(self, query_length, key_length, receivers, senders, head):
         """Compute binned relative position bias"""
         context_position = jnp.arange(query_length, dtype="i4")
@@ -705,7 +705,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
         values = self.relative_attention_bias(relative_position_bucket)
         jax.debug.print("shape after embedding of pos: {values.shape}", values=values)
-        return values[..., head]
+        return jnp.transpose(values, (0, 2, 1))
+        # return values[..., head]
         # return jnp.transpose(values, (0, 2, 1))
         # output has shape [bs, heads, seq_len]
 
@@ -769,13 +770,13 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #works for 1 token at a time decoding only (ie seq_length==1)
             current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
             heads = jnp.arange(self.n_heads)
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender, heads)
+            position_bias = self.compute_bias_sparse(query_length, key_length, receivers[:, 0], current_token_sender[:, 0], heads)
             jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
             # position_bias = position_bias[:, 0, heads]
             jax.debug.print("Pos bias shape (processed): {position_bias.shape}", position_bias=position_bias)
         elif self.has_relative_attention_bias:
             heads = jnp.arange(self.n_heads)
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders, heads)
+            position_bias = self.compute_bias_sparse(query_length, key_length, receivers[:, 0], senders[:, 0], heads)
             jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
             # position_bias = position_bias[:, 0, heads]
             jax.debug.print("Pos bias shape (processed): {position_bias.shape}", position_bias=position_bias)
