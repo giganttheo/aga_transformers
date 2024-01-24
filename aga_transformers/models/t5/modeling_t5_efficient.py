@@ -870,7 +870,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if self.has_relative_attention_bias:
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
             blocks_block = self.compute_block_bias(block_len, num_blocks)
-            jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
+            # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
             position_bias = jnp.concatenate([global_block, blocks_block], axis=4, dtype=self.dtype)
         else:
             position_bias = jnp.zeros((1, 1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
@@ -891,7 +891,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
         block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 0#16#3 #TODO: add in config
+        n_global_tokens = 16#3 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
 
@@ -994,10 +994,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             #adapt graph attention to block efficient attn
             position_bias = None #compat
-            jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, :16])
-            jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
-            jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
-            jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
+            # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, :16])
+            # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
+            # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
+            # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
             position_bias_local = position_bias_local + mask_local
             position_bias_global = position_bias_global + mask_global
 
