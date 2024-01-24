@@ -122,11 +122,11 @@ def test():
     print(" * output for reference model: Done")
 
     ## Encoder part
-    # print(output_training.encoder_last_hidden_state[0, :3, :3])
-    # print(output_reference.encoder_last_hidden_state[0, :3, :3])
-    # print("attn:")
-    # print(output_reference.encoder_attentions[0, 3:10, :6])
-    # print(output_training.encoder_attentions[0, 3:10, :6])
+    print(output_training.encoder_last_hidden_state[0, :3, :3])
+    print(output_reference.encoder_last_hidden_state[0, :3, :3])
+    print("attn:")
+    print(output_reference.encoder_attentions[0, 3:10, :6])
+    print(output_training.encoder_attentions[0, 3:10, :6])
     assert np.allclose(output_training.encoder_last_hidden_state[:, 3:], output_reference.encoder_last_hidden_state[:, 3:], **allclose_kwargs)
     print("==local attn are close==")
     assert np.allclose(output_training.encoder_last_hidden_state[:, :3], output_reference.encoder_last_hidden_state[:, :3], **allclose_kwargs)
