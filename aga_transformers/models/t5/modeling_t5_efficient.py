@@ -680,6 +680,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
+
     @partial(jax.vmap, in_axes=[None, None, None, 1, 1, 0], out_axes=1) #to parallelize over the heads
     def compute_bias_sparse(self, query_length, key_length, receivers, senders, head):
         """Compute binned relative position bias"""
@@ -693,14 +694,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             num_buckets=self.relative_attention_num_buckets,
             max_distance=self.relative_attention_max_distance,
         )
-
-        # jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
-        values = self.relative_attention_bias(relative_position_bucket)
-        # jax.debug.print("shape after embedding of pos: {values.shape}", values=values)
-        # return jnp.transpose(values, (0, 2, 1))
-        return values[..., head]
-        # return jnp.transpose(values, (0, 2, 1))
-        # output has shape [bs, heads, seq_len]
+        jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
+        values = self.relative_attention_bias(relative_position_bucket)[..., head]
+        jax.debug.print("shape after embedding of pos and get head: {values.shape}", relative_position_bucket=relative_position_bucket)
+        return values
 
     def compute_bias(self, query_length, key_length):
         """Compute binned relative position bias"""
