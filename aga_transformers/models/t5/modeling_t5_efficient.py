@@ -243,7 +243,7 @@ def merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mas
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
-  mask_global_shape = global_position_bias.shape#tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
+  mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
   mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
 
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
