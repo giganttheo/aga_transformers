@@ -802,7 +802,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
     def compute_global_bias(self, block_length: int, num_global_tokens: int, num_blocks:int):
         return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=1)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length, dtype="uint16"))
 
-    def compute_block_bias(self, block_length: int):
+    def compute_block_bias(self, block_length: int, num_blocks: int):
         """Compute binned relative position bias"""
         memory_position = jnp.arange(3 * block_length, dtype="i4")
         context_position = memory_position[block_length:-block_length]
@@ -816,8 +816,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         )
 
         values = self.relative_attention_bias(relative_position_bucket)
-        values = values.transpose((2, 0, 1))[None, None, :, :, :]
-        return values
+        # values = values.transpose((2, 0, 1))
+        return einops.repeat(values, 'block_len blocks_len n_heads -> b num_blocks n_heads block_len blocks_len', b=1, num_blocks=num_blocks)
 
     def _split_heads(self, hidden_states):
         return hidden_states.reshape(hidden_states.shape[:2] + (self.n_heads, self.key_value_proj_dim))
@@ -864,10 +864,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias = jnp.zeros((1, self.n_heads, query_length, key_length), dtype=self.dtype)
         return position_bias
 
-    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int) -> np.ndarray:
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, batch_size:int) -> np.ndarray:
         # position_bias shape: # (1, 1, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_relative_attention_bias:
-            position_bias = jnp.concatenate([self.compute_global_bias(block_len, n_global_tokens, num_blocks), self.compute_block_bias(block_len)], axis=4, dtype=self.dtype)
+            position_bias = jnp.concatenate([self.compute_global_bias(block_len, n_global_tokens, num_blocks), self.compute_block_bias(block_len, num_blocks)], axis=4, dtype=self.dtype)
         else:
             position_bias = jnp.zeros((1, 1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
