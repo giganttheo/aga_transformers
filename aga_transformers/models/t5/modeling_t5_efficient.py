@@ -975,7 +975,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # position_bias = self._create_position_bias_sparse(
             #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
             # )
-            block_position_bias = self._create_block_position_bias(block_len)
+            block_position_bias = self._create_block_position_bias(block_len, n_global_tokens)
 
             global_position_bias = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)
 
