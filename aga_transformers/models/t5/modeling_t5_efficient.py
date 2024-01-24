@@ -191,14 +191,6 @@ def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_t
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
-# attn_mask_2_graph_mask = jax.jit(jax.vmap(lambda mask, ids: mask[..., ids]))
-
-# @jax.jit
-@jax.vmap #batch
-@partial(jax.vmap, in_axes=[None, 0]) #head
-def attn_mask_2_graph_mask(mask: jax.Array, ids: jax.Array):
-    return mask.astype(bool).take(ids, axis=-1) #[..., ids]
-
 # Copied from transformers.models.bart.modeling_flax_bart.shift_tokens_right
 def shift_tokens_right(input_ids: np.array, pad_token_id: int, decoder_start_token_id: int) -> np.ndarray:
     """
@@ -688,7 +680,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    # @partial(jax.vmap, in_axes=[None, None, None, 1, 1, 0], out_axes=1) #to parallelize over the heads
+    @partial(jax.vmap, in_axes=[None, None, None, 1, 1, 0], out_axes=1) #to parallelize over the heads
     def compute_bias_sparse(self, query_length, key_length, receivers, senders, head):
         """Compute binned relative position bias"""
         context_position = jnp.arange(query_length, dtype="i4")
@@ -705,8 +697,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
         values = self.relative_attention_bias(relative_position_bucket)
         jax.debug.print("shape after embedding of pos: {values.shape}", values=values)
-        return jnp.transpose(values, (0, 2, 1))
-        # return values[..., head]
+        # return jnp.transpose(values, (0, 2, 1))
+        return values[..., head]
         # return jnp.transpose(values, (0, 2, 1))
         # output has shape [bs, heads, seq_len]
 
@@ -851,12 +843,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
             else:            
                 #graph attention pattern is copied batch and head-wise
-                # receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                # senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                # graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
-                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
-                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                # receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
+                # senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
+                # graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
 
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
             query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
@@ -869,7 +861,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))#attn_mask_2_graph_mask(attention_mask, receivers))
+                graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
@@ -907,7 +899,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = position_bias + graph_mask[:, None]
+                position_bias = position_bias + graph_mask
 
             #adapt graph attention to block efficient attn
             position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
