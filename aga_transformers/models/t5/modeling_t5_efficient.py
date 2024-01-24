@@ -702,7 +702,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             max_distance=self.relative_attention_max_distance,
         )
 
+        jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
         values = self.relative_attention_bias(relative_position_bucket)
+        jax.debug.print("shape after embedding of pos: {values.shape}", values=values)
         heads = jnp.arange(self.n_heads)
         return jnp.transpose(values[:, :, 0, heads], (0, 2, 1))
         # output has shape [bs, heads, seq_len]
