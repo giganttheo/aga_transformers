@@ -995,6 +995,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #adapt graph attention to block efficient attn
             position_bias = None #compat
             jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, :16])
+            jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
             jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
             position_bias_local = position_bias_local + mask_local

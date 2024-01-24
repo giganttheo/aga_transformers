@@ -522,8 +522,8 @@ class FlaxT5Attention(nn.Module):
             )
 
             if graph_mask is not None:
-                jax.debug.print("s: pos_bias: {position_bias} for edges {edges}", position_bias=position_bias[0, 0, :10], edges = zip(senders[0, :10], receivers[0, :10]))
-                jax.debug.print("e: pos_bias: {position_bias} for edges {edges}", position_bias=position_bias[0, 0, -10:], edges = zip(senders[0, -10:], receivers[0, -10:]))
+                jax.debug.print("s: pos_bias: {position_bias} for edges {edges}", position_bias=position_bias[0, 0, :10], edges = list(zip(senders[0, :10], receivers[0, :10])))
+                jax.debug.print("e: pos_bias: {position_bias} for edges {edges}", position_bias=position_bias[0, 0, -10:], edges = list(zip(senders[0, -10:], receivers[0, -10:])))
                 position_bias = position_bias + graph_mask[:, None, :]
                 del graph_mask
 
