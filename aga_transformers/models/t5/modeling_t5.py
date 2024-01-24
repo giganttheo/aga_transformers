@@ -522,7 +522,7 @@ class FlaxT5Attention(nn.Module):
             )
 
             if graph_mask is not None:
-                position_bias = graph_mask[:, None, :] #position_bias + graph_mask[:, None, :]
+                position_bias = 0 * position_bias + graph_mask[:, None, :]
                 del graph_mask
 
             # create dropout rng
