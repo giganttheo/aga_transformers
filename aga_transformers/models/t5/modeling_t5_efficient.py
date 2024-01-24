@@ -694,9 +694,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             max_distance=self.relative_attention_max_distance,
         )
 
-        jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
+        # jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
         values = self.relative_attention_bias(relative_position_bucket)
-        jax.debug.print("shape after embedding of pos: {values.shape}", values=values)
+        # jax.debug.print("shape after embedding of pos: {values.shape}", values=values)
         # return jnp.transpose(values, (0, 2, 1))
         return values[..., head]
         # return jnp.transpose(values, (0, 2, 1))
@@ -763,15 +763,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
             heads = jnp.arange(self.n_heads)
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender, heads)
-            jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
-            # position_bias = position_bias[:, 0, heads]
-            jax.debug.print("Pos bias shape (processed): {position_bias.shape}", position_bias=position_bias)
+            # jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
         elif self.has_relative_attention_bias:
             heads = jnp.arange(self.n_heads)
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders, heads)
-            jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
-            # position_bias = position_bias[:, 0, heads]
-            jax.debug.print("Pos bias shape (processed): {position_bias.shape}", position_bias=position_bias)
+            # jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
         else: #attention_mask is never None
             bs, seq_len = attention_mask.shape
             position_bias = jnp.zeros((bs, self.n_heads, seq_len), dtype=self.dtype)
