@@ -784,8 +784,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
     def compute_bias(self, query_length, key_length, offset=jnp.array(0, dtype="i4")):
         """Compute binned relative position bias"""
-        context_position = jnp.arange(query_length, dtype="i4")[:, None] + offset.astype("i4")
-        memory_position = jnp.arange(key_length, dtype="i4")[None, :]
+        context_position = jnp.arange(query_length, dtype="i4")[:, None]
+        memory_position = jnp.arange(key_length, dtype="i4")[None, :] + offset.astype("i4")
 
         relative_position = memory_position - context_position
         jax.debug.print("relative pos: {relative_position}", relative_position=relative_position)
@@ -811,7 +811,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         relative_position = memory_position[None, :] - context_position[:, None]
         relative_position_bucket = self._relative_position_bucket(
             relative_position,
-            bidirectional=True,
+            bidirectional=(not self.causal),
             num_buckets=self.relative_attention_num_buckets,
             max_distance=self.relative_attention_max_distance,
         )
