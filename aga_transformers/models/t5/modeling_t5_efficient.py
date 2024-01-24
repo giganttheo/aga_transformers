@@ -680,7 +680,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-
+    @partial(jax.jit, static_argnums=(0, 1, 2, 5))
     @partial(jax.vmap, in_axes=[None, None, None, 1, 1, 0], out_axes=1) #to parallelize over the heads
     def compute_bias_sparse(self, query_length, key_length, receivers, senders, head):
         """Compute binned relative position bias"""
@@ -760,11 +760,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
             heads = jnp.arange(self.n_heads)
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender, heads)
-            # jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
         elif self.has_relative_attention_bias:
             heads = jnp.arange(self.n_heads)
             position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders, heads)
-            # jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
         else: #attention_mask is never None
             bs, seq_len = attention_mask.shape
             position_bias = jnp.zeros((bs, self.n_heads, seq_len), dtype=self.dtype)
