@@ -994,8 +994,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             #adapt graph attention to block efficient attn
             position_bias = None #compat
-            position_bias_local = position_bias_local + mask_local
-            position_bias_global = position_bias_global + mask_global
+            position_bias_local = 0 * position_bias_local + mask_local
+            position_bias_global = 0 * position_bias_global + mask_global
 
             # create dropout rng
             dropout_rng = None
