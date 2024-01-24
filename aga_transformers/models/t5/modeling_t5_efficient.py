@@ -239,7 +239,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 
 #   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
-def merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mask, global_position_bias, block_position_bias, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
+def merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
@@ -287,7 +287,7 @@ def merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mas
     mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
     mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
 
-    return mask_local.swapaxes(1, 2) + block_position_bias, mask_global + global_position_bias
+    return mask_local.swapaxes(1, 2), mask_global
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
@@ -959,29 +959,36 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 key_states, value_states = self._concatenate_to_cache(
                     key_states, value_states, query_states
                 )
+            
+            mask_local, mask_global = merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
 
             # replace masked positions with -10_000
             mask_value = jnp.finfo(self.dtype).min
-            graph_mask = jax.lax.select(
-                graph_mask > 0,
-                jnp.full(graph_mask.shape, 0.0).astype(self.dtype),
-                jnp.full(graph_mask.shape, mask_value).astype(self.dtype),
+            mask_local = jax.lax.select(
+                mask_local > 0,
+                jnp.full(mask_local.shape, 0.0).astype(self.dtype),
+                jnp.full(mask_local.shape, mask_value).astype(self.dtype),
+            )
+            mask_global = jax.lax.select(
+                mask_global > 0,
+                jnp.full(mask_global.shape, 0.0).astype(self.dtype),
+                jnp.full(mask_global.shape, mask_value).astype(self.dtype),
             )
 
             # # compute position bias
             # position_bias = self._create_position_bias_sparse(
             #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
             # )
-            block_position_bias = self._create_block_position_bias(block_len, n_global_tokens)
-
-            global_position_bias = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)
+            position_bias_local = self._create_block_position_bias(block_len, n_global_tokens)
+            position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)
 
             # if graph_mask is not None:
             #     position_bias = position_bias + graph_mask
 
             #adapt graph attention to block efficient attn
             position_bias = None #compat
-            position_bias_local, position_bias_global = merge_mask_and_position_bias_blocks_and_global(senders, receivers, graph_mask, global_position_bias, block_position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
+            position_bias_local = position_bias_local + mask_local
+            position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
             dropout_rng = None
