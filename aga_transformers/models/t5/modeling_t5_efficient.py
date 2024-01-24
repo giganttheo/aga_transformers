@@ -788,6 +788,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         memory_position = jnp.arange(key_length, dtype="i4")[None, :]
 
         relative_position = memory_position - context_position
+        jax.debug.print("relative pos: {relative_position}", relative_position=relative_position)
         relative_position_bucket = self._relative_position_bucket(
             relative_position,
             bidirectional=(not self.causal),
