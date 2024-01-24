@@ -688,15 +688,15 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    @partial(jax.vmap, in_axes=[None, None, None, 1, 1], out_axes=1) #to parallelize over the heads
-    def compute_bias_sparse(self, query_length, key_length, receivers, senders):
+    @partial(jax.vmap, in_axes=[None, None, None, 1, 1, 0], out_axes=1) #to parallelize over the heads
+    def compute_bias_sparse(self, query_length, key_length, receivers, senders, head):
         """Compute binned relative position bias"""
         context_position = jnp.arange(query_length, dtype="i4")
         memory_position = jnp.arange(key_length, dtype="i4")
 
         relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0)
         relative_position_bucket = self._relative_position_bucket(
-            relative_position[..., None],
+            relative_position,
             bidirectional=(not self.causal),
             num_buckets=self.relative_attention_num_buckets,
             max_distance=self.relative_attention_max_distance,
@@ -705,8 +705,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
         values = self.relative_attention_bias(relative_position_bucket)
         jax.debug.print("shape after embedding of pos: {values.shape}", values=values)
-        heads = jnp.arange(self.n_heads)
-        return jnp.transpose(values[:, :, 0, heads], (0, 2, 1))
+        return values[..., head]
+        # return jnp.transpose(values, (0, 2, 1))
         # output has shape [bs, heads, seq_len]
 
     def compute_bias(self, query_length, key_length):
@@ -768,16 +768,16 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #this is reproducing the dynamic_slice + broadcast_to combo
             #works for 1 token at a time decoding only (ie seq_length==1)
             current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender)
             heads = jnp.arange(self.n_heads)
+            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender, heads)
             jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
-            position_bias = position_bias[:, 0, heads]
+            # position_bias = position_bias[:, 0, heads]
             jax.debug.print("Pos bias shape (processed): {position_bias.shape}", position_bias=position_bias)
         elif self.has_relative_attention_bias:
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
             heads = jnp.arange(self.n_heads)
+            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders, heads)
             jax.debug.print("Pos bias shape: {position_bias.shape}", position_bias=position_bias)
-            position_bias = position_bias[:, 0, heads]
+            # position_bias = position_bias[:, 0, heads]
             jax.debug.print("Pos bias shape (processed): {position_bias.shape}", position_bias=position_bias)
         else: #attention_mask is never None
             bs, seq_len = attention_mask.shape
