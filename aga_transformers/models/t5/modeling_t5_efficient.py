@@ -688,7 +688,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    @partial(jax.vmap, in_axes=[None, None, None, 1, 1]) #to parallelize over the heads
+    @partial(jax.vmap, in_axes=[None, None, None, 1, 1], out_axes=[1]) #to parallelize over the heads
     def compute_bias_sparse(self, query_length, key_length, receivers, senders):
         """Compute binned relative position bias"""
         context_position = jnp.arange(query_length, dtype="i4")
