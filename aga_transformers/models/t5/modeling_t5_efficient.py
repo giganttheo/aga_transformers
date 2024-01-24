@@ -788,7 +788,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         memory_position = jnp.arange(key_length, dtype="i4")[None, :] + offset.astype("i4")
 
         relative_position = memory_position - context_position
-        jax.debug.print("relative pos: {relative_position}", relative_position=relative_position)
+        # jax.debug.print("relative pos: {relative_position}", relative_position=relative_position)
         relative_position_bucket = self._relative_position_bucket(
             relative_position,
             bidirectional=(not self.causal),
@@ -818,7 +818,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         # values = values.transpose((2, 0, 1))
-        return einops.repeat(values, 'block_len blocks_len n_heads -> b num_blocks n_heads block_len blocks_len', b=1, num_blocks=num_blocks)
+        return einops.repeat(values, 'm c h -> b n h m c', b=1, n=num_blocks)
 
     def _split_heads(self, hidden_states):
         return hidden_states.reshape(hidden_states.shape[:2] + (self.n_heads, self.key_value_proj_dim))
@@ -866,9 +866,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         return position_bias
 
     def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int) -> np.ndarray:
-        # position_bias shape: # (1, 1, n_heads, block_len, 3 * block_len + n_global_tokens)
+        # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_relative_attention_bias:
-            position_bias = jnp.concatenate([self.compute_global_bias(block_len, n_global_tokens, num_blocks), self.compute_block_bias(block_len, num_blocks)], axis=4, dtype=self.dtype)
+            global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
+            blocks_block = self.compute_block_bias(block_len, num_blocks)
+            jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=4, dtype=self.dtype)
         else:
             position_bias = jnp.zeros((1, 1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
@@ -991,8 +994,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             #adapt graph attention to block efficient attn
             position_bias = None #compat
-            position_bias_local = position_bias_local + 0 * mask_local
-            position_bias_global = position_bias_global + 0 * mask_global
+            position_bias_local = position_bias_local + mask_local
+            position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
             dropout_rng = None
