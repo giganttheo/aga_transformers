@@ -694,9 +694,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             num_buckets=self.relative_attention_num_buckets,
             max_distance=self.relative_attention_max_distance,
         )
-        jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
+        # jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
         values = self.relative_attention_bias(relative_position_bucket)[..., head]
-        jax.debug.print("shape after embedding of pos and get head: {values.shape}", values=values)
+        # jax.debug.print("shape after embedding of pos and get head: {values.shape}", values=values)
         return values
 
     def compute_bias(self, query_length, key_length):
@@ -799,7 +799,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
         block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 16 # 3 #TODO: add in config
+        n_global_tokens = 3 #TODO: add in config
         
         batch_size, seq_length = hidden_states.shape[:2]
 
