@@ -782,10 +782,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    def compute_bias(self, query_length, key_length, offset=0):
+    def compute_bias(self, query_length, key_length, offset=jnp.array(0, dtype="uint16")):
         """Compute binned relative position bias"""
-        context_position = jnp.arange(query_length, dtype="i4")[:, None] + offset.astype("i4")
-        memory_position = jnp.arange(key_length, dtype="i4")[None, :]
+        context_position = jnp.arange(query_length, dtype="uint16")[:, None] + offset.astype("uint16")
+        memory_position = jnp.arange(key_length, dtype="uint16")[None, :]
 
         relative_position = memory_position - context_position
         relative_position_bucket = self._relative_position_bucket(
@@ -800,7 +800,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         return values
 
     def compute_global_bias(self, block_length: int, num_global_tokens: int, num_blocks:int):
-        return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=1)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
+        return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=1)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length, dtype="uint16"))
 
     def compute_block_bias(self, block_length: int):
         """Compute binned relative position bias"""
