@@ -696,7 +696,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         )
         jax.debug.print("shape before embedding of pos: {relative_position_bucket.shape}", relative_position_bucket=relative_position_bucket)
         values = self.relative_attention_bias(relative_position_bucket)[..., head]
-        jax.debug.print("shape after embedding of pos and get head: {values.shape}", relative_position_bucket=relative_position_bucket)
+        jax.debug.print("shape after embedding of pos and get head: {values.shape}", values=values)
         return values
 
     def compute_bias(self, query_length, key_length):
