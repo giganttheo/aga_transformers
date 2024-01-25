@@ -911,6 +911,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         query_states *= jnp.sqrt(query_states.shape[-1])
 
         if self.has_variable("graph", "receivers"):
+            jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"].shape)
             #Graph attention
             if len(self.variables["graph"]["receivers"].shape) == 3:
                 receivers =self.variables["graph"]["receivers"]
