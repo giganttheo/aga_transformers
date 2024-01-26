@@ -22,7 +22,7 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     # text is the text (one big string)
     # tokens is the tokenized text
     def dependency_parser(text):
-      splice_size=400
+      splice_size=350
       sents = sentencizer(text, disable=['parser']).sents
       sents_spliced = []
       for sent in sents:
@@ -212,7 +212,6 @@ def create_global_dependency_attn_patterns_from_prepared(dependency_attention_gr
         # Encoder-Decoder cross attention pattern
         encdec_attn = {}
     
-
     heads_enc_self_attn = stitch_patterns_together([dependency_attention_graph]*heads_graph + [enc_self_attn]*heads_window)
     graph = graph_from_path(model.params, heads_enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
