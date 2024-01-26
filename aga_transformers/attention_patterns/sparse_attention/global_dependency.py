@@ -22,7 +22,7 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     # text is the text (one big string)
     # tokens is the tokenized text
     def dependency_parser(text):
-      splice_size=350
+      splice_size=250
       sents = sentencizer(text, disable=['parser']).sents
       sents_spliced = []
       for sent in sents:
