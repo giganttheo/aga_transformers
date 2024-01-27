@@ -138,7 +138,7 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
         m_h = []
         for i_head, receivers in enumerate(receivers_heads[batch_num]):
             h.append(pad_to(receivers, max_graph_len))
-            m_h.append(get_mask(max_graph_len, graph_mask_heads[i_head]))
+            m_h.append(get_mask(max_graph_len, graph_mask_heads[batch_num][i_head]))
         b_h.append(h)
         b_m_h.append(m_h)
     r = b_h
