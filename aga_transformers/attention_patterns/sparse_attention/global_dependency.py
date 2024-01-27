@@ -171,6 +171,15 @@ def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attent
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
     batch_size = len(batch_dependency_attention_graph)
     print(f"Batch size is {batch_size}")
+
+    #stop @ max_length:
+    batch_graphs_p = []
+    for batch in batch_dependency_attention_graph:
+        rsm = [(r, s, m) for r,s,m in zip(batch["receivers"], batch["senders"], batch["graph_mask"]) if (r < max_source_length and s < max_source_length)]
+        rsm = {"receivers": np.array([r for r,_,_ in rsm]), "senders": np.array([s for _,s,_ in rsm]), "graph_mask": np.array([r for _,_,m in rsm])}
+        batch_graphs_p.append(map(None, *rsm))
+    batch_dependency_attention_graph=batch_graphs_p
+
     #Encoder self attention pattern
     if layer_wise:
       #in this mode, the attention pattern can be different for every layer

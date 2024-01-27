@@ -69,6 +69,7 @@ from aga_transformers.models.utils import add_graph_to_params, repeat_relative_p
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
+from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -364,7 +365,8 @@ class TrainState(train_state.TrainState):
 #     def replicate(self):
 #         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
 
-def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, graphs_dataset: Dataset, batch_size: int, shuffle: bool = False, drop_last=True):
+
+def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, attention_kwargs: dict, batch_size: int, shuffle: bool = False, drop_last=True):
     """
     Returns batches of size `batch_size` from `dataset`. If `drop_last` is set to `False`, the final batch may be incomplete,
     and range in size from 1 to `batch_size`. Shuffle batches if `shuffle` is `True`.
@@ -387,6 +389,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, graphs_dataset: Datas
         batch = dataset[idx]
         batch = {k: np.array(v) for k, v in batch.items()}
         graph_batch = batch.pop("dependency_graph") #TODO
+        graph_batch = create_global_dependency_attn_patterns_from_prepared(graph_batch, model, **attention_kwargs)
 
         yield batch, graph_batch
 
@@ -573,7 +576,8 @@ def main():
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
-        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
+
+        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={}, attention_mode="dependency", layer_wise=False)
 
 
     if training_args.gradient_checkpointing:
@@ -637,6 +641,7 @@ def main():
     def preprocess_function(examples):
         inputs = examples[text_column]
         targets = examples[summary_column]
+        graphs = examples["dependency_graph"]
         inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
@@ -804,7 +809,7 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
@@ -829,12 +834,12 @@ def main():
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
         print("\n\n\n")
 
-    def train_step(state, batch):
+    def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
         def compute_loss(params):
             labels = batch.pop("labels")
-            loss, _ = loss_fn_(state.apply_fn, params, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(state.apply_fn, params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
@@ -848,9 +853,9 @@ def main():
 
     # Define eval fn
     @jax.jit
-    def eval_step(params, batch):
+    def eval_step(params, batch, graphs):
         labels = batch.pop("labels")
-        loss, _ = loss_fn(apply_fn, params, graph, train=False, **batch)
+        loss, _ = loss_fn(apply_fn, params, graph=graphs, train=False, **batch)
 
         # # true loss = total loss / total samples
         # loss = jax.lax.psum(loss, "batch")
@@ -895,13 +900,13 @@ def main():
         train_metrics = []
 
         # Generate an epoch by shuffling sampling indices from the train dataset
-        train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
+        train_loader = data_loader(input_rng, train_dataset, attention_kwargs, model, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
-            batch = next(train_loader)
+            batch, graphs = next(train_loader)
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            state, train_metric = train_step(state, batch)
+            state, train_metric = train_step(state, batch, graphs)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
@@ -926,15 +931,15 @@ def main():
         eval_preds = []
         eval_labels = []
         print("Evaluating...")
-        eval_loader = data_loader(input_rng, eval_dataset, eval_batch_size, drop_last=False)
+        eval_loader = data_loader(input_rng, eval_dataset, attention_kwargs, model, eval_batch_size, drop_last=False)
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
             # Model forward
-            batch = next(eval_loader)
+            batch, graphs = next(eval_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, graphs
             )
             eval_metrics.append(metrics)
 
@@ -1002,15 +1007,15 @@ def main():
         pred_generations = []
         pred_labels = []
 
-        pred_loader = data_loader(input_rng, predict_dataset, eval_batch_size, drop_last=False)
+        pred_loader = data_loader(input_rng, predict_dataset, attention_kwargs, model, eval_batch_size, drop_last=False)
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward
-            batch = next(pred_loader)
+            batch, graphs = next(pred_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, graphs
             )
             pred_metrics.append(metrics)
 
