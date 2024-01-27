@@ -1,24 +1,25 @@
 import numpy as np
-import en_core_web_trf
-import benepar
-from spacy.tokens import Doc
 
 from ..attention_pattern import AttentionPattern
 from ..vanilla_attention.vanilla import VanillaAttentionPattern
 from .led import LongformerAttentionPattern
 from ..utils import graph_from_path, get_new_token_ids
 
-nlp = en_core_web_trf.load()
-benepar.download('benepar_en3')
-nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
 
-sentencizer = en_core_web_trf.load()
-sentencizer.add_pipe('sentencizer')
 
 class GlobalDependencyAttentionPattern(AttentionPattern):
   #Attention pattern constructed from the dependency graph, using the Berkeley Neural Parser model
   # https://github.com/nikitakit/self-attentive-parser
   def __init__(self, text, tokens, self_edge=False, global_tokens=[0], bidirectional=False, **kwargs):
+    import en_core_web_trf
+    import benepar
+    from spacy.tokens import Doc
+    nlp = en_core_web_trf.load()
+    benepar.download('benepar_en3')
+    nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
+
+    sentencizer = en_core_web_trf.load()
+    sentencizer.add_pipe('sentencizer')
     # text is the text (one big string)
     # tokens is the tokenized text
     def dependency_parser(text):
@@ -114,10 +115,10 @@ def create_global_dependency_attn_patterns(model, max_source_length, max_target_
     return graph
 
 
-def stitch_patterns_together(list_attentions_per_head):
-    receivers_heads = [attn_pattern["receivers"] for attn_pattern in list_attentions_per_head]
-    senders_heads = [attn_pattern["senders"] for attn_pattern in list_attentions_per_head]
-    graph_mask_heads = [attn_pattern["graph_mask"] for attn_pattern in list_attentions_per_head]      
+def stitch_patterns_together(list_batch_list_attentions_per_head):
+    receivers_heads = [[attn_pattern["receivers"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
+    senders_heads = [[attn_pattern["senders"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
+    graph_mask_heads = [[attn_pattern["graph_mask"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head] 
 
     def pad_to(mat, padding):
       padded_mat = np.zeros((padding), dtype=np.uint16)
@@ -128,19 +129,28 @@ def stitch_patterns_together(list_attentions_per_head):
       graph_mask[:previous_mask.shape[0]] = previous_mask
       return graph_mask
 
-    max_graph_len = max([receivers.shape[0] for receivers in receivers_heads])
+    max_graph_len = max([receivers.shape[0] for receivers_head in receivers_heads for receivers in receivers_head])
     r, s, m = [], [], []
-    h = []
-    m_h = []
-    for i_head, receivers in enumerate(receivers_heads):
-        h.append(pad_to(receivers, max_graph_len))
-        m_h.append(get_mask(max_graph_len, graph_mask_heads[i_head]))
-    r = h
-    h = []
-    for senders in senders_heads:
-        h.append(pad_to(senders, max_graph_len))
-    m = m_h
-    s = h
+    b_h = []
+    b_m_h = []
+    for batch_num in range(len(receivers_heads)):
+        h = []
+        m_h = []
+        for i_head, receivers in enumerate(receivers_heads[batch_num]):
+            h.append(pad_to(receivers, max_graph_len))
+            m_h.append(get_mask(max_graph_len, graph_mask_heads[i_head]))
+        b_h.append(h)
+        b_m_h.append(m_h)
+    r = b_h
+
+    b_h = []
+    for batch_num in range(len(senders_heads)):
+        h = []
+        for senders in senders_heads[batch_num]:
+            h.append(pad_to(senders, max_graph_len))
+        b_h.append(h)
+    m = b_m_h
+    s = b_h
     return np.array(r, dtype=np.uint16), np.array(s, dtype=np.uint16), np.array(m, dtype="i4")
    
 
@@ -156,9 +166,11 @@ def prepare_global_dependency_attn_patterns(text, tokens, bidirectional=False, s
                                 self_edge=self_edge,
                                 ).get_attention_graph()
 
-def create_global_dependency_attn_patterns_from_prepared(dependency_attention_graph, model, max_source_length, max_target_length, heads_graph=3, heads_window=9,window_sizes=[32], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
+def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attention_graph, model, max_source_length, max_target_length, heads_graph=3, heads_window=9,window_sizes=[32], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
+    batch_size = len(batch_dependency_attention_graph)
+    print(f"Batch size is {batch_size}")
     #Encoder self attention pattern
     if layer_wise:
       #in this mode, the attention pattern can be different for every layer
@@ -212,6 +224,6 @@ def create_global_dependency_attn_patterns_from_prepared(dependency_attention_gr
         # Encoder-Decoder cross attention pattern
         encdec_attn = {}
     
-    heads_enc_self_attn = stitch_patterns_together([dependency_attention_graph]*heads_graph + [enc_self_attn]*heads_window)
+    heads_enc_self_attn = stitch_patterns_together([[dependency_attention_graph]*heads_graph + [enc_self_attn]*heads_window for dependency_attention_graph in batch_dependency_attention_graph])
     graph = graph_from_path(model.params, heads_enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph

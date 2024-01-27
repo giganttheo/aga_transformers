@@ -75,6 +75,9 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         attention_kwargs.pop("autoregressive")
         graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
         graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
+    elif attention_mode == "dependency":
+        graph = None
+        graph_ar = None
     else:
         graph = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
     return tokenizer, model, graph, graph_ar
