@@ -151,7 +151,7 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
         b_h.append(h)
     m = b_m_h
     s = b_h
-    return np.array(r, dtype=np.uint16), np.array(s, dtype=np.uint16), np.array(m, dtype="i4")
+    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool")}
    
 
 def prepare_global_dependency_attn_patterns(text, tokens, bidirectional=False, self_edge=False, global_tokens=[0], **kwargs):
