@@ -24,7 +24,7 @@ def main():
 
             attention_kwargs = {
                 "bidirectional":True,
-                "self_edge": True,
+                "self_edge": False,
                 "global_tokens": [0, 1, 2], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
                 "text": text,
                 "tokens": tokens,
@@ -39,8 +39,7 @@ def main():
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             executor.map(get_graph, inputs)
 
-
-    with open("graphs_tib.pickle", "wb") as outfile:
+    with open("dependency_graphs_tib.pickle", "wb") as outfile:
         pickle.dump(graphs, outfile, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
