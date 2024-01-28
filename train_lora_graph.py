@@ -577,7 +577,7 @@ def main():
         }
         print(attention_kwargs)
 
-        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={}, attention_mode="dependency", layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="dependency", layer_wise=False)
 
 
     if training_args.gradient_checkpointing:
