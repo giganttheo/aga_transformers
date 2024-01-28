@@ -900,7 +900,7 @@ def main():
         train_metrics = []
 
         # Generate an epoch by shuffling sampling indices from the train dataset
-        train_loader = data_loader(input_rng, train_dataset, attention_kwargs, model, train_batch_size, shuffle=True)
+        train_loader = data_loader(input_rng, train_dataset, model, attention_kwargs, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
@@ -931,7 +931,7 @@ def main():
         eval_preds = []
         eval_labels = []
         print("Evaluating...")
-        eval_loader = data_loader(input_rng, eval_dataset, attention_kwargs, model, eval_batch_size, drop_last=False)
+        eval_loader = data_loader(input_rng, eval_dataset, model, attention_kwargs, eval_batch_size, drop_last=False)
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
             # Model forward
@@ -1007,7 +1007,7 @@ def main():
         pred_generations = []
         pred_labels = []
 
-        pred_loader = data_loader(input_rng, predict_dataset, attention_kwargs, model, eval_batch_size, drop_last=False)
+        pred_loader = data_loader(input_rng, predict_dataset, model, attention_kwargs, eval_batch_size, drop_last=False)
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward
