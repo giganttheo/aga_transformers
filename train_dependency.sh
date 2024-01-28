@@ -36,7 +36,7 @@ export TOKENIZERS_PARALLELISM=false
 # 	--gradient_checkpointing
 
 python ./train_lora_graph.py \
-	--output_dir "./8k-dep-test" \
+	--output_dir "./8k-global-dependency" \
 	--model_name_or_path "google/flan-t5-base" \
 	--tokenizer_name "google/flan-t5-base" \
 	--dataset_name="gigant/tib_dependency" \
@@ -46,16 +46,13 @@ python ./train_lora_graph.py \
 	--num_train_epochs 4 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 8 \
-	--per_device_eval_batch_size 8 \
+	--per_device_train_batch_size 6 \
+	--per_device_eval_batch_size 6 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
-	--seed 43 \
-	--max_train_samples 128 \
-	--max_eval_samples 128 \
 	--gradient_checkpointing \
 	# --resume_from_checkpoint \
 	# --run_id "fv3mirpt"

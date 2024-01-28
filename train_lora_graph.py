@@ -389,7 +389,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, attention_kwar
         batch = dataset[idx]
         batch = {k: np.array(v) for k, v in batch.items()}
         graph_batch = batch.pop("dependency_graph") #TODO
-        graph_batch = create_global_dependency_attn_patterns_from_prepared(graph_batch, model, **attention_kwargs)
+        graph_batch = create_global_dependency_attn_patterns_from_prepared(graph_batch, model, layer_wise=False, **attention_kwargs)
 
         yield batch, graph_batch
 
@@ -578,7 +578,6 @@ def main():
         print(attention_kwargs)
 
         tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="dependency", layer_wise=False)
-
 
     if training_args.gradient_checkpointing:
         print("=============================")
