@@ -799,7 +799,7 @@ def main():
         dtype_momentum=dtype,
     )
 
-    # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
+    optimizer = optax.MultiSteps(optimizer, every_k_schedule=2) #gradient accumulation
     
     # Create LoRA model
     apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
