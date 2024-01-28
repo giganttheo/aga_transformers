@@ -176,7 +176,7 @@ def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attent
     batch_graphs_p = []
     for batch in batch_dependency_attention_graph:
         rsm = [(r, s, m) for r,s,m in zip(batch["receivers"], batch["senders"], batch["graph_mask"]) if (r < max_source_length and s < max_source_length)]
-        rsm = {"receivers": np.array([r for r,_,_ in rsm]), "senders": np.array([s for _,s,_ in rsm]), "graph_mask": np.array([r for _,_,m in rsm])}
+        rsm = {"receivers": np.array([r for r,_,_ in rsm]), "senders": np.array([s for _,s,_ in rsm]), "graph_mask": np.array([m for _,_,m in rsm])}
         batch_graphs_p.append(map(None, *rsm))
     batch_dependency_attention_graph=batch_graphs_p
 
