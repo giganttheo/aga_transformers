@@ -170,14 +170,13 @@ def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attent
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
     batch_size = len(batch_dependency_attention_graph)
-    print(f"Batch size is {batch_size}")
 
     #stop @ max_length:
     batch_graphs_p = []
     for batch in batch_dependency_attention_graph:
         rsm = [(r, s, m) for r,s,m in zip(batch["receivers"], batch["senders"], batch["graph_mask"]) if (r < max_source_length and s < max_source_length)]
         # + 3 to take into account the prefix "summarize: ""
-        rsm = {"receivers": np.array([r + 3 for r,_,_ in rsm]), "senders": np.array([s + 3 for _,s,_ in rsm]), "graph_mask": np.array([m for _,_,m in rsm])}
+        rsm = {"receivers": np.array([r + 3 if r <= 3 else r for r,_,_ in rsm]), "senders": np.array([s + 3 if s <= 3 else s for _,s,_ in rsm]), "graph_mask": np.array([m for _,_,m in rsm])}
         batch_graphs_p.append(rsm)
     batch_dependency_attention_graph=batch_graphs_p
 
@@ -234,6 +233,6 @@ def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attent
         # Encoder-Decoder cross attention pattern
         encdec_attn = {}
     
-    heads_enc_self_attn = stitch_patterns_together([[dependency_attention_graph]*heads_graph + [enc_self_attn]*heads_window for dependency_attention_graph in batch_dependency_attention_graph])
+    heads_enc_self_attn = stitch_patterns_together([[enc_self_attn]*heads_window + [dependency_attention_graph]*heads_graph for dependency_attention_graph in batch_dependency_attention_graph])
     graph = graph_from_path(model.params, heads_enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
