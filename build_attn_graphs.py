@@ -19,7 +19,7 @@ def main():
     for split in ["train", "valid", "test"]:
         def get_graph(input):
             i, data_point = input
-            text = data_point["transcript"]
+            text = "summarize: " + data_point["transcript"] #TODO
             tokens = tokenizer(data_point["transcript"]).tokens()
 
             attention_kwargs = {
