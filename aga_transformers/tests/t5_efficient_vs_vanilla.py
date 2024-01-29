@@ -45,6 +45,7 @@ def test():
     model.params = model.to_bf16(model.params)
 
     #initialize at zero the new vocabulary for edge labels
+    print("initialize at zero the new vocabulary for edge labels")
     vocab_size = 8
     model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
 

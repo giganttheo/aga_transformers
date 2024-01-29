@@ -125,5 +125,5 @@ def add_graph_to_params(params, graph):
 
 def init_augmented_vocab(params, n_heads, vocab_size, dtype="bfloat16"):
   for block in params['encoder']['block'].keys():
-    params['encoder']['block'][block]['layer']['0']['SelfAttention']['relative_attention_bias'] = {'embedding': jnp.zeros((vocab_size, n_heads), dtype=dtype)}
+    params['encoder']['block'][block]['layer']['0']['SelfAttention']['graph_edge_bias'] = {'embedding': jnp.zeros((vocab_size, n_heads), dtype=dtype)}
   return params
