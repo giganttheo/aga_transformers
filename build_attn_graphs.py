@@ -31,12 +31,12 @@ def main():
             graph = prepare_global_dependency_attn_patterns(**attention_kwargs)
             graphs[split][i] = graph
             print(f"{i} processed, / TOTAL={len(graphs[split])}")
-        # for i, data_point in tqdm(enumerate(dataset[split])):
-        #     get_graph(data_point, i, split)
-        inputs = list(enumerate(dataset[split]))
-        print(len(inputs))
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(get_graph, inputs)
+        for i, data_point in tqdm(enumerate(dataset[split])):
+            get_graph(data_point, i, split)
+        # inputs = list(enumerate(dataset[split]))
+        # print(len(inputs))
+        # with concurrent.futures.ThreadPoolExecutor() as executor:
+        #     executor.map(get_graph, inputs)
 
     with open("dependency_graphs_tib.pickle", "wb") as outfile:
         pickle.dump(graphs, outfile, protocol=pickle.HIGHEST_PROTOCOL)
