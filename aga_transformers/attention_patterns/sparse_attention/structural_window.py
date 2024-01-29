@@ -61,14 +61,16 @@ class StructuralAttentionPattern(AttentionPattern):
         # global attention
         for i in global_tokens:
             for j in seq_q:
-                edges.add((i, j))
-                receivers.append(i)
-                senders.append(j)
+                if (i, j) not in edges:
+                    edges.add((i, j))
+                    receivers.append(i)
+                    senders.append(j)
         for j in global_tokens:
             for i in seq_kv - set((j,)) - global_tokens:
-                edges.add((j, i))
-                receivers.append(i)
-                senders.append(j)
+                if (j, i) not in edges:
+                    edges.add((j, i))
+                    receivers.append(i)
+                    senders.append(j)
             
         if mode == "window":
             #local window attention
@@ -76,9 +78,10 @@ class StructuralAttentionPattern(AttentionPattern):
                 window = set([i + offset * 1 for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * 1 >= 0])
                 # print(f"window: {window - global_tokens}")
                 for j in window - global_tokens:
-                    edges.add((i, j))
-                    receivers.append(i)
-                    senders.append(j)
+                    if (i,j ) not in edges:
+                        edges.add((i, j))
+                        receivers.append(i)
+                        senders.append(j)
 
         offset_tokens = num_slides
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
