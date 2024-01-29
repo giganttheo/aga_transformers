@@ -61,35 +61,21 @@ class StructuralAttentionPattern(AttentionPattern):
 
         all_nodes = set(range(num_slides + seq_len_kv))
         print(f"Word tokens: {seq_kv}")
-
-        # global attention
-        for i in global_tokens:
-            for j in all_nodes:
-                if (j, i) not in edges:
-                    edges.add((j, i))
-                    receivers.append(i)
-                    senders.append(j)
-        for j in global_tokens:
-            for i in all_nodes - set((j,)) - global_tokens:
-                if (j, i) not in edges:
-                    edges.add((j, i))
-                    receivers.append(i)
-                    senders.append(j)
+        print(f"Mode: {mode}")
             
         if mode == "window":
             #local window attention
             for i in seq_kv - global_tokens:
-                window = set([i + offset * 1 for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * 1 >= 0])
+                window = set([i + offset * 1 for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q + num_slides > i + offset * 1 >= num_slides])
                 # print(f"window: {window - global_tokens}")
                 for j in window - global_tokens:
-                    if (i,j) not in edges:
-                        edges.add((i, j))
+                    if (j, i) not in edges:
+                        edges.add((j, i))
                         receivers.append(i)
                         senders.append(j)
 
         offset_tokens = num_slides
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
-            print(f"Slide id: {slide_id}")
             node_slide = slide_id
             for edge_sentence_id in edges_slide:
                 node_tokens = new_tokens[edge_sentence_id]
@@ -120,6 +106,20 @@ class StructuralAttentionPattern(AttentionPattern):
                     edges.add((node_slide_2, node_slide))
                     receivers.append(node_slide)
                     senders.append(node_slide_2)
+
+        # global attention
+        for i in global_tokens:
+            for j in all_nodes:
+                if (j, i) not in edges:
+                    edges.add((j, i))
+                    receivers.append(i)
+                    senders.append(j)
+        for j in global_tokens:
+            for i in all_nodes - set((j,)) - global_tokens:
+                if (j, i) not in edges:
+                    edges.add((j, i))
+                    receivers.append(i)
+                    senders.append(j)
 
         num_tokens = max_listoflists(new_tokens) + len(edges_slides_to_transcript_segments)
         del edges
