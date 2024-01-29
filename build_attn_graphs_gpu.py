@@ -3,10 +3,6 @@ from datasets import load_dataset
 import pickle
 from tqdm import tqdm
 
-import concurrent.futures
-import time
-import requests as r
-
 from aga_transformers.attention_patterns.sparse_attention.global_dependency import prepare_global_dependency_attn_patterns
 
 def main():
@@ -18,7 +14,7 @@ def main():
     for split in ["train", "valid", "test"]:
         def get_graph(input):
             i, data_point = input
-            text = "summarize: " + data_point["transcript"] #TODO
+            text = "summarize: " + data_point["transcript"]
             tokens = tokenizer(data_point["transcript"]).tokens()
 
             attention_kwargs = {
@@ -35,8 +31,8 @@ def main():
         #     get_graph(data_point, i, split)
         inputs = list(enumerate(dataset[split]))
         print(len(inputs))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            executor.map(get_graph, inputs)
+        for input in tqdm(inputs):
+            get_graph(input)
 
     with open("dependency_graphs_tib.pickle", "wb") as outfile:
         pickle.dump(graphs, outfile, protocol=pickle.HIGHEST_PROTOCOL)

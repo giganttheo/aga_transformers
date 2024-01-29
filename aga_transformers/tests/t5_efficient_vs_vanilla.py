@@ -15,7 +15,8 @@ from transformers.generation.flax_utils import GreedyState
 from transformers import AutoTokenizer
 from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 
-from ..models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration
+# from ..models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration
+from ..models.t5.modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
 from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
