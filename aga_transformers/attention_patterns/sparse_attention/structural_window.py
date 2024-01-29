@@ -51,6 +51,8 @@ class StructuralAttentionPattern(AttentionPattern):
         global_tokens = set([s_tok + num_slides for s_tok in sentence_tokens])
         print(f"Document tokens: {global_tokens}")
 
+        slides_tokens = set(range(num_slides))
+
         receivers = []
         senders = []
 
@@ -60,15 +62,15 @@ class StructuralAttentionPattern(AttentionPattern):
 
         # global attention
         for i in global_tokens:
-            for j in seq_q:
-                if (i, j) not in edges:
-                    edges.add((i, j))
+            for j in seq_q + slides_tokens:
+                if (j, i) not in edges:
+                    edges.add((j, i))
                     receivers.append(i)
                     senders.append(j)
         for j in global_tokens:
-            for i in seq_kv - set((j,)) - global_tokens:
-                if (i, j) not in edges:
-                    edges.add((i, j))
+            for i in seq_kv + slides_tokens - set((j,)) - global_tokens:
+                if (j, i) not in edges:
+                    edges.add((j, i))
                     receivers.append(i)
                     senders.append(j)
             
