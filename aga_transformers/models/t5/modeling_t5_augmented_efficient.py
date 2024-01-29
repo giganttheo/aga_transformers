@@ -942,8 +942,15 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
         block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 3 #TODO: add in config
-        n_slides = 0
+        
+        #"slide" tokens are added at the beginning of the document
+        if self.has_variable("graph", "n_slides"):
+            n_slides = self.variables["graph"]["n_slides"]
+        else:
+            n_slides = 0
+        #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
+        n_document_tokens = 3 #TODO: add in config
+        n_global_tokens = n_document_tokens + n_slides
         
         batch_size, seq_length = hidden_states.shape[:2]
 
