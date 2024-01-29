@@ -49,7 +49,7 @@ class StructuralAttentionPattern(AttentionPattern):
         edges = set({})
 
         #global attn
-        global_tokens = set(sentence_tokens)
+        global_tokens = set([s_tok + num_slides for s_tok in sentence_tokens])
         print(f"Document tokens: {global_tokens}")
 
         receivers = []
