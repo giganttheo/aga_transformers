@@ -129,12 +129,12 @@ def create_window_structural_attn_patterns(model, data_point, tokenizer, window_
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_structural_attn_patterns')
     #Encoder self attention pattern
-    enc_self_attn = [StructuralAttentionPattern(
+    enc_self_attn = StructuralAttentionPattern(
                                 data_point=data_point,
                                 tokenizer=tokenizer,
-                                window_size=window_size,
+                                window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
-                                ).get_attention_graph() for window_size in window_sizes]
+                                ).get_attention_graph()
 
     # Decoder self attention pattern
     dec_self_attn = {}
