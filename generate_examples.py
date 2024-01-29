@@ -12,16 +12,24 @@ import jax
 test_dataset = load_dataset("gigant/tib", split="test")
 
 
-generation_config = {
-    "num_beams": 2, #instead of 2?
-    "max_new_tokens": 512,
-    "min_length": 1,
-    "length_penalty": -1.0,
-    "early_stopping": True,
-    "no_repeat_ngram_size": 3
-}
+# generation_config = {
+#     "num_beams": 2, #instead of 2?
+#     "max_new_tokens": 512,
+#     "min_length": 1,
+#     "length_penalty": -1.0,
+#     "early_stopping": True,
+#     "no_repeat_ngram_size": 3
+# }
 
-generation_config = transformers.GenerationConfig(**generation_config)
+# generation_config = transformers.GenerationConfig(**generation_config)
+
+generation_config = transformers.GenerationConfig(
+    num_beams = 2,
+    max_new_tokens = 512,
+    min_length = 100,
+    length_penalty = 2.0,
+    early_stopping = True,
+    no_repeat_ngram_size = 3)
 
 repo_path="gigant/graph-t5-global-window-8k-tib" # ==> my checkpoint
 attention_kwargs={
