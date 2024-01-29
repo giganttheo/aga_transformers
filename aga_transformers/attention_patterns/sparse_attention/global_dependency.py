@@ -166,7 +166,7 @@ def prepare_global_dependency_attn_patterns(text, tokens, bidirectional=False, s
                                 self_edge=self_edge,
                                 ).get_attention_graph()
 
-def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attention_graph, model, max_source_length, max_target_length, heads_graph=3, heads_window=9,window_sizes=[32], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
+def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attention_graph, model, max_source_length, max_target_length, heads_graph=1, heads_window=11,window_sizes=[32], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
     batch_size = len(batch_dependency_attention_graph)
