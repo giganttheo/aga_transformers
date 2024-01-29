@@ -33,7 +33,7 @@ class StructuralAttentionPattern(AttentionPattern):
         seq_len_q = len(tokenized)
         seq_len_kv = seq_len_q
 
-        num_slides = len(edges_slides_to_transcript_segments.keys())
+        num_slides = len(edges_slides_to_transcript_segments)
 
         # get the mapping from the segments to the tokens (new_tokens[i] is the tokens ids in segment i)
         new_tokens = get_new_token_ids(data_point['transcript_segments']['text'], tokenized.tokens())
