@@ -32,7 +32,6 @@ class StructuralAttentionPattern(AttentionPattern):
         tokenized = tokenizer(data_point['transcript'])
         seq_len_q = len(tokenized)
         seq_len_kv = seq_len_q
-
         num_slides = len(edges_slides_to_transcript_segments)
         print(f"Number of slides: {num_slides}")
 
@@ -55,9 +54,10 @@ class StructuralAttentionPattern(AttentionPattern):
         receivers = []
         senders = []
 
-        seq_kv = set(range(num_slides, seq_len_kv))
+        seq_kv = set(range(num_slides, num_slides + seq_len_kv))
         seq_q = seq_kv
-                # print(f"global tokens: {global_tokens}")
+        print(f"Word tokens: {seq_kv}")
+
         # global attention
         for i in global_tokens:
             for j in seq_q:
