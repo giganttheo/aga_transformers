@@ -821,7 +821,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 #slide -> slide edge
                 graph_edge_buckets = graph_edge_buckets.at[sl_token, slide_tokens].set(6)
 
-        values = jnp.where(graph_edge_buckets>=0, self.graph_edge_bias(graph_edge_buckets), 0)
+        values = jnp.where(graph_edge_buckets[..., None]>=0, self.graph_edge_bias(graph_edge_buckets), jnp.zeros(tuple(graph_edge_buckets.shape) + (1,)))
         values = values.transpose((2, 0, 1))[None, :, :, :]
         return values
 
