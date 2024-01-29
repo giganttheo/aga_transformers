@@ -33,7 +33,7 @@ class StructuralAttentionPattern(AttentionPattern):
         seq_len_q = len(tokenized.tokens())
         seq_len_kv = seq_len_q
         num_slides = len(edges_slides_to_transcript_segments)
-        print(f"Number of slides: {num_slides}")
+        # print(f"Number of slides: {num_slides}")
 
         # get the mapping from the segments to the tokens (new_tokens[i] is the tokens ids in segment i)
         new_tokens = get_new_token_ids(data_point['transcript_segments']['text'], tokenized.tokens())
@@ -82,6 +82,7 @@ class StructuralAttentionPattern(AttentionPattern):
 
         offset_tokens = num_slides
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
+            print(f"Slide id: {slide_id}")
             node_slide = slide_id
             for edge_sentence_id in edges_slide:
                 node_tokens = new_tokens[edge_sentence_id]
@@ -136,6 +137,7 @@ def create_window_structural_attn_patterns(model, data_point, tokenizer, window_
                                 tokenizer=tokenizer,
                                 window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
+                                mode="structure"
                                 ).get_attention_graph()
 
     # Decoder self attention pattern
