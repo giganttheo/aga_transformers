@@ -5,21 +5,22 @@ from ..vanilla_attention.vanilla import VanillaAttentionPattern
 from .led import LongformerAttentionPattern
 from ..utils import graph_from_path, get_new_token_ids
 
+#TODO: not import this when calling create_global_dependency_attn_patterns_from_prepared
+import en_core_web_trf
+import benepar
+from spacy.tokens import Doc
+nlp = en_core_web_trf.load()
+benepar.download('benepar_en3')
+nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
 
+sentencizer = en_core_web_trf.load()
+sentencizer.add_pipe('sentencizer')
 
 class GlobalDependencyAttentionPattern(AttentionPattern):
   #Attention pattern constructed from the dependency graph, using the Berkeley Neural Parser model
   # https://github.com/nikitakit/self-attentive-parser
   def __init__(self, text, tokens, self_edge=False, global_tokens=[0], bidirectional=False, **kwargs):
-    import en_core_web_trf
-    import benepar
-    from spacy.tokens import Doc
-    nlp = en_core_web_trf.load()
-    benepar.download('benepar_en3')
-    nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
 
-    sentencizer = en_core_web_trf.load()
-    sentencizer.add_pipe('sentencizer')
     # text is the text (one big string)
     # tokens is the tokenized text
     def dependency_parser(text):
