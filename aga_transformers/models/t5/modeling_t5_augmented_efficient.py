@@ -752,7 +752,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             self.graph_edge_bias = nn.Embed(
                 self.vocabulary_edge_bias,
                 self.n_heads,
-                embedding_init=jax.nn.initializers.normal(kv_init_std),
+                embedding_init=jax.nn.initializers.zeros,
                 dtype=self.dtype,
             )
 

@@ -18,7 +18,7 @@ from transformers import FlaxT5ForConditionalGeneration as ReferenceModel
 # from ..models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration
 from ..models.t5.modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration
 from ..models.t5.t5 import preprocess_function
-from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers
+from ..models.utils import repeat_relative_pos_bias, add_graph_to_params, tie_relative_pos_bias, tie_graph_layers, init_augmented_vocab
 from ..attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ..attention_patterns.sparse_attention.led import create_led_attn_patterns
 
@@ -43,6 +43,10 @@ def test():
         repo_path,
     )
     model.params = model.to_bf16(model.params)
+
+    #initialize at zero the new vocabulary for edge labels
+    vocab_size = 8
+    model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
 
     #tieing the graph so it is defined for first layer only
     model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
