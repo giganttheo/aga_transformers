@@ -67,8 +67,8 @@ class StructuralAttentionPattern(AttentionPattern):
                     senders.append(j)
         for j in global_tokens:
             for i in seq_kv - set((j,)) - global_tokens:
-                if (j, i) not in edges:
-                    edges.add((j, i))
+                if (i, j) not in edges:
+                    edges.add((i, j))
                     receivers.append(i)
                     senders.append(j)
             
@@ -78,7 +78,7 @@ class StructuralAttentionPattern(AttentionPattern):
                 window = set([i + offset * 1 for offset in range(- (window_size // 2), (window_size % 2) + window_size // 2) if seq_len_q > i + offset * 1 >= 0])
                 # print(f"window: {window - global_tokens}")
                 for j in window - global_tokens:
-                    if (i,j ) not in edges:
+                    if (i,j) not in edges:
                         edges.add((i, j))
                         receivers.append(i)
                         senders.append(j)
