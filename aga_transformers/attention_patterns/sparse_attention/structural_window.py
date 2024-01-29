@@ -34,6 +34,7 @@ class StructuralAttentionPattern(AttentionPattern):
         seq_len_kv = seq_len_q
 
         num_slides = len(edges_slides_to_transcript_segments)
+        print(f"Number of slides: {num_slides}")
 
         # get the mapping from the segments to the tokens (new_tokens[i] is the tokens ids in segment i)
         new_tokens = get_new_token_ids(data_point['transcript_segments']['text'], tokenized.tokens())
@@ -41,7 +42,7 @@ class StructuralAttentionPattern(AttentionPattern):
         def max_listoflists(inputlist):
             return max([max(sublist) for sublist in inputlist if sublist != []])
 
-        slides_offset = max_listoflists(new_tokens) + 1 #TODO
+        # slides_offset = max_listoflists(new_tokens) + 1 #TODO
 
         receivers = []
         senders = []
@@ -49,6 +50,7 @@ class StructuralAttentionPattern(AttentionPattern):
 
         #global attn
         global_tokens = set(sentence_tokens)
+        print(f"Document tokens: {global_tokens}")
 
         receivers = []
         senders = []
@@ -111,7 +113,7 @@ class StructuralAttentionPattern(AttentionPattern):
                     receivers.append(node_slide)
                     senders.append(node_slide_2)
 
-        num_tokens = slides_offset + len(edges_slides_to_transcript_segments) - 1
+        num_tokens = max_listoflists(new_tokens) + len(edges_slides_to_transcript_segments)
         del edges
 
         receivers = np.array(receivers, dtype=np.uint16)
