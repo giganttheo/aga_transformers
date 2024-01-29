@@ -30,8 +30,8 @@ class StructuralAttentionPattern(AttentionPattern):
     def __init__(self, data_point, tokenizer, window_size, sentence_tokens=[0], mode="structure", **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(data_point)
         tokenized = tokenizer(data_point['transcript'])
-        seq_len_q = tokenized.shape[0]
-        seq_len_kv = tokenized.shape[0]
+        seq_len_q = len(tokenized)
+        seq_len_kv = seq_len_q
 
         num_slides = len(edges_slides_to_transcript_segments.keys())
 
