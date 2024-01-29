@@ -19,7 +19,7 @@ def main():
         def get_graph(input):
             i, data_point = input
             text = "summarize: " + data_point["transcript"] #TODO
-            tokens = tokenizer(data_point["transcript"]).tokens()
+            tokens = tokenizer(text).tokens()
 
             attention_kwargs = {
                 "bidirectional":True,
