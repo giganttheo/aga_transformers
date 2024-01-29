@@ -58,17 +58,19 @@ class StructuralAttentionPattern(AttentionPattern):
 
         seq_kv = set(range(num_slides, num_slides + seq_len_kv))
         seq_q = seq_kv
+
+        all_nodes = set(range(num_slides + seq_len_kv))
         print(f"Word tokens: {seq_kv}")
 
         # global attention
         for i in global_tokens:
-            for j in seq_q + slides_tokens:
+            for j in all_nodes:
                 if (j, i) not in edges:
                     edges.add((j, i))
                     receivers.append(i)
                     senders.append(j)
         for j in global_tokens:
-            for i in seq_kv + slides_tokens - set((j,)) - global_tokens:
+            for i in all_nodes - set((j,)) - global_tokens:
                 if (j, i) not in edges:
                     edges.add((j, i))
                     receivers.append(i)
