@@ -368,7 +368,7 @@ class TrainState(train_state.TrainState):
 #         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
 
 
-def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, data_args, batch_size: int, shuffle: bool = False, drop_last=True):
+def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset, model, data_args, batch_size: int, shuffle: bool = False, drop_last=True):
     """
     Returns batches of size `batch_size` from `dataset`. If `drop_last` is set to `False`, the final batch may be incomplete,
     and range in size from 1 to `batch_size`. Shuffle batches if `shuffle` is `True`.
@@ -391,18 +391,18 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, data_args, bat
         batch = dataset[idx]
         batch = {k: np.array(v) for k, v in batch.items()}
         attention_kwargs= {
-            "data_point": dataset[idx],
-
+            "mode": "window",
+            "is_padded": True,
+            "data_point": raw_dataset[idx],
+            "tokenized": batch["input_ids"],
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
             "window_sizes": [254],
             "autoregressive": False,
-            "sentence_tokens": [0, 1, 2], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         graph_batch = create_window_structural_attn_patterns(model, layer_wise=False, **attention_kwargs)
-
         yield batch, graph_batch
-
 
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
@@ -642,7 +642,9 @@ def main():
     def preprocess_function(examples):
         inputs = examples[text_column]
         targets = examples[summary_column]
-        inputs = [prefix + inp for inp in inputs]
+        num_slides = len(examples['keyframes']['timestamp'])
+        slide_token="<extra_id_99>"
+        inputs = [slide_token*num_slides + prefix + inp for inp in inputs]
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
@@ -674,7 +676,7 @@ def main():
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
-        train_texts = train_dataset[text_column]
+        train_texts = train_dataset
         train_dataset = train_dataset.map(
             preprocess_function,
             batched=True,
@@ -690,6 +692,7 @@ def main():
         if data_args.max_eval_samples is not None:
             max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
             eval_dataset = eval_dataset.select(range(max_eval_samples))
+        eval_texts = eval_dataset
         eval_dataset = eval_dataset.map(
             preprocess_function,
             batched=True,
@@ -705,6 +708,7 @@ def main():
         if data_args.max_predict_samples is not None:
             max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
             predict_dataset = predict_dataset.select(range(max_predict_samples))
+        predict_texts = predict_dataset
         predict_dataset = predict_dataset.map(
             preprocess_function,
             batched=True,
@@ -902,7 +906,7 @@ def main():
         train_metrics = []
 
         # Generate an epoch by shuffling sampling indices from the train dataset
-        train_loader = data_loader(input_rng, train_dataset, model, train_batch_size, shuffle=True)
+        train_loader = data_loader(input_rng, train_dataset, train_texts, model, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
@@ -933,7 +937,7 @@ def main():
         eval_preds = []
         eval_labels = []
         print("Evaluating...")
-        eval_loader = data_loader(input_rng, eval_dataset, model, eval_batch_size, drop_last=False)
+        eval_loader = data_loader(input_rng, eval_dataset, eval_texts, model, eval_batch_size, drop_last=False)
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
             # Model forward
@@ -1009,7 +1013,7 @@ def main():
         pred_generations = []
         pred_labels = []
 
-        pred_loader = data_loader(input_rng, predict_dataset, model, eval_batch_size, drop_last=False)
+        pred_loader = data_loader(input_rng, predict_dataset, predict_texts, model, eval_batch_size, drop_last=False)
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward

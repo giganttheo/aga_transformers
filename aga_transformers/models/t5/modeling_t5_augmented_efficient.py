@@ -822,7 +822,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 graph_edge_buckets = graph_edge_buckets.at[sl_token, slide_tokens].set(6)
 
         values = jnp.where(graph_edge_buckets[..., None]>=0, self.graph_edge_bias(graph_edge_buckets), jnp.zeros(tuple(graph_edge_buckets.shape) + (1,)))
-        values = values.transpose((2, 0, 1))[None, :, :, :]
+        values = values.transpose((2, 0, 1))#[None, :, :, :]
         return values
 
     def compute_bias(self, query_length, key_length, offset=jnp.array(0, dtype="i4")):
@@ -908,23 +908,24 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return position_bias
 
-    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_slides=0) -> np.ndarray:
+    partial(jax.vmap, in_axes=[None, None, None, 0])
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_slides=np.array([0])) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_graph_edge_bias:
             #n_global tokens include the document tokens and the slide tokens
             slide_tokens = jnp.arange(n_slides)
             document_tokens = jnp.arange(n_slides, n_global_tokens)
             global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, document_tokens, slide_tokens, in_window=True)
-            global_block_edge = global_block_edge[:, None] #broadcast with num_blocks
+            global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
-            global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
+            global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)[0]
             if self.has_graph_edge_bias:
                 global_block = global_block + global_block_edge
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
-            position_bias = jnp.concatenate([global_block, blocks_block], axis=4, dtype=self.dtype)
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype)
         else:
-            position_bias = jnp.zeros((1, 1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
+            position_bias = jnp.zeros((1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
 
     def __call__(
@@ -941,19 +942,19 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
+        batch_size, seq_length = hidden_states.shape[:2]
+
         block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
         
         #"slide" tokens are added at the beginning of the document
         if self.has_variable("graph", "n_slides"):
             n_slides = self.variables["graph"]["n_slides"]
         else:
-            n_slides = 0
+            n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
         #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
-        n_document_tokens = 3 #TODO: add in config
-        n_global_tokens = n_document_tokens + n_slides
+        n_document_tokens = 2 #TODO: add in config
+        n_global_tokens = n_document_tokens + n_slides.max()
         
-        batch_size, seq_length = hidden_states.shape[:2]
-
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
 
         # q, k, v projections
@@ -1049,10 +1050,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_slides)
             position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)     
             if self.has_graph_edge_bias:
-                n_global_tokens=n_global_tokens
-                slide_tokens = jnp.arange(n_slides)
-                document_tokens = jnp.arange(n_slides, n_global_tokens)
-                global_edge = self.compute_edge_bias_global(n_global_tokens, seq_length, document_tokens, slide_tokens, in_window=False)
+                @jax.vmap
+                def get_global_edge(n_slides):
+                    slide_tokens = jnp.arange(n_slides)
+                    document_tokens = jnp.arange(n_slides, n_global_tokens)
+                    return self.compute_edge_bias_global(n_global_tokens, seq_length, document_tokens, slide_tokens, in_window=False)
+                global_edge=get_global_edge(n_slides)
                 position_bias_global = position_bias_global + global_edge
 
             # if graph_mask is not None:

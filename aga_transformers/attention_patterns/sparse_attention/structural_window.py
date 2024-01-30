@@ -27,16 +27,17 @@ def get_slides2segments_edges(data_point):
 
 
 class StructuralAttentionPattern(AttentionPattern):
-    def __init__(self, data_point, tokenized, window_size, sentence_tokens=[0], mode="structure", **kwargs):
+    def __init__(self, data_point, tokens, window_size, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(data_point)
         # tokenized = tokenizer(data_point['transcript'])
-        seq_len_q = len(tokenized.tokens())
+        seq_len_q = len(tokens)
         seq_len_kv = seq_len_q
         num_slides = len(edges_slides_to_transcript_segments)
+        self.n_slides = num_slides
         # print(f"Number of slides: {num_slides}")
 
         # get the mapping from the segments to the tokens (new_tokens[i] is the tokens ids in segment i)
-        new_tokens = get_new_token_ids(data_point['transcript_segments']['text'], tokenized.tokens())
+        new_tokens = get_new_token_ids(data_point['transcript_segments']['text'], tokens)
 
         def max_listoflists(inputlist):
             return max([max(sublist) for sublist in inputlist if sublist != []])
@@ -56,7 +57,11 @@ class StructuralAttentionPattern(AttentionPattern):
         receivers = []
         senders = []
 
-        seq_kv = set(range(num_slides, num_slides + seq_len_kv))
+        if is_padded:
+            #slides are included in seq_len_kv
+            seq_kv = set(range(num_slides, seq_len_kv))
+        else:
+            seq_kv = set(range(num_slides, num_slides + seq_len_kv))
         seq_q = seq_kv
 
         all_nodes = set(range(num_slides + seq_len_kv))
@@ -81,24 +86,28 @@ class StructuralAttentionPattern(AttentionPattern):
                 node_tokens = new_tokens[edge_sentence_id]
                 for node_token in node_tokens:
                     # slide / tokens edges
-                    node_token = node_token + offset_tokens
-                    if(node_token, node_slide) not in edges and (node_slide, node_token) not in edges:
-                        edges.add((node_token, node_slide))
-                        edges.add((node_slide, node_token))
-                        receivers.append(node_token)
-                        senders.append(node_slide)
-                        senders.append(node_token)
-                        receivers.append(node_slide)
-                    if mode == "structure":
-                        for edge_sentence_id_2 in edges_slide:
-                            node_tokens_2 = new_tokens[edge_sentence_id_2]
-                            for node_token_2 in node_tokens_2:
-                                # edges between tokens within the same slide
-                                node_token_2 = node_token_2 + offset_tokens
-                                if (node_token_2, node_token) not in edges:
-                                    edges.add((node_token_2, node_token))
-                                    receivers.append(node_token)
-                                    senders.append(node_token_2)
+                    if not is_padded:
+                        node_token = node_token + offset_tokens
+                    if node_token >= offset_tokens:
+                        if(node_token, node_slide) not in edges and (node_slide, node_token) not in edges:
+                            edges.add((node_token, node_slide))
+                            edges.add((node_slide, node_token))
+                            receivers.append(node_token)
+                            senders.append(node_slide)
+                            senders.append(node_token)
+                            receivers.append(node_slide)
+                        if mode == "structure":
+                            for edge_sentence_id_2 in edges_slide:
+                                node_tokens_2 = new_tokens[edge_sentence_id_2]
+                                for node_token_2 in node_tokens_2:
+                                    # edges between tokens within the same slide
+                                    if not is_padded:
+                                        node_token_2 = node_token_2 + offset_tokens
+                                    if node_token_2 >= offset_tokens:
+                                        if (node_token_2, node_token) not in edges:
+                                            edges.add((node_token_2, node_token))
+                                            receivers.append(node_token)
+                                            senders.append(node_token_2)
             for slide_id_2 in range(len(edges_slides_to_transcript_segments)):
                 # slide / slide edges
                 node_slide_2 = slide_id_2
@@ -136,13 +145,13 @@ class StructuralAttentionPattern(AttentionPattern):
         self.size = (num_tokens, num_tokens)
 
 
-def create_window_structural_attn_patterns(model, data_point, tokenizer, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure",  **kwargs):
+def create_window_structural_attn_patterns(model, data_point, tokens, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure",  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_structural_attn_patterns')
     #Encoder self attention pattern
     enc_self_attn = StructuralAttentionPattern(
                                 data_point=data_point,
-                                tokenizer=tokenizer,
+                                tokens=tokens,
                                 window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
                                 mode=mode
@@ -159,6 +168,7 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
     receivers_heads = [[attn_pattern["receivers"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
     senders_heads = [[attn_pattern["senders"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
     graph_mask_heads = [[attn_pattern["graph_mask"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head] 
+    n_slides = [attn_pattern[0]["n_slides"] for attn_pattern in list_batch_list_attentions_per_head]
 
     def pad_to(mat, padding):
       padded_mat = np.zeros((padding), dtype=np.uint16)
@@ -191,20 +201,21 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
         b_h.append(h)
     m = b_m_h
     s = b_h
-    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool")}
+    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool"), "n_slides": np.array(n_slides, dtype=np.uint16)}
    
 
-def create_window_structural_attn_patterns_batch(model, data_point, tokenized, max_source_length, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure",  **kwargs):
+def create_window_structural_attn_patterns_batch(model, data_point, tokens, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", is_padded=False, **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
     batch_size = len(data_point)
     batch_enc_self_attn = [StructuralAttentionPattern(
                                 data_point=data_point[i],
-                                tokenized=tokenized[i],
+                                tokens=tokens[i],
                                 window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
                                 mode=mode,
-                                ).get_attention_graph() for i in range(batch_size)]
+                                is_padded=is_padded,
+                                ).get_attention_graph(with_num_slides=True) for i in range(batch_size)]
     # Decoder self attention pattern
     dec_self_attn = {}
     # Encoder-Decoder cross attention pattern
