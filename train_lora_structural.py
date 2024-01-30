@@ -642,13 +642,12 @@ def main():
     def preprocess_function(examples):
         inputs = examples[text_column]
         targets = examples[summary_column]
-        num_slides = len(examples['keyframes']['timestamp'])
+        num_slides = [len(example['keyframes']['timestamp']) for example in examples]
         slide_token="<extra_id_99>"
-        inputs = [slide_token*num_slides + prefix + inp for inp in inputs]
+        inputs = [slide_token*num_slides_ + prefix + inp for (inp, num_slides_) in zip(inputs, num_slides)]
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        model_inputs["dependency_graph"] = examples["dependency_graph"]
 
         # Setup the tokenizer for targets
         labels = tokenizer(
