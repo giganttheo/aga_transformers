@@ -44,7 +44,7 @@ def create_lora(model, optimizer, dtype="bfloat16"):
         if 'embedding' in path:
             # print(f'Fully finetuning param {path}')
             return LORA_FULL
-        dim = 256 #was 64
+        dim = 64 # 64 > 256 (test 128?)
         # print(f'Using LoRA with dim={dim} for param {path}')
         return dim
 

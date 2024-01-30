@@ -27,9 +27,9 @@ def get_slides2segments_edges(data_point):
 
 
 class StructuralAttentionPattern(AttentionPattern):
-    def __init__(self, data_point, tokenizer, window_size, sentence_tokens=[0], mode="structure", **kwargs):
+    def __init__(self, data_point, tokenized, window_size, sentence_tokens=[0], mode="structure", **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(data_point)
-        tokenized = tokenizer(data_point['transcript'])
+        # tokenized = tokenizer(data_point['transcript'])
         seq_len_q = len(tokenized.tokens())
         seq_len_kv = seq_len_q
         num_slides = len(edges_slides_to_transcript_segments)
@@ -135,7 +135,8 @@ class StructuralAttentionPattern(AttentionPattern):
         self.graph_mask = graph_mask
         self.size = (num_tokens, num_tokens)
 
-def create_window_structural_attn_patterns(model, data_point, tokenizer, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False,  **kwargs):
+
+def create_window_structural_attn_patterns(model, data_point, tokenizer, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure",  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_structural_attn_patterns')
     #Encoder self attention pattern
@@ -144,7 +145,7 @@ def create_window_structural_attn_patterns(model, data_point, tokenizer, window_
                                 tokenizer=tokenizer,
                                 window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
-                                mode="structure"
+                                mode=mode
                                 ).get_attention_graph()
 
     # Decoder self attention pattern
@@ -152,4 +153,63 @@ def create_window_structural_attn_patterns(model, data_point, tokenizer, window_
     # Encoder-Decoder cross attention pattern
     encdec_attn = {}
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
+    return graph
+
+def stitch_patterns_together(list_batch_list_attentions_per_head):
+    receivers_heads = [[attn_pattern["receivers"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
+    senders_heads = [[attn_pattern["senders"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
+    graph_mask_heads = [[attn_pattern["graph_mask"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head] 
+
+    def pad_to(mat, padding):
+      padded_mat = np.zeros((padding), dtype=np.uint16)
+      padded_mat[:mat.shape[0]] = mat
+      return padded_mat
+    def get_mask(padding, previous_mask):
+      graph_mask = np.zeros((padding), dtype="i4")
+      graph_mask[:previous_mask.shape[0]] = previous_mask
+      return graph_mask
+
+    max_graph_len = max([receivers.shape[0] for receivers_head in receivers_heads for receivers in receivers_head])
+    r, s, m = [], [], []
+    b_h = []
+    b_m_h = []
+    for batch_num in range(len(receivers_heads)):
+        h = []
+        m_h = []
+        for i_head, receivers in enumerate(receivers_heads[batch_num]):
+            h.append(pad_to(receivers, max_graph_len))
+            m_h.append(get_mask(max_graph_len, graph_mask_heads[batch_num][i_head]))
+        b_h.append(h)
+        b_m_h.append(m_h)
+    r = b_h
+
+    b_h = []
+    for batch_num in range(len(senders_heads)):
+        h = []
+        for senders in senders_heads[batch_num]:
+            h.append(pad_to(senders, max_graph_len))
+        b_h.append(h)
+    m = b_m_h
+    s = b_h
+    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool")}
+   
+
+def create_window_structural_attn_patterns_batch(model, data_point, tokenized, max_source_length, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure",  **kwargs):
+    if len(kwargs.keys()) > 0:
+      print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
+    batch_size = len(data_point)
+    batch_enc_self_attn = [StructuralAttentionPattern(
+                                data_point=data_point[i],
+                                tokenized=tokenized[i],
+                                window_size=window_sizes[0],
+                                sentence_tokens=sentence_tokens,
+                                mode=mode,
+                                ).get_attention_graph() for i in range(batch_size)]
+    # Decoder self attention pattern
+    dec_self_attn = {}
+    # Encoder-Decoder cross attention pattern
+    encdec_attn = {}
+    
+    heads_enc_self_attn = stitch_patterns_together([[enc_self_attn]*1 for enc_self_attn in batch_enc_self_attn])
+    graph = graph_from_path(model.params, heads_enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
