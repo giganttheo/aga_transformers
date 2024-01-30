@@ -9,6 +9,7 @@ cd ~/graph-transformer/aga_transformers
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
 export TOKENIZERS_PARALLELISM=false
+wandb login
 
 # export XLA_PYTHON_CLIENT_PREALLOCATE=false
 

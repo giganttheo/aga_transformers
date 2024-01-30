@@ -642,7 +642,7 @@ def main():
     def preprocess_function(examples):
         inputs = examples[text_column]
         targets = examples[summary_column]
-        num_slides = [len(example['keyframes']['timestamp']) for example in examples]
+        num_slides = [len(example['timestamp']) for example in examples['keyframes']]
         slide_token="<extra_id_99>"
         inputs = [slide_token*num_slides_ + prefix + inp for (inp, num_slides_) in zip(inputs, num_slides)]
         model_inputs = tokenizer(
