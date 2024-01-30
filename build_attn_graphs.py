@@ -22,9 +22,9 @@ def main():
             tokens = tokenizer(text).tokens()
 
             attention_kwargs = {
-                "bidirectional":True,
+                "bidirectional":False,
                 "self_edge": False,
-                "global_tokens": [0, 1, 2], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+                "global_tokens": [], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
                 "text": text,
                 "tokens": tokens,
             }
