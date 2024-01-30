@@ -51,7 +51,7 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
 
     graph = construct_dependency_graph(dependency_parser(text))
     new_token_ids = get_new_token_ids(graph["nodes"], tokens)
-    new_edges = set([(new_id_s, new_id_r, graph["edge_labels"][i]) for (i, (id_s, id_r)) in enumerate(graph["edges"]) for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]])
+    new_edges = set([(new_id_s, new_id_r, graph["edge_labels"][(id_s, id_r)]) for (id_s, id_r) in graph["edges"] for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]])
     if bidirectional:
        new_edges.update(set([(edge[1], edge[0], "[return]" + edge[2]) for edge in new_edges]))
     if self_edge:
