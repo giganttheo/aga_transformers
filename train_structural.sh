@@ -12,7 +12,7 @@ export TOKENIZERS_PARALLELISM=false
 
 # export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
-python ./train_lora_graph.py \
+python ./train_lora_structural.py \
 	--output_dir "./8k-structure-window" \
 	--model_name_or_path "google/flan-t5-base" \
 	--tokenizer_name "google/flan-t5-base" \
