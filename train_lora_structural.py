@@ -66,7 +66,7 @@ import lorax
 from lorax import LoraWeight
 
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
-from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5
+from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 # from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
@@ -579,7 +579,7 @@ def main():
     if model_args.model_name_or_path:
         dtype=model_args.dtype
 
-        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="dependency", layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False)
 
     if training_args.gradient_checkpointing:
         print("=============================")
