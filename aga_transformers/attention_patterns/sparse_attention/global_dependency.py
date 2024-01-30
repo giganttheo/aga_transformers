@@ -51,14 +51,14 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
 
     graph = construct_dependency_graph(dependency_parser(text))
     new_token_ids = get_new_token_ids(graph["nodes"], tokens)
-    new_edges = set([(new_id_s, new_id_r) for (id_s, id_r) in graph["edges"] for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]])
+    new_edges = set([(new_id_s, new_id_r, graph["edge_labels"][i]) for (i, (id_s, id_r)) in enumerate(graph["edges"]) for new_id_r in new_token_ids[id_r] for new_id_s in new_token_ids[id_s]])
     if bidirectional:
-       new_edges.update(set([(edge[1], edge[0]) for edge in new_edges]))
+       new_edges.update(set([(edge[1], edge[0], "[return]" + edge[2]) for edge in new_edges]))
     if self_edge:
-       new_edges.update(set([(token_id, token_id) for token_id in range(len(tokens))]))
+       new_edges.update(set([(token_id, token_id, "self") for token_id in range(len(tokens))]))
     #global tokens
-    new_edges.update(set([(global_token, token_id) for token_id in range(len(tokens)) for global_token in global_tokens]))
-    new_edges.update(set([(token_id, global_token) for token_id in range(len(tokens)) for global_token in global_tokens]))
+    new_edges.update(set([(global_token, token_id, "") for token_id in range(len(tokens)) for global_token in global_tokens]))
+    new_edges.update(set([(token_id, global_token, "") for token_id in range(len(tokens)) for global_token in global_tokens]))
 
     receivers = np.array([edge[1] for edge in new_edges], dtype=np.uint16)
     senders = np.array([edge[0] for edge in new_edges], dtype=np.uint16)
@@ -66,6 +66,7 @@ class GlobalDependencyAttentionPattern(AttentionPattern):
     receivers = np.array(receivers, dtype=np.uint16)
     senders = np.array(senders, dtype=np.uint16)
     graph_mask = np.array(graph_mask, dtype=bool)
+    self.edge_labels = [edge[2] for edge in new_edges]
     self.receivers = receivers
     self.senders = senders
     self.graph_mask = graph_mask
@@ -165,7 +166,7 @@ def prepare_global_dependency_attn_patterns(text, tokens, bidirectional=False, s
                                 bidirectional=bidirectional,
                                 global_tokens=global_tokens,
                                 self_edge=self_edge,
-                                ).get_attention_graph()
+                                ).get_attention_graph(with_edge_labels=True)
 
 def create_global_dependency_attn_patterns_from_prepared(batch_dependency_attention_graph, model, max_source_length, max_target_length, heads_graph=1, heads_window=11,window_sizes=[32], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
