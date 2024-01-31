@@ -1112,7 +1112,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
             jax.debug.print("shapes: position bias local: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_local, mask_local=mask_local)
-            position_bias_local = position_bias_local + mask_local.swapaxes(1, 2)
+            position_bias_local = position_bias_local + mask_local
             jax.debug.print("shapes: position bias global: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_global, mask_local=mask_global)
             position_bias_global = position_bias_global + mask_global
 
