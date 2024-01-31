@@ -243,7 +243,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  print(mask_local_shape)
+  jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
   mask_global_shape = (n_global_tokens, seq_len)
@@ -1072,7 +1072,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 key_states, value_states = self._concatenate_to_cache(
                     key_states, value_states, query_states
                 )
-            print(f"mask_shape = {graph_mask.shape}")
+            jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
 
             # replace masked positions with -10_000
@@ -1110,9 +1110,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
             # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-            print(f"shapes: position bias local: {position_bias_local.shape} masklocal: {mask_local.shape}")
+            jax.debug.print("shapes: position bias local: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_local, mask_local=mask_local)
             position_bias_local = position_bias_local + mask_local.swapaxes(1, 2)
-            print(f"shape position bias: {position_bias_local.shape}")
+            jax.debug.print("shape position bias: {position_bias_local.shape}", position_bias_local=position_bias_local)
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
