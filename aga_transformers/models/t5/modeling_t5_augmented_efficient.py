@@ -1136,7 +1136,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # merge blocks
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
-
+            jax.debug.print("shapes for global attn: {position_bias_global.shape}, & {query_states.shape}", position_bias_global=position_bias_global, query_states=query_states[:, :n_global_tokens, ...])
             global_attn_weights = position_bias_global
             # global_attn_weights = dot_product_attention_weights(
             #     query_states[:, :n_global_tokens, ...],
