@@ -949,7 +949,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
     @partial(jax.vmap, in_axes=[None, None, None, None, None, 0]) #batch
     def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array(0)) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
-        if self.has_graph_edge_bias and False:
+        if self.has_graph_edge_bias:
             #n_global tokens include the document tokens and the slide tokens
             # slide_tokens = slice(n_slides)
             # document_tokens = slice(n_slides, n_global_tokens)
@@ -957,7 +957,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
-            if self.has_graph_edge_bias and False:
+            if self.has_graph_edge_bias:
+                assert global_block.shape[1:] == global_block_edge.shape[1:]
                 global_block = global_block + global_block_edge
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
@@ -1093,11 +1094,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # )
             position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_document_tokens, n_slides)
             position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)     
-            if self.has_graph_edge_bias and False:
+            if self.has_graph_edge_bias:
                 @jax.vmap
                 def get_global_edge(n_slides_):
                     return self.compute_edge_bias_global(n_global_tokens, seq_length, n_slides_, n_document_tokens, in_window=False)
                 global_edge=get_global_edge(n_slides)
+                assert position_bias_global.shape == global_edge.shape
                 position_bias_global = position_bias_global + global_edge
 
             # if graph_mask is not None:
