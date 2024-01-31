@@ -810,12 +810,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             graph_edge_buckets = graph_edge_buckets.at[document_tokens, :].set(0)
             # slide -> local edge
             graph_edge_buckets = graph_edge_buckets.at[slide_tokens, :].set(2)
-            for doc_token in document_tokens:
+            for doc_token in np.arange(query_length)[document_tokens]:
                 #document -> document edge
                 graph_edge_buckets = graph_edge_buckets.at[doc_token, document_tokens].set(7)
                 #document -> slide edge
                 graph_edge_buckets = graph_edge_buckets.at[doc_token, slide_tokens].set(4)
-            for sl_token in slide_tokens:
+            for sl_token in np.arange(query_length)[slide_tokens]:
                 #slide -> document edge
                 graph_edge_buckets = graph_edge_buckets.at[sl_token, document_tokens].set(5)
                 #slide -> slide edge
@@ -909,12 +909,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         return position_bias
 
     partial(jax.vmap, in_axes=[None, None, None, 0])
-    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_slides=np.array([[0]])) -> np.ndarray:
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_slides=np.array([0])) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_graph_edge_bias:
             #n_global tokens include the document tokens and the slide tokens
-            slide_tokens = jnp.arange(n_slides[0])
-            document_tokens = jnp.arange(n_slides[0], n_global_tokens)
+            slide_tokens = slice(n_slides)
+            document_tokens = slice(n_slides, n_global_tokens)
             global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, document_tokens, slide_tokens, in_window=True)
             global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
