@@ -792,6 +792,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
+    @partial(jax.jit, static_argnums=[0])
     def compute_edge_bias_global(self, query_length, key_length, n_slides, n_document_tokens, in_window=False):
         """Compute edge label bias"""
         # context_position = jnp.arange(query_length, dtype="i4")[:, None]
@@ -827,10 +828,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # graph_edge_buckets = graph_edge_buckets.at[:n_slides, :].set(2)
             graph_edge_buckets = jnp.where(jnp.less(axis_0, n_slides), 2, graph_edge_buckets)
 
-            for doc_token in jnp.arange(query_length):
+            for doc_token in jnp.arange(n_document_tokens):
                 #document -> document edge
                 # graph_edge_buckets = graph_edge_buckets.at[doc_token, n_slides:n_global_tokens].set(7)
-                is_in_range = jnp.logical_and(jnp.less_equal(n_slides, doc_token), jnp.less(doc_token, n_global_tokens))
+                doc_token = n_slides + doc_token
+                is_in_range = jnp.less(doc_token, n_global_tokens)
                 tmp = jnp.equal(axis_0, doc_token)
                 tmp_2 = jnp.less_equal(n_slides, axis_1)
                 tmp_3 = jnp.less(axis_1, n_global_tokens)
@@ -946,7 +948,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #n_global tokens include the document tokens and the slide tokens
             # slide_tokens = slice(n_slides)
             # document_tokens = slice(n_slides, n_global_tokens)
-            print(f"n_slides shape inside fn: {n_slides.shape}")
             global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, n_slides, n_document_tokens, in_window=True)
             global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
@@ -981,12 +982,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #"slide" tokens are added at the beginning of the document
         if self.has_variable("graph", "n_slides"):
             n_slides = self.variables["graph"]["n_slides"]
-            print(f"n_slides shape: {n_slides.shape}")
         else:
             n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
         #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
         n_document_tokens = 2 #TODO: add in config
-        n_global_tokens = 256 # static value that should be >= n_document_tokens + n_slides.max()
+        n_global_tokens = 64 # static value that should be >= n_document_tokens + n_slides.max()
         
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
 
