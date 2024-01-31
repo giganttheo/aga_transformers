@@ -797,8 +797,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # context_position = jnp.arange(query_length, dtype="i4")[:, None]
         # memory_position = jnp.arange(key_length, dtype="i4")[None, :]
 
-        jax.debug.print("shapes: n_slides{n_slides}, global_tokens {n_global_tokens}, n_document_tokens {n_document_tokens}", n_slides=n_slides, n_global_tokens=n_global_tokens, n_document_tokens=n_document_tokens)
-
+        jax.debug.print("\n\n====================\n\nshapes: n_slides{n_slides}, global_tokens {n_global_tokens}, n_document_tokens {n_document_tokens}\n\n====================\n\n", n_slides=n_slides, n_global_tokens=n_global_tokens, n_document_tokens=n_document_tokens)
+        
         graph_edge_buckets = jnp.full((query_length, key_length), -1)
         #TODO define multiple types of edge labels
         
