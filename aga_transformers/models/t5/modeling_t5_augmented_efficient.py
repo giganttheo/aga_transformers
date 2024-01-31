@@ -961,7 +961,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 global_block = global_block + global_block_edge
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
-            position_bias = jnp.concatenate([global_block, blocks_block], axis=2, dtype=self.dtype) #merge on last axis 
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
         else:
             position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
@@ -1137,16 +1137,17 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
-            global_attn_weights = dot_product_attention_weights(
-                query_states[:, :n_global_tokens, ...],
-                key_states,
-                bias=position_bias_global,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
-            )
+            global_attn_weights = position_bias_global
+            # global_attn_weights = dot_product_attention_weights(
+            #     query_states[:, :n_global_tokens, ...],
+            #     key_states,
+            #     bias=position_bias_global,
+            #     dropout_rng=dropout_rng,
+            #     dropout_rate=self.dropout,
+            #     broadcast_dropout=True,
+            #     deterministic=deterministic,
+            #     dtype=self.dtype,
+            # )
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
