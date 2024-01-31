@@ -881,7 +881,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         return values
 
     def compute_global_bias(self, block_length: int, num_global_tokens: int, num_blocks:int):
-        return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=0)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
+        return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=1)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
 
     def compute_block_bias(self, block_length: int, num_blocks: int):
         """Compute binned relative position bias"""
@@ -954,11 +954,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # slide_tokens = slice(n_slides)
             # document_tokens = slice(n_slides, n_global_tokens)
             global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, n_slides, n_document_tokens, in_window=True)
-            global_block_edge = global_block_edge[None] #broadcast with num_blocks
+            global_block_edge = global_block_edge[:, None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
             if self.has_graph_edge_bias:
-                assert global_block.shape[1:] == global_block_edge.shape[1:]
+                assert global_block.shape[2:] == global_block_edge.shape[2:]
                 global_block = global_block + global_block_edge
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
@@ -1095,7 +1095,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_document_tokens, n_slides)
             position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)     
             if self.has_graph_edge_bias:
-                @jax.vmap
+                @jax.vmap #batch_size
                 def get_global_edge(n_slides_):
                     return self.compute_edge_bias_global(n_global_tokens, seq_length, n_slides_, n_document_tokens, in_window=False)
                 global_edge=get_global_edge(n_slides)
