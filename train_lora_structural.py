@@ -650,7 +650,9 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        model_inputs["tokens"]=model_inputs.tokens()
+        model_inputs["tokens"]=tokenizer(
+            inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
+        ).tokens()
 
         # Setup the tokenizer for targets
         labels = tokenizer(
