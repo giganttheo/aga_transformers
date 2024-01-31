@@ -913,7 +913,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         return position_bias
 
     partial(jax.vmap, in_axes=[None, None, None, None, 0])
-    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=np.array(2), n_slides=np.array([0])) -> np.ndarray:
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array([0])) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_graph_edge_bias:
             #n_global tokens include the document tokens and the slide tokens
@@ -1056,7 +1056,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # position_bias = self._create_position_bias_sparse(
             #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
             # )
-            position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_slides[..., None])
+            position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_slides)
             position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)     
             if self.has_graph_edge_bias:
                 @jax.vmap
