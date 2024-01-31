@@ -70,8 +70,7 @@ from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augme
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 # from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
-from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns
-
+from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -403,7 +402,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset,
             "autoregressive": False,
             "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
-        graph_batch = create_window_structural_attn_patterns(model, layer_wise=False, **attention_kwargs)
+        graph_batch = create_window_structural_attn_patterns_batch(model, layer_wise=False, **attention_kwargs)
         yield batch, graph_batch
 
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
