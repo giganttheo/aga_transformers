@@ -933,6 +933,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #n_global tokens include the document tokens and the slide tokens
             # slide_tokens = slice(n_slides)
             # document_tokens = slice(n_slides, n_global_tokens)
+            print(f"n_slides shape inside fn: {n_slides.shape}")
             global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, n_slides, n_global_tokens, n_document_tokens, in_window=True)
             global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
@@ -967,7 +968,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #"slide" tokens are added at the beginning of the document
         if self.has_variable("graph", "n_slides"):
             n_slides = self.variables["graph"]["n_slides"]
-            print(f"N_slides shape: {n_slides.shape}")
+            print(f"n_slides shape: {n_slides.shape}")
         else:
             n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
         #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
