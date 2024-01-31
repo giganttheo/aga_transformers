@@ -650,7 +650,7 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        model_inputs["tokens"]=tokenizer.convert_ids_to_tokens(model_inputs["input_ids"])
+        model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in model_inputs["input_ids"]]
 
         # Setup the tokenizer for targets
         labels = tokenizer(
