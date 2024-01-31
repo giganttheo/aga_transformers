@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from .modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
 from .modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
 from .modeling_t5 import FlaxT5ForConditionalGeneration
-from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_layers, tie_relative_pos_bias
+from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_layers, tie_relative_pos_bias, init_augmented_vocab
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
@@ -105,6 +105,9 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
             "autoregressive":False,
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
+
+    vocab_size = 8
+    model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
     #tieing the graph so it is defined for first layer only
     model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=attention_kwargs["autoregressive"])
     
