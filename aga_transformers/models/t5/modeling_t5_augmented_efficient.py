@@ -796,7 +796,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-
     def compute_edge_bias_global(self, query_length, key_length, n_slides, n_document_tokens, in_window=False):
         """Compute edge label bias"""
         # context_position = jnp.arange(query_length, dtype="i4")[:, None]
@@ -962,7 +961,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 global_block = global_block + global_block_edge
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
-            position_bias = jnp.concatenate([global_block, blocks_block], axis=-1, dtype=self.dtype) #merge on last axis 
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=2, dtype=self.dtype) #merge on last axis 
         else:
             position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
@@ -1111,9 +1110,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
             jax.debug.print("shapes: position bias local: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_local, mask_local=mask_local)
-            position_bias_local = position_bias_local #+ mask_local.swapaxes(1, 2)
+            position_bias_local = position_bias_local + mask_local.swapaxes(1, 2)
             jax.debug.print("shape position bias: {position_bias_local.shape}", position_bias_local=position_bias_local)
-            position_bias_global = position_bias_global #+ mask_global
+            position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
             dropout_rng = None
@@ -1439,7 +1438,7 @@ class FlaxT5BlockCollection(nn.Module):
     def setup(self):
         self.causal = self.config.causal
         if self.gradient_checkpointing:
-            FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8), variables=["params"]) #?
+            FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8), variables=["params", "graph"]) #?
             self.blocks = [
                 FlaxT5CheckpointLayer(
                     self.config,
