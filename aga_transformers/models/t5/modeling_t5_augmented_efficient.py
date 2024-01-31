@@ -927,7 +927,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         return position_bias
 
     partial(jax.vmap, in_axes=[None, None, None, None, 0])
-    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array([0])) -> np.ndarray:
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array(0)) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_graph_edge_bias:
             #n_global tokens include the document tokens and the slide tokens
@@ -967,6 +967,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #"slide" tokens are added at the beginning of the document
         if self.has_variable("graph", "n_slides"):
             n_slides = self.variables["graph"]["n_slides"]
+            print(f"N_slides shape: {n_slides.shape}")
         else:
             n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
         #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
