@@ -991,7 +991,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
         #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
         n_document_tokens = 2 #TODO: add in config
-        n_global_tokens = 4 # static value that should be >= n_document_tokens + n_slides.max()
+        n_global_tokens = 64 # static value that should be >= n_document_tokens + n_slides.max()
         
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
 
