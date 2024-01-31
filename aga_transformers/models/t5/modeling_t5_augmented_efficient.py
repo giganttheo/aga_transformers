@@ -1111,7 +1111,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
             jax.debug.print("shapes: position bias local: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_local, mask_local=mask_local)
             position_bias_local = position_bias_local + mask_local.swapaxes(1, 2)
-            jax.debug.print("shape position bias: {position_bias_local.shape}", position_bias_local=position_bias_local)
+            jax.debug.print("shapes: position bias global: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_global, mask_local=mask_global)
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
@@ -1138,16 +1138,17 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
             jax.debug.print("shapes for global attn: {position_bias_global.shape}, & {query_states.shape}", position_bias_global=position_bias_global, query_states=query_states[:, :n_global_tokens, ...])
             global_attn_weights = position_bias_global
-            # global_attn_weights = dot_product_attention_weights(
-            #     query_states[:, :n_global_tokens, ...],
-            #     key_states,
-            #     bias=position_bias_global,
-            #     dropout_rng=dropout_rng,
-            #     dropout_rate=self.dropout,
-            #     broadcast_dropout=True,
-            #     deterministic=deterministic,
-            #     dtype=self.dtype,
-            # )
+            global_attn_weights = dot_product_attention_weights(
+                query_states[:, :n_global_tokens, ...],
+                key_states,
+                bias=None,#position_bias_global,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+            jax.debug.print("shape of attn weights global: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
