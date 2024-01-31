@@ -792,7 +792,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    def compute_edge_bias_global(self, query_length, key_length, document_tokens, slide_tokens, in_window=False):
+    def compute_edge_bias_global(self, query_length, key_length, n_slides, n_global_tokens, in_window=False):
         """Compute edge label bias"""
         # context_position = jnp.arange(query_length, dtype="i4")[:, None]
         # memory_position = jnp.arange(key_length, dtype="i4")[None, :]
@@ -800,26 +800,29 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         graph_edge_buckets = jnp.full((query_length, key_length), -1)
         #TODO define multiple types of edge labels
         
+        # slide_tokens = slice(n_slides)
+        # document_tokens = slice(n_slides, n_global_tokens)
+
         if in_window:
             #local -> document edge
-            graph_edge_buckets = graph_edge_buckets.at[:, document_tokens].set(1)
+            graph_edge_buckets = graph_edge_buckets.at[:, n_slides:n_global_tokens].set(1)
             #local -> slide edge
-            graph_edge_buckets = graph_edge_buckets.at[:,slide_tokens].set(3)
+            graph_edge_buckets = graph_edge_buckets.at[:,:n_slides].set(3)
         else:
             # document -> local edge
-            graph_edge_buckets = graph_edge_buckets.at[document_tokens, :].set(0)
+            graph_edge_buckets = graph_edge_buckets.at[n_slides:n_global_tokens, :].set(0)
             # slide -> local edge
-            graph_edge_buckets = graph_edge_buckets.at[slide_tokens, :].set(2)
-            for doc_token in np.arange(query_length)[document_tokens]:
+            graph_edge_buckets = graph_edge_buckets.at[:n_slides, :].set(2)
+            for doc_token in np.arange(query_length)[n_slides:n_global_tokens]:
                 #document -> document edge
-                graph_edge_buckets = graph_edge_buckets.at[doc_token, document_tokens].set(7)
+                graph_edge_buckets = graph_edge_buckets.at[doc_token, n_slides:n_global_tokens].set(7)
                 #document -> slide edge
-                graph_edge_buckets = graph_edge_buckets.at[doc_token, slide_tokens].set(4)
-            for sl_token in np.arange(query_length)[slide_tokens]:
+                graph_edge_buckets = graph_edge_buckets.at[doc_token, :n_slides].set(4)
+            for sl_token in np.arange(query_length)[:n_slides]:
                 #slide -> document edge
-                graph_edge_buckets = graph_edge_buckets.at[sl_token, document_tokens].set(5)
+                graph_edge_buckets = graph_edge_buckets.at[sl_token, n_slides:n_global_tokens].set(5)
                 #slide -> slide edge
-                graph_edge_buckets = graph_edge_buckets.at[sl_token, slide_tokens].set(6)
+                graph_edge_buckets = graph_edge_buckets.at[sl_token, :n_slides].set(6)
 
         values = jnp.where(graph_edge_buckets[..., None]>=0, self.graph_edge_bias(graph_edge_buckets), jnp.zeros(tuple(graph_edge_buckets.shape) + (1,)))
         values = values.transpose((2, 0, 1))#[None, :, :, :]
@@ -915,7 +918,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #n_global tokens include the document tokens and the slide tokens
             slide_tokens = slice(n_slides)
             document_tokens = slice(n_slides, n_global_tokens)
-            global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, document_tokens, slide_tokens, in_window=True)
+            global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, n_slides, n_global_tokens, in_window=True)
             global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)[0]
@@ -1057,10 +1060,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             if self.has_graph_edge_bias:
                 @jax.vmap
                 def get_global_edge(n_slides_):
-                    slide_tokens = jnp.arange(n_slides_[0])
-                    document_tokens = jnp.arange(n_slides_[0], n_global_tokens)
-                    return self.compute_edge_bias_global(n_global_tokens, seq_length, document_tokens, slide_tokens, in_window=False)
-                global_edge=get_global_edge(n_slides[..., None])
+                    return self.compute_edge_bias_global(n_global_tokens, seq_length, n_slides_, n_global_tokens, in_window=False)
+                global_edge=get_global_edge(n_slides)
                 position_bias_global = position_bias_global + global_edge
 
             # if graph_mask is not None:
