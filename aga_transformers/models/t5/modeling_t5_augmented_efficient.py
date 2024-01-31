@@ -810,10 +810,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if in_window:
             #local -> document edge
             # graph_edge_buckets = graph_edge_buckets.at[:, n_slides:n_global_tokens].set(1)
-            # tmp = jnp.less_equal(n_slides, axis_1)
-            # tmp_2 = jnp.less_equal(axis_1, n_global_tokens)
-            # graph_edge_buckets = jnp.where(jnp.logical_and(tmp, tmp_2), 1, graph_edge_buckets)
-            graph_edge_buckets = jnp.where(n_slides <= axis_1 < n_global_tokens, 1, graph_edge_buckets)
+            tmp = jnp.less_equal(n_slides, axis_1)
+            tmp_2 = jnp.less_equal(axis_1, n_global_tokens)
+            graph_edge_buckets = jnp.where(jnp.logical_and(tmp, tmp_2), 1, graph_edge_buckets)
+            # graph_edge_buckets = jnp.where(n_slides <= axis_1 < n_global_tokens, 1, graph_edge_buckets)
             #local -> slide edge
             # graph_edge_buckets = graph_edge_buckets.at[:,:n_slides].set(3)
             graph_edge_buckets = jnp.where(axis_1 < n_slides, 3, graph_edge_buckets)
