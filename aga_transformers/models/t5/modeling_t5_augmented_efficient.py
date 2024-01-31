@@ -1141,7 +1141,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             global_attn_weights = dot_product_attention_weights(
                 query_states[:, :n_global_tokens, ...],
                 key_states,
-                bias=None,#position_bias_global,
+                bias=position_bias_global,
                 dropout_rng=dropout_rng,
                 dropout_rate=self.dropout,
                 broadcast_dropout=True,
