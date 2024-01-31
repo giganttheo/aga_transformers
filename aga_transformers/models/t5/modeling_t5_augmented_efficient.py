@@ -827,28 +827,30 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # graph_edge_buckets = graph_edge_buckets.at[:n_slides, :].set(2)
             graph_edge_buckets = jnp.where(jnp.less(axis_0, n_slides), 2, graph_edge_buckets)
 
-            for doc_token in jnp.arange(query_length)[n_slides:n_global_tokens]:
+            for doc_token in jnp.arange(query_length):
                 #document -> document edge
                 # graph_edge_buckets = graph_edge_buckets.at[doc_token, n_slides:n_global_tokens].set(7)
+                is_in_range = jnp.logical_and(jnp.less_equal(n_slides, doc_token), jnp.less(doc_token, n_global_tokens))
                 tmp = jnp.equal(axis_0, doc_token)
                 tmp_2 = jnp.less_equal(n_slides, axis_1)
                 tmp_3 = jnp.less(axis_1, n_global_tokens)
-                graph_edge_buckets = jnp.where(jnp.logical_and(tmp, jnp.logical_and(tmp_2, tmp_3)), 7, graph_edge_buckets)
+                graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, jnp.logical_and(tmp_2, tmp_3))), 7, graph_edge_buckets)
                 #document -> slide edge
                 # graph_edge_buckets = graph_edge_buckets.at[doc_token, :n_slides].set(4)
                 tmp_2 = jnp.less(axis_1, n_slides)
-                graph_edge_buckets = jnp.where(jnp.logical_and(tmp, tmp_2), 4, graph_edge_buckets)
-            for sl_token in jnp.arange(query_length)[:n_slides]:
+                graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, tmp_2)), 4, graph_edge_buckets)
+            for sl_token in jnp.arange(query_length):
                 #slide -> document edge
                 # graph_edge_buckets = graph_edge_buckets.at[sl_token, n_slides:n_global_tokens].set(5)
+                is_in_range = jnp.less(sl_token, n_slides)
                 tmp = jnp.equal(axis_0, sl_token)
                 tmp_2 = jnp.less_equal(n_slides, axis_1)
                 tmp_3 = jnp.less(axis_1, n_global_tokens)
-                graph_edge_buckets = jnp.where(jnp.logical_and(tmp, jnp.logical_and(tmp_2, tmp_3)), 5, graph_edge_buckets)
+                graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, jnp.logical_and(tmp_2, tmp_3))), 5, graph_edge_buckets)
                 #slide -> slide edge
                 # graph_edge_buckets = graph_edge_buckets.at[sl_token, :n_slides].set(6)
                 tmp_2 = jnp.less(axis_1, n_slides)
-                graph_edge_buckets = jnp.where(jnp.logical_and(tmp, tmp_2), 6, graph_edge_buckets)
+                graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, tmp_2)), 6, graph_edge_buckets)
 
         values = jnp.where(graph_edge_buckets[..., None]>=0, self.graph_edge_bias(graph_edge_buckets), jnp.zeros(tuple(graph_edge_buckets.shape) + (1,)))
         values = values.transpose((2, 0, 1))#[None, :, :, :]
