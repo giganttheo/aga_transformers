@@ -240,7 +240,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 #   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #batch
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None], out_axes=[1, 0]) #heads
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
   print(mask_local_shape)
@@ -1110,7 +1110,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
             # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-            position_bias_local = position_bias_local + mask_local
+            position_bias_local = position_bias_local + mask_local.swapaxes(1, 2)
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
