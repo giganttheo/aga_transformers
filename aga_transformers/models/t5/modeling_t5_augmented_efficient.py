@@ -1060,7 +1060,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # position_bias = self._create_position_bias_sparse(
             #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
             # )
-            position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_slides)
+            position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_document_tokens, n_slides)
             position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)     
             if self.has_graph_edge_bias:
                 @jax.vmap
