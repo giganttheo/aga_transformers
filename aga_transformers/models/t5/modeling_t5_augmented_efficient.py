@@ -913,8 +913,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_graph_edge_bias:
             #n_global tokens include the document tokens and the slide tokens
-            slide_tokens = np.arange(n_slides)
-            document_tokens = np.arange(n_slides, n_global_tokens)
+            slide_tokens = jnp.arange(n_slides)
+            document_tokens = jnp.arange(n_slides, n_global_tokens)
             global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, document_tokens, slide_tokens, in_window=True)
             global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
@@ -1057,8 +1057,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             if self.has_graph_edge_bias:
                 @jax.vmap
                 def get_global_edge(n_slides_):
-                    slide_tokens = np.arange(n_slides_)
-                    document_tokens = np.arange(n_slides_, n_global_tokens)
+                    slide_tokens = jnp.arange(n_slides_)
+                    document_tokens = jnp.arange(n_slides_, n_global_tokens)
                     return self.compute_edge_bias_global(n_global_tokens, seq_length, document_tokens, slide_tokens, in_window=False)
                 global_edge=get_global_edge(n_slides)
                 position_bias_global = position_bias_global + global_edge
