@@ -797,6 +797,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # context_position = jnp.arange(query_length, dtype="i4")[:, None]
         # memory_position = jnp.arange(key_length, dtype="i4")[None, :]
 
+        jax.debug.print("shapes: n_slides{n_slides}, global_tokens {n_global_tokens.shape}, n_document_tokens {n_document_tokens.shape}", n_slides=n_slides, n_global_tokens=n_global_tokens, n_document_tokens=n_document_tokens)
+
         graph_edge_buckets = jnp.full((query_length, key_length), -1)
         #TODO define multiple types of edge labels
         
@@ -808,7 +810,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if in_window:
             #local -> document edge
             # graph_edge_buckets = graph_edge_buckets.at[:, n_slides:n_global_tokens].set(1)
-            graph_edge_buckets = jnp.where(n_slides <=axis_1< n_global_tokens, 1, graph_edge_buckets)
+            graph_edge_buckets = jnp.where(n_slides<= axis_1< n_global_tokens, 1, graph_edge_buckets)
             #local -> slide edge
             # graph_edge_buckets = graph_edge_buckets.at[:,:n_slides].set(3)
             graph_edge_buckets = jnp.where(axis_1 < n_slides, 3, graph_edge_buckets)
