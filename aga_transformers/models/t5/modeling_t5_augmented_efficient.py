@@ -806,7 +806,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if in_window:
             #local -> document edge
             # graph_edge_buckets = graph_edge_buckets.at[:, n_slides:n_global_tokens].set(1)
-            graph_edge_buckets = jax.lax.dynamic_update_slice(graph_edge_buckets, jnp.full((query_length, n_document_tokens), 1), (0, n_slides))
+            graph_edge_buckets = jax.lax.dynamic_update_slice(graph_edge_buckets, jnp.full((query_length, key_length), 1)[0, :n_document_tokens], (0, n_slides))
             #local -> slide edge
             graph_edge_buckets = graph_edge_buckets.at[:,:n_slides].set(3)
         else:
