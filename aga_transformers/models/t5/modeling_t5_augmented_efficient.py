@@ -926,7 +926,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return position_bias
 
-    partial(jax.vmap, in_axes=[None, None, None, None, 0])
+    @partial(jax.vmap, in_axes=[None, None, None, None, 0])
     def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array(0)) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_graph_edge_bias:
