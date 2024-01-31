@@ -241,6 +241,8 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
+  #6, 12, num_blocks, block_len, 3 * block_len + n_global_tokens
+  print(mask_local_shape)
   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
   mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
@@ -249,6 +251,7 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
 
     @jax.vmap #batch
+    @jax.vmap #heads
     @jax.vmap #num_edges
     def _get_ids_in_blocks(senders, receivers):
       #block id
@@ -271,12 +274,12 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
       return block_id, block_pos_q, block_pos_k
 
     @jax.vmap #batch
-    @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+    @jax.vmap #heads # @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
     def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
         return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
 
     @jax.vmap #batch
-    @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+    @jax.vmap #heads #was @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
     def _update_mask_global(mask, graph_mask, senders, receivers):
         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
@@ -1033,7 +1036,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
 
-            print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
+            # print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
             query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
             key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
