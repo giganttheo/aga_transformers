@@ -4,15 +4,15 @@ from ..attention_pattern import AttentionPattern
 from ..utils import graph_from_path, get_new_token_ids
 
 
-def get_slides2segments_edges(data_point):
+def get_slides2segments_edges(transcript_segments, keyframes):
   """
   data_point is a row from gigant/tib
 
   edges_slides_to_transcript_segments is the mapping from slides to segments of the transcript
   *[i] is the list of segments connected to slide i
   """
-  starts, ends = data_point['transcript_segments']['start'], data_point['transcript_segments']['end']
-  keyframes_timestamps = data_point['keyframes']['timestamp']
+  starts, ends = transcript_segments['start'], transcript_segments['end']
+  keyframes_timestamps = keyframes['timestamp']
   i_keyframes = 0
   #connection between slides and transcript segments
   edges_slides_to_transcript_segments = [[]]*len(keyframes_timestamps)
@@ -27,8 +27,8 @@ def get_slides2segments_edges(data_point):
 
 
 class StructuralAttentionPattern(AttentionPattern):
-    def __init__(self, data_point, tokens, window_size, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
-        edges_slides_to_transcript_segments = get_slides2segments_edges(data_point)
+    def __init__(self, transcript_segments, keyframes, tokens, window_size, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
+        edges_slides_to_transcript_segments = get_slides2segments_edges(transcript_segments, keyframes)
         # tokenized = tokenizer(data_point['transcript'])
         seq_len_q = len(tokens)
         seq_len_kv = seq_len_q
@@ -37,7 +37,7 @@ class StructuralAttentionPattern(AttentionPattern):
         # print(f"Number of slides: {num_slides}")
 
         # get the mapping from the segments to the tokens (new_tokens[i] is the tokens ids in segment i)
-        new_tokens = get_new_token_ids(data_point['transcript_segments']['text'], tokens)
+        new_tokens = get_new_token_ids(transcript_segments['text'], tokens)
 
         def max_listoflists(inputlist):
             return max([max(sublist) for sublist in inputlist if sublist != []])
@@ -150,7 +150,8 @@ def create_window_structural_attn_patterns(model, data_point, tokens, window_siz
       print(f'keyword arguments {kwargs.keys()} are not used by create_structural_attn_patterns')
     #Encoder self attention pattern
     enc_self_attn = StructuralAttentionPattern(
-                                data_point=data_point,
+                                transcript_segments=data_point["transcript_segments"],
+                                keyframes=data_point["keyframes"],
                                 tokens=tokens,
                                 window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
@@ -204,12 +205,13 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
     return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool"), "n_slides": np.array(n_slides, dtype=np.uint16)}
    
 
-def create_window_structural_attn_patterns_batch(model, data_point, tokens, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", is_padded=False, **kwargs):
+def create_window_structural_attn_patterns_batch(model, transcript_segments, keyframes, tokens, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", is_padded=False, **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
-    batch_size = len(data_point)
+    batch_size = len(keyframes)
     batch_enc_self_attn = [StructuralAttentionPattern(
-                                data_point=data_point[i],
+                                transcript_segments=transcript_segments[i],
+                                keyframes=keyframes[i],
                                 tokens=tokens[i],
                                 window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
