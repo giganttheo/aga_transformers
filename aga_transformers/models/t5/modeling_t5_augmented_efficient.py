@@ -827,7 +827,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # graph_edge_buckets = graph_edge_buckets.at[:n_slides, :].set(2)
             graph_edge_buckets = jnp.where(jnp.less(axis_0, n_slides), 2, graph_edge_buckets)
 
-            for doc_token in np.arange(query_length)[n_slides:n_global_tokens]:
+            for doc_token in jnp.arange(query_length)[n_slides:n_global_tokens]:
                 #document -> document edge
                 # graph_edge_buckets = graph_edge_buckets.at[doc_token, n_slides:n_global_tokens].set(7)
                 tmp = jnp.equal(axis_0, doc_token)
@@ -838,7 +838,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 # graph_edge_buckets = graph_edge_buckets.at[doc_token, :n_slides].set(4)
                 tmp_2 = jnp.less(axis_1, n_slides)
                 graph_edge_buckets = jnp.where(jnp.logical_and(tmp, tmp_2), 4, graph_edge_buckets)
-            for sl_token in np.arange(query_length)[:n_slides]:
+            for sl_token in jnp.arange(query_length)[:n_slides]:
                 #slide -> document edge
                 # graph_edge_buckets = graph_edge_buckets.at[sl_token, n_slides:n_global_tokens].set(5)
                 tmp = jnp.equal(axis_0, sl_token)
