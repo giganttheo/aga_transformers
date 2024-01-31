@@ -388,6 +388,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset,
 
     for idx in batch_idx:
         batch = dataset[idx]
+        tokens = batch.pop("tokens")
         batch = {k: np.array(v) for k, v in batch.items()}
         attention_kwargs= {
             "mode": "window",
@@ -395,7 +396,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset,
             # "data_point": raw_dataset[idx],
             "keyframes": raw_dataset[idx]["keyframes"],
             "transcript_segments": raw_dataset[idx]["transcript_segments"],
-            "tokens": batch.tokens(),
+            "tokens": tokens,
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
             "window_sizes": [254],
@@ -649,6 +650,7 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
+        model_inputs["tokens"]=model_inputs.tokens()
 
         # Setup the tokenizer for targets
         labels = tokenizer(
