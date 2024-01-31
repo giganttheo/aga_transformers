@@ -243,7 +243,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
+  #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
   mask_global_shape = (n_global_tokens, seq_len)
@@ -990,7 +990,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
         #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
         n_document_tokens = 2 #TODO: add in config
-        n_global_tokens = 64 # static value that should be >= n_document_tokens + n_slides.max()
+        n_global_tokens = 256 # static value that should be >= n_document_tokens + n_slides.max()
         
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
 
@@ -1070,7 +1070,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 key_states, value_states = self._concatenate_to_cache(
                     key_states, value_states, query_states
                 )
-            jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
+            # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
 
             # replace masked positions with -10_000
@@ -1109,9 +1109,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
             # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-            jax.debug.print("shapes: position bias local: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_local, mask_local=mask_local)
+            # jax.debug.print("shapes: position bias local: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_local, mask_local=mask_local)
             position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
-            jax.debug.print("shapes: position bias global: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_global, mask_local=mask_global)
+            # jax.debug.print("shapes: position bias global: {position_bias_local.shape} masklocal: {mask_local.shape}", position_bias_local=position_bias_global, mask_local=mask_global)
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
@@ -1136,7 +1136,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # merge blocks
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
-            jax.debug.print("shapes for global attn: {position_bias_global.shape}, & {query_states.shape}", position_bias_global=position_bias_global, query_states=query_states[:, :n_global_tokens, ...])
+            # jax.debug.print("shapes for global attn: {position_bias_global.shape}, & {query_states.shape}", position_bias_global=position_bias_global, query_states=query_states[:, :n_global_tokens, ...])
             global_attn_weights = position_bias_global
             global_attn_weights = dot_product_attention_weights(
                 query_states[:, :n_global_tokens, ...],
@@ -1148,7 +1148,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
-            jax.debug.print("shape of attn weights global: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
+            # jax.debug.print("shape of attn weights global: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
