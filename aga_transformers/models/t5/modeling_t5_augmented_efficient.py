@@ -1033,6 +1033,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
 
+            print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
             query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
             key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
