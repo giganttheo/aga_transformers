@@ -802,32 +802,38 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         
         # slide_tokens = slice(n_slides)
         # document_tokens = slice(n_slides, n_global_tokens)
+        axis_0 = jnp.arange(query_length)[:, None]
+        axis_1 = jnp.arange(key_length)[None]
 
         if in_window:
             #local -> document edge
             # graph_edge_buckets = graph_edge_buckets.at[:, n_slides:n_global_tokens].set(1)
-            # tmp_upd = jnp.full((query_length, key_length), 1)
-            # # tmp_upd = tmp_upd.at[:, n_document_tokens:].set(0)
-            # tmp_upd = jax.lax.dynamic_slice(tmp_upd, (0, 0), (query_length, n_document_tokens))
-            # graph_edge_buckets = jax.lax.dynamic_update_slice(graph_edge_buckets, tmp_upd, (0, n_slides))
-            graph_edge_buckets = jnp.where(jnp.arange(key_length)[None]>=n_document_tokens, 0, graph_edge_buckets)
+            graph_edge_buckets = jnp.where(n_slides <=axis_1< n_global_tokens, 1, graph_edge_buckets)
             #local -> slide edge
-            graph_edge_buckets = graph_edge_buckets.at[:,:n_slides].set(3)
+            # graph_edge_buckets = graph_edge_buckets.at[:,:n_slides].set(3)
+            graph_edge_buckets = jnp.where(axis_1 < n_slides, 3, graph_edge_buckets)
         else:
             # document -> local edge
-            graph_edge_buckets = graph_edge_buckets.at[n_slides:n_global_tokens, :].set(0)
+            # graph_edge_buckets = graph_edge_buckets.at[n_slides:n_global_tokens, :].set(0)
+            graph_edge_buckets = jnp.where(n_slides <= axis_0 < n_global_tokens, 0, graph_edge_buckets)
             # slide -> local edge
-            graph_edge_buckets = graph_edge_buckets.at[:n_slides, :].set(2)
+            # graph_edge_buckets = graph_edge_buckets.at[:n_slides, :].set(2)
+            graph_edge_buckets = jnp.where(axis_0 < n_slides, 2, graph_edge_buckets)
+
             for doc_token in np.arange(query_length)[n_slides:n_global_tokens]:
                 #document -> document edge
-                graph_edge_buckets = graph_edge_buckets.at[doc_token, n_slides:n_global_tokens].set(7)
+                # graph_edge_buckets = graph_edge_buckets.at[doc_token, n_slides:n_global_tokens].set(7)
+                graph_edge_buckets = jnp.where(axis_0==doc_token and n_slides<=axis_1<n_global_tokens, 7, graph_edge_buckets)
                 #document -> slide edge
-                graph_edge_buckets = graph_edge_buckets.at[doc_token, :n_slides].set(4)
+                # graph_edge_buckets = graph_edge_buckets.at[doc_token, :n_slides].set(4)
+                graph_edge_buckets = jnp.where(axis_0==doc_token and axis_1<n_slides, 4, graph_edge_buckets)
             for sl_token in np.arange(query_length)[:n_slides]:
                 #slide -> document edge
-                graph_edge_buckets = graph_edge_buckets.at[sl_token, n_slides:n_global_tokens].set(5)
+                # graph_edge_buckets = graph_edge_buckets.at[sl_token, n_slides:n_global_tokens].set(5)
+                graph_edge_buckets = jnp.where(axis_0==sl_token and n_slides<=axis_1<n_global_tokens, 5, graph_edge_buckets)
                 #slide -> slide edge
-                graph_edge_buckets = graph_edge_buckets.at[sl_token, :n_slides].set(6)
+                # graph_edge_buckets = graph_edge_buckets.at[sl_token, :n_slides].set(6)
+                graph_edge_buckets = jnp.where(axis_0==sl_token and axis_1<n_slides, 6, graph_edge_buckets)
 
         values = jnp.where(graph_edge_buckets[..., None]>=0, self.graph_edge_bias(graph_edge_buckets), jnp.zeros(tuple(graph_edge_buckets.shape) + (1,)))
         values = values.transpose((2, 0, 1))#[None, :, :, :]
