@@ -50,7 +50,7 @@ class StructuralAttentionPattern(AttentionPattern):
 
         #global attn
         global_tokens = set([s_tok + num_slides for s_tok in sentence_tokens])
-        print(f"Document tokens: {global_tokens}")
+        # print(f"Document tokens: {global_tokens}")
 
         slides_tokens = set(range(num_slides))
 
@@ -65,8 +65,8 @@ class StructuralAttentionPattern(AttentionPattern):
         seq_q = seq_kv
 
         all_nodes = set(range(num_slides + seq_len_kv))
-        print(f"Word tokens: {seq_kv}")
-        print(f"Mode: {mode}")
+        # print(f"Word tokens: {seq_kv}")
+        # print(f"Mode: {mode}")
             
         if mode == "window":
             #local window attention
