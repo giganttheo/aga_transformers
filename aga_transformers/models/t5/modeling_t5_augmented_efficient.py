@@ -878,11 +878,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             max_distance=self.relative_attention_max_distance,
         )
         values = self.relative_attention_bias(relative_position_bucket)
-        values = values.transpose((2, 0, 1))[None, :, :, :]
+        values = values.transpose((2, 0, 1))
         return values
 
     def compute_global_bias(self, block_length: int, num_global_tokens: int, num_blocks:int):
-        return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=1)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
+        return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=0)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
 
     def compute_block_bias(self, block_length: int, num_blocks: int):
         """Compute binned relative position bias"""
@@ -947,7 +947,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return position_bias
 
-    @partial(jax.vmap, in_axes=[None, None, None, None, None, 0])
+    @partial(jax.vmap, in_axes=[None, None, None, None, None, 0]) #batch
     def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array(0)) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_graph_edge_bias and False:
@@ -957,14 +957,14 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, n_slides, n_document_tokens, in_window=True)
             global_block_edge = global_block_edge[None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
-            global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)[0]
+            global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
             if self.has_graph_edge_bias and False:
                 global_block = global_block + global_block_edge
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
-            position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype)
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=-1, dtype=self.dtype) #merge on last axis 
         else:
-            position_bias = jnp.zeros((1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
+            position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
 
     def __call__(
