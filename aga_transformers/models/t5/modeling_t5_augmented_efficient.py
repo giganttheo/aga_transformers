@@ -955,7 +955,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         n_document_tokens = 2 #TODO: add in config
         n_global_tokens = n_document_tokens + n_slides.max()
         
-        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+        num_blocks=jnp.ceil((seq_length - n_global_tokens) / block_len)
 
         # q, k, v projections
         query_states = self.q(hidden_states)  # (batch_size, n_heads, seq_length, dim_per_head)
