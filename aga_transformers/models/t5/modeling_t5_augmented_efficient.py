@@ -239,19 +239,20 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 
 #   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #batch
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
-  mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  #6, 12, num_blocks, block_len, 3 * block_len + n_global_tokens
+  mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
   print(mask_local_shape)
   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
 
-  mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
+  mask_global_shape = (n_global_tokens, seq_len)
   mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
 
   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
 
-    @jax.vmap #batch
-    @jax.vmap #heads
+    # @jax.vmap #batch
+    # @jax.vmap #heads
     @jax.vmap #num_edges
     def _get_ids_in_blocks(senders, receivers):
       #block id
@@ -273,13 +274,13 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
 
       return block_id, block_pos_q, block_pos_k
 
-    @jax.vmap #batch
-    @jax.vmap #heads # @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+    # @jax.vmap #batch
+    # @jax.vmap #heads # @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
     def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
         return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
 
-    @jax.vmap #batch
-    @jax.vmap #heads #was @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+    # @jax.vmap #batch
+    # @jax.vmap #heads #was @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
     def _update_mask_global(mask, graph_mask, senders, receivers):
         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
