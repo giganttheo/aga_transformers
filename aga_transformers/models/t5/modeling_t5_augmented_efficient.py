@@ -240,7 +240,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 #   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #batch
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None]) #heads
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None], out_axes=[1, 0]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
   print(mask_local_shape)
@@ -291,7 +291,7 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
     mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
     mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
 
-    return mask_local.swapaxes(1, 2), mask_global
+    return mask_local, mask_global #.swapaxes(1, 2)
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
