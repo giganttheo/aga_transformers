@@ -792,7 +792,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    @partial(jax.jit, static_argnums=[0])
+
     def compute_edge_bias_global(self, query_length, key_length, n_slides, n_document_tokens, in_window=False):
         """Compute edge label bias"""
         # context_position = jnp.arange(query_length, dtype="i4")[:, None]
