@@ -241,7 +241,7 @@ def test():
 
         logits_processor = FlaxLogitsProcessorList()
 
-        batch_size, num_beams, cur_len = input_ids.shape
+        _, num_beams, cur_len = input_ids.shape #_ was batch_size
         max_length=512
         # sequences = jnp.full((batch_size, 512), pad_token_id, dtype=jnp.int32)
         sequences = jnp.full((batch_size, num_beams, max_length), pad_token_id, dtype=jnp.int32)
