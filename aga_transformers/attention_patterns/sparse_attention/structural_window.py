@@ -202,6 +202,7 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
       return graph_mask
 
     max_graph_len = max([receivers.shape[0] for receivers_head in receivers_heads for receivers in receivers_head])
+    print(f"Max graph len: {max_graph_len}")
     r, s, m = [], [], []
     b_h = []
     b_m_h = []
