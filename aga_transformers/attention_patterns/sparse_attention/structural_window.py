@@ -152,6 +152,7 @@ class StructuralAttentionPattern(AttentionPattern):
         del edges
 
         receivers = np.array(receivers, dtype=np.uint16)
+        print(f"receivers shape {receivers.shape}")
         senders = np.array(senders, dtype=np.uint16)
         receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
         receivers = np.array(receivers, dtype=np.uint16)
