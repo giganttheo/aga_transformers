@@ -650,9 +650,9 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        model_inputs["tokens"]=tokenizer(
-            inputs, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
-        ).tokens()
+        model_inputs["tokens"]=[tokenizer(
+            input, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
+        ).tokens() for input in inputs]
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
         #     inputs, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
         # ).tokens()]
