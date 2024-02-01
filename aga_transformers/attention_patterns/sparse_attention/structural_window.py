@@ -230,7 +230,7 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
         b_h.append(h)
     m = b_m_h
     s = b_h
-    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool"), "n_slides": np.array(n_slides, dtype=np.uint16), "edge_labels": np.array(b_e, dtype="i4")}
+    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool"), "n_slides": np.array(n_slides, dtype=np.uint16), "edge_labels": np.array(b_e, dtype=np.int8)}
    
 
 def create_window_structural_attn_patterns_batch(model, transcript_segments, keyframes, tokens, max_source_length, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", is_padded=False, **kwargs):
