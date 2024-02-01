@@ -398,9 +398,9 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset,
             "transcript_segments": raw_dataset[idx]["transcript_segments"],
             "tokens": tokens,
             "max_source_length": data_args.max_source_length,
-            "max_target_length": data_args.max_target_length,
+            # "max_target_length": data_args.max_target_length,
             "window_sizes": [254],
-            "autoregressive": False,
+            # "autoregressive": False,
             "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         graph_batch = create_window_structural_attn_patterns_batch(model, layer_wise=False, **attention_kwargs)

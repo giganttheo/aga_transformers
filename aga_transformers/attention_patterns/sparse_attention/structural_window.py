@@ -25,7 +25,6 @@ def get_slides2segments_edges(transcript_segments, keyframes):
       edges_slides_to_transcript_segments[i_keyframes] = edges_slides_to_transcript_segments[i_keyframes] + [i_transcript]
   return edges_slides_to_transcript_segments
 
-
 class StructuralAttentionPattern(AttentionPattern):
     def __init__(self, transcript_segments, keyframes, tokens, window_size, max_source_length=None, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(transcript_segments, keyframes)
