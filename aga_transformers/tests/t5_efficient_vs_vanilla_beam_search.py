@@ -435,7 +435,7 @@ def test():
                 sequences=next_sequences,
                 is_sent_finished=next_is_sent_finished,
                 model_kwargs=next_model_kwargs,
-            )
+            ), model_outputs
         r = []
         states = []
         for rep in range(n):
