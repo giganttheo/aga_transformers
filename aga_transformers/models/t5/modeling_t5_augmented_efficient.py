@@ -1022,12 +1022,12 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if self.has_variable("graph", "receivers"):
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
             #Graph attention
-            edge_labels = self.variables["graph"]["edge_labels"] #TODO
             if len(self.variables["graph"]["receivers"].shape) == 3 and self.variables["graph"]["receivers"].shape[1] != self.n_heads:
                 #graph attention pattern is copied head-wise
                 receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
                 senders = einops.repeat(self.variables["graph"]["senders"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
             elif len(self.variables["graph"]["receivers"].shape) == 3:
                 receivers =self.variables["graph"]["receivers"]
                 senders = self.variables["graph"]["senders"]
