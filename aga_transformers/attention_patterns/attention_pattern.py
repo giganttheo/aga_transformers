@@ -78,8 +78,9 @@ class AttentionPattern():
     return jax.tree_util.tree_map(lambda r,s: f (r,s), self.receivers, self.senders)
 
   def get_attention_graph(self, with_edge_labels=False, with_num_slides=False):
+    d = {"receivers": self.receivers, "senders": self.senders, "graph_mask": self.graph_mask}
     if with_num_slides:
-      return {"receivers": self.receivers, "senders": self.senders, "graph_mask": self.graph_mask, "n_slides": self.n_slides}
+      d["n_slides"] = self.n_slides
     if with_edge_labels:
-      return {"receivers": self.receivers, "senders": self.senders, "graph_mask": self.graph_mask, "edge_labels": self.edge_labels}
-    return {"receivers": self.receivers, "senders": self.senders, "graph_mask": self.graph_mask}
+      d["edge_labels"] = self.edge_labels
+    return d

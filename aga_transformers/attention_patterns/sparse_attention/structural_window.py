@@ -44,18 +44,16 @@ class StructuralAttentionPattern(AttentionPattern):
 
         # slides_offset = max_listoflists(new_tokens) + 1 #TODO
 
-        receivers = []
-        senders = []
-        edges = set({})
-
         #global attn
         global_tokens = set([s_tok + num_slides for s_tok in sentence_tokens])
         # print(f"Document tokens: {global_tokens}")
 
         slides_tokens = set(range(num_slides))
 
+        edges = set({})
         receivers = []
         senders = []
+        edge_labels = []
 
         if is_padded:
             #slides are included in seq_len_kv
@@ -78,6 +76,7 @@ class StructuralAttentionPattern(AttentionPattern):
                         edges.add((j, i))
                         receivers.append(i)
                         senders.append(j)
+                        edge_labels.append(-1)
 
         offset_tokens = num_slides
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
@@ -94,8 +93,10 @@ class StructuralAttentionPattern(AttentionPattern):
                             edges.add((node_slide, node_token))
                             receivers.append(node_token)
                             senders.append(node_slide)
+                            edge_labels.append(0) # slide -> word 
                             senders.append(node_token)
                             receivers.append(node_slide)
+                            edge_labels.append(1) # word -> slide 
                         if mode == "structure":
                             for edge_sentence_id_2 in edges_slide:
                                 node_tokens_2 = new_tokens[edge_sentence_id_2]
@@ -108,6 +109,7 @@ class StructuralAttentionPattern(AttentionPattern):
                                             edges.add((node_token_2, node_token))
                                             receivers.append(node_token)
                                             senders.append(node_token_2)
+                                            edge_labels.append(-1) # word -> slide 
             for slide_id_2 in range(len(edges_slides_to_transcript_segments)):
                 # slide / slide edges
                 node_slide_2 = slide_id_2
@@ -115,6 +117,7 @@ class StructuralAttentionPattern(AttentionPattern):
                     edges.add((node_slide_2, node_slide))
                     receivers.append(node_slide)
                     senders.append(node_slide_2)
+                    edge_labels.append(2) # slide -> slide 
 
         # global attention
         for i in global_tokens:
@@ -123,13 +126,23 @@ class StructuralAttentionPattern(AttentionPattern):
                     edges.add((j, i))
                     receivers.append(i)
                     senders.append(j)
+                    if j in slides_tokens:
+                        edge_labels.append(3) # slide -> document
+                    elif j in global_tokens:
+                        edge_labels.append(4) # document -> document
+                    else:
+                        edge_labels.append(5) # word -> document
+
         for j in global_tokens:
             for i in all_nodes - set((j,)) - global_tokens:
                 if (j, i) not in edges:
                     edges.add((j, i))
                     receivers.append(i)
                     senders.append(j)
-
+                    if i in slides_tokens:
+                        edge_labels.append(6) # document -> slide 
+                    else:
+                        edge_labels.append(7) # document -> word 
         num_tokens = max_listoflists(new_tokens) + len(edges_slides_to_transcript_segments)
         del edges
 
@@ -139,11 +152,12 @@ class StructuralAttentionPattern(AttentionPattern):
         receivers = np.array(receivers, dtype=np.uint16)
         senders = np.array(senders, dtype=np.uint16)
         graph_mask = np.array(graph_mask, dtype=bool)
+        edge_labels = np.array(edge_labels, dtype="i4")
+        self.edge_labels = edge_labels
         self.receivers = receivers
         self.senders = senders
         self.graph_mask = graph_mask
         self.size = (num_tokens, num_tokens)
-
 
 def create_window_structural_attn_patterns(model, data_point, tokens, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure",  **kwargs):
     if len(kwargs.keys()) > 0:
@@ -169,10 +183,11 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
     receivers_heads = [[attn_pattern["receivers"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
     senders_heads = [[attn_pattern["senders"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head]
     graph_mask_heads = [[attn_pattern["graph_mask"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head] 
+    edge_labels_heads = [[attn_pattern["edge_labels"] for attn_pattern in list_attentions_per_head] for list_attentions_per_head in list_batch_list_attentions_per_head] 
     n_slides = [attn_pattern[0]["n_slides"] for attn_pattern in list_batch_list_attentions_per_head]
 
-    def pad_to(mat, padding):
-      padded_mat = np.zeros((padding), dtype=np.uint16)
+    def pad_to(mat, padding, pad_value=0):
+      padded_mat = np.full((padding), pad_value, dtype="i4")
       padded_mat[:mat.shape[0]] = mat
       return padded_mat
     def get_mask(padding, previous_mask):
@@ -184,14 +199,18 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
     r, s, m = [], [], []
     b_h = []
     b_m_h = []
+    b_e = []
     for batch_num in range(len(receivers_heads)):
         h = []
         m_h = []
+        e = []
         for i_head, receivers in enumerate(receivers_heads[batch_num]):
             h.append(pad_to(receivers, max_graph_len))
+            e.append(pad_to(edge_labels_heads[batch_num][i_head], max_graph_len, -1))
             m_h.append(get_mask(max_graph_len, graph_mask_heads[batch_num][i_head]))
         b_h.append(h)
         b_m_h.append(m_h)
+        b_e.append(e)
     r = b_h
 
     b_h = []
@@ -202,7 +221,7 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
         b_h.append(h)
     m = b_m_h
     s = b_h
-    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool"), "n_slides": np.array(n_slides, dtype=np.uint16)}
+    return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool"), "n_slides": np.array(n_slides, dtype=np.uint16), "edge_labels": np.array(b_e, dtype="i4")}
    
 
 def create_window_structural_attn_patterns_batch(model, transcript_segments, keyframes, tokens, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", is_padded=False, **kwargs):
@@ -217,7 +236,7 @@ def create_window_structural_attn_patterns_batch(model, transcript_segments, key
                                 sentence_tokens=sentence_tokens,
                                 mode=mode,
                                 is_padded=is_padded,
-                                ).get_attention_graph(with_num_slides=True) for i in range(batch_size)]
+                                ).get_attention_graph(with_num_slides=True, with_edge_labels=True) for i in range(batch_size)]
     # Decoder self attention pattern
     dec_self_attn = {}
     # Encoder-Decoder cross attention pattern
