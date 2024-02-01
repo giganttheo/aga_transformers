@@ -1107,9 +1107,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
             
             if self.has_graph_edge_bias:
-                edge_bias_local = self.graph_edge_bias(edge_bias_local[:, :1].swapaxes(1, -1)).swapaxes(1, -1)
+                edge_bias_local = self.graph_edge_bias(edge_bias_local[:, 0]).swapaxes(1, -1)
                 position_bias_local = position_bias_local + edge_bias_local
-                edge_bias_global = self.graph_edge_bias(edge_bias_global[:, :1].swapaxes(1, -1)).swapaxes(1, -1)
+                edge_bias_global = self.graph_edge_bias(edge_bias_global[:, 0]).swapaxes(1, -1)
                 position_bias_global = position_bias_global + edge_bias_global
 
             # if self.has_graph_edge_bias:
