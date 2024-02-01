@@ -226,9 +226,22 @@ def test():
             model_kwargs=model_kwargs,
         )
 
+        input_ids = model._expand_to_num_beams(input_ids, num_beams=num_beams)
+
+        if "encoder_outputs" in model_kwargs:
+            model_kwargs["encoder_outputs"]["last_hidden_state"] = model._expand_to_num_beams(
+                model_kwargs["encoder_outputs"]["last_hidden_state"], num_beams=num_beams
+            )
+
+        for kwarg in ["attention_mask", "decoder_attention_mask"]:
+            if kwarg in model_kwargs:
+                model_kwargs[kwarg] = model._expand_to_num_beams(
+                    model_kwargs[kwarg], num_beams=num_beams
+                )
+
         logits_processor = FlaxLogitsProcessorList()
 
-        _, cur_len = input_ids.shape
+        batch_size, num_beams, cur_len = input_ids.shape
         max_length=512
         # sequences = jnp.full((batch_size, 512), pad_token_id, dtype=jnp.int32)
         sequences = jnp.full((batch_size, num_beams, max_length), pad_token_id, dtype=jnp.int32)
