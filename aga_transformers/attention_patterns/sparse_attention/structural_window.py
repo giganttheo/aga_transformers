@@ -148,6 +148,7 @@ class StructuralAttentionPattern(AttentionPattern):
                     else:
                         edge_labels.append(7) # document -> word 
         num_tokens = max_listoflists(new_tokens) + len(edges_slides_to_transcript_segments)
+        print(f"Number of edges is {len(edges)}")
         del edges
 
         receivers = np.array(receivers, dtype=np.uint16)

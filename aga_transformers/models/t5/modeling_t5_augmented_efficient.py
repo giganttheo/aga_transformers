@@ -1461,7 +1461,7 @@ class FlaxT5BlockCollection(nn.Module):
     def setup(self):
         self.causal = self.config.causal
         if self.gradient_checkpointing:
-            FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8), variables=["params", "graph"]) #?
+            FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)) #?, variables=["params", "graph"]
             self.blocks = [
                 FlaxT5CheckpointLayer(
                     self.config,
