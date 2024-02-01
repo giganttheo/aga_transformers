@@ -33,7 +33,7 @@ class StructuralAttentionPattern(AttentionPattern):
         max_slides = 64 #maximum n of slides accepted, else they will be merge
         num_slides = len(edges_slides_to_transcript_segments)
         merge_factor = math.ceil(num_slides / max_slides)
-        print(f"Merge factor is {merge_factor}")
+        # print(f"Merge factor is {merge_factor}")
         num_slides = num_slides // merge_factor
         seq_len_q = min(max_source_length - num_slides, len(tokens))
         seq_len_kv = seq_len_q
@@ -148,11 +148,11 @@ class StructuralAttentionPattern(AttentionPattern):
                     else:
                         edge_labels.append(7) # document -> word 
         num_tokens = max_listoflists(new_tokens) + len(edges_slides_to_transcript_segments)
-        print(f"Number of edges is {len(edges)}")
+        # print(f"Number of edges is {len(edges)}")
         del edges
 
         receivers = np.array(receivers, dtype=np.uint16)
-        print(f"receivers shape {receivers.shape}")
+        # print(f"receivers shape {receivers.shape}")
         senders = np.array(senders, dtype=np.uint16)
         receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
         receivers = np.array(receivers, dtype=np.uint16)
@@ -201,8 +201,10 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
       graph_mask[:previous_mask.shape[0]] = previous_mask
       return graph_mask
 
-    max_graph_len = max([receivers.shape[0] for receivers_head in receivers_heads for receivers in receivers_head])
-    print(f"Max graph len: {max_graph_len}")
+    # max_graph_len = max([receivers.shape[0] for receivers_head in receivers_heads for receivers in receivers_head])
+    max_graph_len = (8192 - 66) * 254 + (66 * 8192) # > maximum length
+
+    # print(f"Max graph len: {max_graph_len}")
     r, s, m = [], [], []
     b_h = []
     b_m_h = []
