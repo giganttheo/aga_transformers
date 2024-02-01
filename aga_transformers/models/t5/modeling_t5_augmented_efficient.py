@@ -1106,11 +1106,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks, n_document_tokens, n_slides)
             position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
             
-            # if self.has_graph_edge_bias:
-            #     jax.debug.print("edge_bias_local: {edge_bias_local.shape}; position_bias_local: {position_bias_local.shape}", edge_bias_local=edge_bias_local, position_bias_local=position_bias_local)
-            #     # edge_bias_local = self.graph_edge_bias(edge_bias_local[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
-            #     edge_bias_local = edge_bias_local[:, 0]
-            #     edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,)))
+            if self.has_graph_edge_bias:
+                jax.debug.print("edge_bias_local: {edge_bias_local.shape}; position_bias_local: {position_bias_local.shape}", edge_bias_local=edge_bias_local, position_bias_local=position_bias_local)
+                # edge_bias_local = self.graph_edge_bias(edge_bias_local[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
+                edge_bias_local = edge_bias_local[:, 0]
+                edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,)))
             #     position_bias_local = position_bias_local + edge_bias_local.transpose((0, 4, 1, 2, 3))
             #     jax.debug.print("edge_bias_global: {edge_bias_global.shape}; position_bias_global: {position_bias_global.shape}", edge_bias_global=edge_bias_global, position_bias_global=position_bias_global)
             #     # edge_bias_global = self.graph_edge_bias(edge_bias_global[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
