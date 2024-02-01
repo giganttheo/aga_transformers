@@ -27,10 +27,10 @@ def get_slides2segments_edges(transcript_segments, keyframes):
 
 
 class StructuralAttentionPattern(AttentionPattern):
-    def __init__(self, transcript_segments, keyframes, tokens, window_size, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
+    def __init__(self, transcript_segments, keyframes, tokens, window_size, max_source_length=None, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(transcript_segments, keyframes)
         # tokenized = tokenizer(data_point['transcript'])
-        seq_len_q = len(tokens)
+        seq_len_q = min(max_source_length - num_slides, len(tokens))
         seq_len_kv = seq_len_q
         num_slides = len(edges_slides_to_transcript_segments)
         self.n_slides = num_slides
@@ -88,7 +88,7 @@ class StructuralAttentionPattern(AttentionPattern):
                     if not is_padded:
                         node_token = node_token + offset_tokens
                     if node_token >= offset_tokens:
-                        if(node_token, node_slide) not in edges and (node_slide, node_token) not in edges:
+                        if(node_token, node_slide) not in edges and (node_slide, node_token) not in edges and node_token < max_source_length:
                             edges.add((node_token, node_slide))
                             edges.add((node_slide, node_token))
                             receivers.append(node_token)
@@ -152,14 +152,14 @@ class StructuralAttentionPattern(AttentionPattern):
         receivers = np.array(receivers, dtype=np.uint16)
         senders = np.array(senders, dtype=np.uint16)
         graph_mask = np.array(graph_mask, dtype=bool)
-        edge_labels = np.array(edge_labels, dtype="i4")
+        edge_labels = np.array(edge_labels, dtype=np.int8) #-127 -> 128
         self.edge_labels = edge_labels
         self.receivers = receivers
         self.senders = senders
         self.graph_mask = graph_mask
         self.size = (num_tokens, num_tokens)
 
-def create_window_structural_attn_patterns(model, data_point, tokens, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure",  **kwargs):
+def create_window_structural_attn_patterns(model, data_point, tokens, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_structural_attn_patterns')
     #Encoder self attention pattern
@@ -224,11 +224,12 @@ def stitch_patterns_together(list_batch_list_attentions_per_head):
     return {"receivers": np.array(r, dtype=np.uint16), "senders": np.array(s, dtype=np.uint16), "graph_mask": np.array(m, dtype="bool"), "n_slides": np.array(n_slides, dtype=np.uint16), "edge_labels": np.array(b_e, dtype="i4")}
    
 
-def create_window_structural_attn_patterns_batch(model, transcript_segments, keyframes, tokens, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", is_padded=False, **kwargs):
+def create_window_structural_attn_patterns_batch(model, transcript_segments, keyframes, tokens, max_source_length, window_sizes=[32], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", is_padded=False, **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')
     batch_size = len(keyframes)
     batch_enc_self_attn = [StructuralAttentionPattern(
+                                max_source_length=max_source_length,
                                 transcript_segments=transcript_segments[i],
                                 keyframes=keyframes[i],
                                 tokens=tokens[i],
