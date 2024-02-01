@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 from ..attention_pattern import AttentionPattern
 from ..utils import graph_from_path, get_new_token_ids
@@ -29,7 +30,11 @@ class StructuralAttentionPattern(AttentionPattern):
     def __init__(self, transcript_segments, keyframes, tokens, window_size, max_source_length=None, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(transcript_segments, keyframes)
         # tokenized = tokenizer(data_point['transcript'])
+        max_slides = 64 #maximum n of slides accepted, else they will be merge
         num_slides = len(edges_slides_to_transcript_segments)
+        merge_factor = math.ceil(num_slides / max_slides)
+        print(f"Merge factor is {merge_factor}")
+        num_slides = num_slides // merge_factor
         seq_len_q = min(max_source_length - num_slides, len(tokens))
         seq_len_kv = seq_len_q
         self.n_slides = num_slides
@@ -79,7 +84,7 @@ class StructuralAttentionPattern(AttentionPattern):
 
         offset_tokens = num_slides
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
-            node_slide = slide_id
+            node_slide = slide_id // merge_factor
             for edge_sentence_id in edges_slide:
                 node_tokens = new_tokens[edge_sentence_id]
                 for node_token in node_tokens:
@@ -111,7 +116,7 @@ class StructuralAttentionPattern(AttentionPattern):
                                             edge_labels.append(-1) # word -> slide 
             for slide_id_2 in range(len(edges_slides_to_transcript_segments)):
                 # slide / slide edges
-                node_slide_2 = slide_id_2
+                node_slide_2 = slide_id_2 // merge_factor
                 if (node_slide_2, node_slide) not in edges:
                     edges.add((node_slide_2, node_slide))
                     receivers.append(node_slide)
