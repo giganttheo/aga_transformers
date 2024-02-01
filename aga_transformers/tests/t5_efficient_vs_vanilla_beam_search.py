@@ -435,13 +435,22 @@ def test():
                 sequences=next_sequences,
                 is_sent_finished=next_is_sent_finished,
                 model_kwargs=next_model_kwargs,
-            ), model_outputs
+            ), model_outputs, flatten_beam_dim(
+                                    lax.dynamic_slice(
+                                        state.running_sequences,
+                                        (0, 0, state.cur_len - input_ids_length),
+                                        (batch_size, num_beams, input_ids_length),
+                                    )
+                                )
         r = []
-        states = []
-        for rep in range(n):
+        states = [state]
+        from functools import partial
+        state, output, running_token = partial(beam_search_body_fn, input_ids_length=input_ids.shape[-1])(state)
+        r.append((output, running_token))
+        for rep in range(1, n):
             states.append(state)
-            state, output = beam_search_body_fn(states[rep])
-            r.append((output, state.running_token))
+            state, output, running_token = beam_search_body_fn(states[rep])
+            r.append((output, running_token))
         return r, states
 
     n = 5
