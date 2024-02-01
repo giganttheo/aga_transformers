@@ -1022,6 +1022,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if self.has_variable("graph", "receivers"):
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
             #Graph attention
+            edge_labels = self.variables["graph"]["edge_labels"] #TODO
             if len(self.variables["graph"]["receivers"].shape) == 3 and self.variables["graph"]["receivers"].shape[1] != self.n_heads:
                 #graph attention pattern is copied head-wise
                 receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
@@ -1083,7 +1084,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                     key_states, value_states, query_states
                 )
             # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
-            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False, edge_labels)
 
             # replace masked positions with -10_000
             mask_value = jnp.finfo(self.dtype).min
