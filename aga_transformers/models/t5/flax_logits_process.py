@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import numpy as np
 import jax
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -27,7 +28,7 @@ def _get_generated_ngrams(banned_ngrams, prev_input_ids, ngram_size, cur_len):
     ngram_idx = tuple(prev_input_ids[start_idx:cur_len])
     return banned_ngrams.get(ngram_idx, [])
 
-def _get_ngrams(ngram_size: int, prev_input_ids: jnp.ndarray, num_hypos: int):
+def _get_ngrams(ngram_size: int, prev_input_ids: np.ndarray, num_hypos: int):
     """
     Assume ngram_size=2 and prev_input_ids=tensor([[40, 2883, 2712, 4346]]). The output of generated ngrams look like
     this {(40,): [2883], (2883,): [2712], (2712,): [4346]}.
@@ -56,23 +57,30 @@ def _get_ngrams(ngram_size: int, prev_input_ids: jnp.ndarray, num_hypos: int):
     return generated_ngrams
 
 def _calc_banned_ngram_tokens(
-    ngram_size: int, prev_input_ids: jnp.ndarray, num_hypos: int, cur_len: int
+    ngram_size: int, prev_input_ids: np.darray, num_hypos: int, cur_len: int
 ) -> List[Iterable[int]]:
     """Copied from fairseq for no_repeat_ngram in beam_search"""
-    def true_fun(prev_input_ids):
-        # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
+    if cur_len + 1 < ngram_size:
         return [[] for _ in range(num_hypos)]
-    def false_fun(prev_input_ids):
-        generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
-        banned_tokens = [
-            _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
-            for hypo_idx in range(num_hypos)
-        ]
-        return banned_tokens
-    return jax.lax.cond(cur_len + 1 < ngram_size, true_fun, false_fun, prev_input_ids)
+    generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
+    banned_tokens = [
+        _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
+        for hypo_idx in range(num_hypos)
+    ]
+    return banned_tokens
+    # def true_fun(prev_input_ids):
+    #     # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
+    #     return [[] for _ in range(num_hypos)]
+    # def false_fun(prev_input_ids):
+    #     generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
+    #     banned_tokens = [
+    #         _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
+    #         for hypo_idx in range(num_hypos)
+    #     ]
+    #     return banned_tokens
+    # return jax.lax.cond(cur_len + 1 < ngram_size, true_fun, false_fun, prev_input_ids)
      
     
-
 class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
     r"""
     N-grams are groups of "n" consecutive words, characters, or tokens taken from a sequence of text. Given the
@@ -121,9 +129,9 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         self.ngram_size = ngram_size
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING) #__call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray
-    def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
+    def __call__(self, input_ids: np.ndarray, scores: np.ndarray, cur_len: int) -> jnp.ndarray:
         num_batch_hypotheses = scores.shape[0]
         banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
         for i, banned_tokens in enumerate(banned_batch_tokens):
-            scores = scores.at[i, banned_tokens].set(-float("inf"))
-        return scores
+            scores[i, banned_tokens] = (-float("inf"))
+        return jnp.array(scores)
