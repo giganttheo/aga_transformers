@@ -131,7 +131,8 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING) #__call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray
     def __call__(self, input_ids: np.ndarray, scores: np.ndarray, cur_len: int) -> jnp.ndarray:
-        def _call_fn(input_ids, scores, cur_len):
+        def _call_fn(args):
+            input_ids, scores, cur_len = args
             input_ids = np.array(input_ids)
             scores = np.array(scores)
             num_batch_hypotheses = scores.shape[0]
