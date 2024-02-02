@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 from transformers.generation.flax_logits_process import FlaxLogitsProcessor, LOGITS_PROCESSOR_INPUTS_DOCSTRING
-from transformers.generation.utils import add_start_docstrings
+from transformers.utils import add_start_docstrings
 
 def _get_generated_ngrams(banned_ngrams, prev_input_ids, ngram_size, cur_len):
     """
