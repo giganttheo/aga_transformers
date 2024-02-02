@@ -69,7 +69,7 @@ def _calc_banned_ngram_tokens(
             for hypo_idx in range(num_hypos)
         ]
         return banned_tokens
-    return jax.lax.cond(cur_len + 1 < ngram_size, true_fun, false_fun, ngram_size, prev_input_ids, num_hypos)
+    return jax.lax.cond(cur_len + 1 < ngram_size, true_fun, false_fun, ngram_size, prev_input_ids)
      
     
 
