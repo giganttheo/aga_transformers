@@ -53,7 +53,7 @@ decoder_start_token_id = model.config.decoder_start_token_id
 
 # @jax.jit
 def generate(input_ids, inputs):
-    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1,num_beams=generation_config["num_beams"]).sequences
+    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1,num_beams=generation_config["num_beams"])
     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
 for rec in tqdm(test_dataset):
