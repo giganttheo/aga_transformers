@@ -256,7 +256,7 @@ def create_window_structural_attn_patterns_batch(model, transcript_segments, key
     graph = graph_from_path(model.params, heads_enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
 
-def prepare_window_structural_attn_patterns(model, transcript_segments, keyframes, tokens, max_source_length, window_sizes=[32], sentence_tokens=[0, 1], layer_wise=False, mode="structure", is_padded=False, **kwargs):
+def prepare_window_structural_attn_patterns(transcript_segments, keyframes, tokens, max_source_length, window_sizes=[32], sentence_tokens=[0, 1], mode="structure", is_padded=False, **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
     #Encoder self attention pattern
