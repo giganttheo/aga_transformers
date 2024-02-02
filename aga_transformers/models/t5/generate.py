@@ -40,7 +40,8 @@ def gather_beams(nested, beam_indices, batch_size, new_num_beams):
     return jax.tree_util.tree_map(gather_fn, nested)
 
 
-def beam_search(model, params, input_ids, model_kwargs, length_penalty, batch_size=1,num_beams=3, n=512):
+def beam_search(model, params, input_ids, model_kwargs, length_penalty, batch_size=1,num_beams=3):
+
     model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
     pad_token_id = model.config.pad_token_id
 
@@ -91,15 +92,6 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, batch_si
 
     model_kwargs = model.prepare_inputs_for_generation(flatten_beam_dim(input_ids), max_length, **model_kwargs)
 
-
-    # state = GreedyState(
-    #         cur_len=cur_len,
-    #         sequences=sequences,
-    #         running_token=input_ids,
-    #         is_sent_finished=False,
-    #         model_kwargs=model_kwargs,
-    #     )
-    
     # initialize state
     state = BeamSearchState(
         cur_len=cur_len,
@@ -131,7 +123,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, batch_si
             )
         else:
             best_running_score = state.running_scores[:, :1] / (
-                (state.cur_len) ** length_penalty
+                float(state.cur_len) ** length_penalty
             )
         worst_finished_score = jnp.where(
             state.is_sent_finished, jnp.min(state.scores, axis=1, keepdims=True), np.array(-1.0e7)
