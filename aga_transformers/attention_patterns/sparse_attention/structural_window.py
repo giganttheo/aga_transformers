@@ -255,3 +255,18 @@ def create_window_structural_attn_patterns_batch(model, transcript_segments, key
     heads_enc_self_attn = stitch_patterns_together([[enc_self_attn]*1 for enc_self_attn in batch_enc_self_attn])
     graph = graph_from_path(model.params, heads_enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
+
+def prepare_window_structural_attn_patterns(model, transcript_segments, keyframes, tokens, max_source_length, window_sizes=[32], sentence_tokens=[0, 1], layer_wise=False, mode="structure", is_padded=False, **kwargs):
+    if len(kwargs.keys()) > 0:
+      print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
+    #Encoder self attention pattern
+    return StructuralAttentionPattern(
+                                max_source_length=max_source_length,
+                                transcript_segments=transcript_segments,
+                                keyframes=keyframes,
+                                tokens=tokens,
+                                window_size=window_sizes[0],
+                                sentence_tokens=sentence_tokens,
+                                mode=mode,
+                                is_padded=is_padded,
+                                ).get_attention_graph(with_num_slides=True, with_edge_labels=True)
