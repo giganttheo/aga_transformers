@@ -57,7 +57,7 @@ def _get_ngrams(ngram_size: int, prev_input_ids: np.ndarray, num_hypos: int):
     return generated_ngrams
 
 def _calc_banned_ngram_tokens(
-    ngram_size: int, prev_input_ids: np.darray, num_hypos: int, cur_len: int
+    ngram_size: int, prev_input_ids: np.ndarray, num_hypos: int, cur_len: int
 ) -> List[Iterable[int]]:
     """Copied from fairseq for no_repeat_ngram in beam_search"""
     if cur_len + 1 < ngram_size:
