@@ -53,7 +53,7 @@ decoder_start_token_id = model.config.decoder_start_token_id
 
 @jax.jit
 def generate(input_ids, inputs):
-    beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1,num_beams=generation_config["num_beams"])
+    beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1,num_beams=generation_config["num_beams"]).sequences
 
 for rec in tqdm(test_dataset):
     text = "summarize: " + rec["transcript"]
