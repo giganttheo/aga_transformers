@@ -8,6 +8,8 @@ import jax
 from transformers.generation import FlaxLogitsProcessorList
 from transformers.generation.flax_utils import GreedyState, BeamSearchState, FlaxBeamSearchOutput
 
+from aga_transformers.models.t5.flax_logits_process import FlaxNoRepeatNGramLogitsProcessor
+
 def flatten_beam_dim(tensor):
     """Flattens the first two dimensions of a non-scalar array."""
     # ignore scalars (e.g. cache index)
@@ -40,7 +42,7 @@ def gather_beams(nested, beam_indices, batch_size, new_num_beams):
     return jax.tree_util.tree_map(gather_fn, nested)
 
 
-def beam_search(model, params, input_ids, model_kwargs, length_penalty, early_stopping=True, batch_size=1,num_beams=3):
+def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repeat_ngram_size, early_stopping=True, batch_size=1,num_beams=3):
 
     model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
     pad_token_id = model.config.pad_token_id
@@ -66,6 +68,8 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, early_st
             )
 
     logits_processor = FlaxLogitsProcessorList()
+
+    logits_processor.append(FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
 
     _, num_beams, cur_len = input_ids.shape #_ was batch_size
     max_length=512
