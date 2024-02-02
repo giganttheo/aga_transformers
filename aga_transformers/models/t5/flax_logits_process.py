@@ -23,7 +23,7 @@ def _get_generated_ngrams(banned_ngrams, prev_input_ids, ngram_size, cur_len):
     """
     # Before decoding the next token, prevent decoding of ngrams that have already appeared
     start_idx = cur_len + 1 - ngram_size
-    ngram_idx = tuple(prev_input_ids[start_idx:cur_len].tolist())
+    ngram_idx = tuple(prev_input_ids[start_idx:cur_len])
     return banned_ngrams.get(ngram_idx, [])
 
 def _get_ngrams(ngram_size: int, prev_input_ids: jnp.ndarray, num_hypos: int):
@@ -46,7 +46,7 @@ def _get_ngrams(ngram_size: int, prev_input_ids: jnp.ndarray, num_hypos: int):
     # Initialize an empty list of dictionaries, one for each hypothesis (index) in the range of num_hypos
     generated_ngrams = [{} for _ in range(num_hypos)]
     for idx in range(num_hypos):
-        gen_tokens = prev_input_ids[idx].tolist()
+        gen_tokens = prev_input_ids[idx]
         generated_ngram = generated_ngrams[idx]
         # Loop through each n-gram of size ngram_size in the list of tokens (gen_tokens)
         for ngram in zip(*[gen_tokens[i:] for i in range(ngram_size)]):
@@ -120,5 +120,5 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         num_batch_hypotheses = scores.shape[0]
         banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
         for i, banned_tokens in enumerate(banned_batch_tokens):
-            scores[i, banned_tokens] = -float("inf")
+            scores = scores.at[i, banned_tokens].set(-float("inf"))
         return scores
