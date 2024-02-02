@@ -131,12 +131,13 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING) #__call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray
     def __call__(self, input_ids: np.ndarray, scores: np.ndarray, cur_len: int) -> jnp.ndarray:
-        def _call_fn(scores):
+        def _call_fn(input_ids, scores, cur_len):
+            input_ids = np.array(input_ids)
             scores = np.array(scores)
             num_batch_hypotheses = scores.shape[0]
             banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
             for i, banned_tokens in enumerate(banned_batch_tokens):
                 scores[i, banned_tokens] = (-float("inf"))
             return jnp.array(scores)
-        return hcb.call(_call_fn, scores,
+        return hcb.call(_call_fn, input_ids, scores, cur_len,
                   result_shape=jax.ShapeDtypeStruct(scores.shape, scores.dtype))
