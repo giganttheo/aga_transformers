@@ -139,5 +139,5 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             for i, banned_tokens in enumerate(banned_batch_tokens):
                 scores[i, banned_tokens] = (-float("inf"))
             return jnp.array(scores)
-        return hcb.call(_call_fn, input_ids, scores, cur_len,
+        return hcb.call(_call_fn, (input_ids, scores, cur_len),
                   result_shape=jax.ShapeDtypeStruct(scores.shape, scores.dtype))
