@@ -53,7 +53,8 @@ decoder_start_token_id = model.config.decoder_start_token_id
 
 @jax.jit
 def generate(input_ids, inputs):
-    return beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1,num_beams=generation_config["num_beams"]).sequences
+    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1,num_beams=generation_config["num_beams"]).sequences
+    return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
 for rec in tqdm(test_dataset):
     text = "summarize: " + rec["transcript"]
@@ -61,9 +62,9 @@ for rec in tqdm(test_dataset):
     inputs = tokenizer(text, return_tensors="np", truncation=True, max_length=attention_kwargs["max_source_length"])
     # label_ids = tokenizer(label, return_tensors="pt").input_ids
     input_ids = inputs.pop("input_ids")
-    pred_ids = generate(input_ids, inputs)
+    preds = generate(input_ids, inputs)
     # pred_ids = generate(inputs["input_ids"], inputs["attention_mask"], params)
-    predictions.append(tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True))
+    predictions.append(preds)
     references.append(label)
 
 # open file in write mode
