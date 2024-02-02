@@ -59,10 +59,10 @@ def _calc_banned_ngram_tokens(
     ngram_size: int, prev_input_ids: jnp.ndarray, num_hypos: int, cur_len: int
 ) -> List[Iterable[int]]:
     """Copied from fairseq for no_repeat_ngram in beam_search"""
-    def true_fun(ngram_size, prev_input_ids, num_hypos):
+    def true_fun(ngram_size, prev_input_ids):
         # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
         return [[] for _ in range(num_hypos)]
-    def false_fun(ngram_size, prev_input_ids, num_hypos):
+    def false_fun(ngram_size, prev_input_ids):
         generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
         banned_tokens = [
             _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
