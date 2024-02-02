@@ -121,7 +121,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, early_st
             )
         else:
             best_running_score = state.running_scores[:, :1] / (
-                float(state.cur_len) ** length_penalty
+                (state.cur_len).astype(jnp.float16) ** length_penalty
             )
         worst_finished_score = jnp.where(
             state.is_sent_finished, jnp.min(state.scores, axis=1, keepdims=True), np.array(-1.0e7)
