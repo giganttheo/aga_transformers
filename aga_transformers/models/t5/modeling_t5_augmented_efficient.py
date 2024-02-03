@@ -1022,10 +1022,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
             #precomputed masks and edge biases
             if self.has_variable("graph", "edge_bias_local"):
-                mask_local = self.variables["graph"]["mask_local"]
-                mask_global = self.variables["graph"]["mask_global"]
-                edge_bias_local = self.variables["graph"]["edge_bias_local"]
-                edge_bias_global = self.variables["graph"]["edge_bias_global"]
+                mask_local = self.variables["graph"]["mask_local"].astype("bool")
+                mask_global = self.variables["graph"]["mask_global"].astype("bool")
+                edge_bias_local = self.variables["graph"]["edge_bias_local"].astype("bfloat16")
+                edge_bias_global = self.variables["graph"]["edge_bias_global"].astype("bfloat16")
                 precomputed=True
             else:
                 precomputed=False
