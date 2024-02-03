@@ -653,7 +653,7 @@ def main():
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
         graphs=[]
-        for i in range(len(examples)):
+        for i in range(len(inputs)):
             #graph generation
             attention_kwargs= {
                 "mode": "window",
