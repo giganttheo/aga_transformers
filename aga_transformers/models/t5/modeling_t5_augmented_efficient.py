@@ -1024,8 +1024,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             if self.has_variable("graph", "edge_bias_local"):
                 mask_local = self.variables["graph"]["mask_local"].astype("bool")
                 mask_global = self.variables["graph"]["mask_global"].astype("bool")
-                edge_bias_local = self.variables["graph"]["edge_bias_local"].astype("bfloat16")
-                edge_bias_global = self.variables["graph"]["edge_bias_global"].astype("bfloat16")
+                edge_bias_local = self.variables["graph"]["edge_bias_local"].astype(jnp.int8)
+                edge_bias_global = self.variables["graph"]["edge_bias_global"].astype(jnp.int8)
                 precomputed=True
             else:
                 precomputed=False
@@ -1121,13 +1121,13 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 # edge_bias_local = self.graph_edge_bias(edge_bias_local[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
                 if not precomputed:
                     edge_bias_local = edge_bias_local[:, 0]
-                edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,)))
+                edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,), dtype=self.dtype))
                 position_bias_local = position_bias_local + edge_bias_local.transpose((0, 4, 1, 2, 3))
                 # jax.debug.print("edge_bias_global: {edge_bias_global.shape}; position_bias_global: {position_bias_global.shape}", edge_bias_global=edge_bias_global, position_bias_global=position_bias_global)
                 # edge_bias_global = self.graph_edge_bias(edge_bias_global[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
                 if not precomputed:
                     edge_bias_global = edge_bias_global[:, 0]
-                edge_bias_global = jnp.where(edge_bias_global[..., None]>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (1,)))
+                edge_bias_global = jnp.where(edge_bias_global[..., None]>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (1,), dtype=self.dtype))
                 position_bias_global = position_bias_global + edge_bias_global.transpose((0, 3, 1, 2))
 
             # if self.has_graph_edge_bias:
