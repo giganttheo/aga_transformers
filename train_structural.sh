@@ -15,8 +15,8 @@ wandb login
 
 python ./train_lora_structural.py \
 	--output_dir "./8k-structure-window" \
-	--model_name_or_path "google/flan-t5-base" \
-	--tokenizer_name "google/flan-t5-base" \
+	--model_name_or_path "google/long-t5-local-base" \
+	--tokenizer_name "google/long-t5-local-base" \
 	--dataset_name="gigant/tib" \
 	--source_prefix "summarize: " \
 	--do_train \

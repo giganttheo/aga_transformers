@@ -70,7 +70,7 @@ from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augme
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 # from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
-from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch
+from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch, prepare_window_structural_attn_patterns
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -388,22 +388,24 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset,
 
     for idx in batch_idx:
         batch = dataset[idx]
-        tokens = batch.pop("tokens")
+        graph_batch = batch.pop("graph")
+        graph_batch = {k: np.stack(v, dtype=v[0].dtype) for k, v in graph_batch.items()}
+
         batch = {k: np.array(v) for k, v in batch.items()}
-        attention_kwargs= {
-            "mode": "window",
-            "is_padded": True,
-            # "data_point": raw_dataset[idx],
-            "keyframes": raw_dataset[idx]["keyframes"],
-            "transcript_segments": raw_dataset[idx]["transcript_segments"],
-            "tokens": tokens,
-            "max_source_length": data_args.max_source_length,
-            # "max_target_length": data_args.max_target_length,
-            "window_sizes": [254],
-            # "autoregressive": False,
-            "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
-        }
-        graph_batch = create_window_structural_attn_patterns_batch(model, layer_wise=False, **attention_kwargs)
+        # attention_kwargs= {
+        #     "mode": "window",
+        #     "is_padded": True,
+        #     # "data_point": raw_dataset[idx],
+        #     "keyframes": raw_dataset[idx]["keyframes"],
+        #     "transcript_segments": raw_dataset[idx]["transcript_segments"],
+        #     "tokens": tokens,
+        #     "max_source_length": data_args.max_source_length,
+        #     # "max_target_length": data_args.max_target_length,
+        #     "window_sizes": [254],
+        #     # "autoregressive": False,
+        #     "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        # }
+        # graph_batch = create_window_structural_attn_patterns_batch(model, layer_wise=False, from_longt5_local=True **attention_kwargs)
         yield batch, graph_batch
 
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
@@ -650,9 +652,26 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        model_inputs["tokens"]=[tokenizer(
-            input, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
-        ).tokens() for input in inputs]
+        graphs=[]
+        for example, num_slides_ in zip(examples, num_slides):
+            #graph generation
+            attention_kwargs= {
+                "mode": "window",
+                "is_padded": True,
+                # "data_point": raw_dataset[idx],
+                "keyframes": example["keyframes"],
+                "transcript_segments": example["transcript_segments"],
+                "tokens": tokenizer(
+                                    slide_token*num_slides_ + prefix + example[text_column], max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
+                                    ).tokens(),
+                "max_source_length": data_args.max_source_length,
+                # "max_target_length": data_args.max_target_length,
+                "window_sizes": [254],
+                # "autoregressive": False,
+                "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            }
+            graphs.append(prepare_window_structural_attn_patterns(layer_wise=False, from_longt5_local=True **attention_kwargs))
+        model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
         #     inputs, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
         # ).tokens()]

@@ -37,10 +37,10 @@ class AttentionPattern():
       clean_senders_heads.append(np.array(clean_s))
     return clean_receivers_heads, clean_senders_heads
 
-  def _padding_graphs(self, receivers_heads, senders_heads):
+  def _padding_graphs(self, receivers_heads, senders_heads, graph_edges=None, max_graph_len=None):
 
-    def pad_to(mat, padding):
-      padded_mat = np.zeros((padding), dtype=np.uint16)
+    def pad_to(mat, padding, pad_value=0):
+      padded_mat = np.full((padding), pad_value, dtype="i4")
       padded_mat[:mat.shape[0]] = mat
       return padded_mat
     def get_mask(mat, padding):
@@ -48,8 +48,9 @@ class AttentionPattern():
       graph_mask[:mat.shape[0]] = np.ones_like(mat, dtype="i4")
       return graph_mask
 
-    if isinstance(receivers_heads, list):
-      max_graph_len = max([receivers.shape[0] for receivers in receivers_heads])
+    if isinstance(receivers_heads, list) or max_graph_len is not None:
+      if max_graph_len is None:
+        max_graph_len = max([receivers.shape[0] for receivers in receivers_heads])
       r, s, m = [], [], []
       h = []
       m_h = []
@@ -62,12 +63,20 @@ class AttentionPattern():
         h.append(pad_to(senders, max_graph_len))
       m = m_h
       s = h
+      if graph_edges is not None:
+        h = []
+        for graph_edges_ in graph_edges:
+          h.append(pad_to(graph_edges, max_graph_len, -1))
+        e = h
     else: #no heads ==> no padding
       max_graph_len = receivers_heads.shape[0]
       r = receivers_heads
       s = senders_heads
       m = get_mask(r, max_graph_len)
-    return np.array(r, dtype=np.uint16), np.array(s, dtype=np.uint16), np.array(m, dtype="i4")
+    
+    if graph_edges is None:
+      return np.array(r, dtype=np.uint16), np.array(s, dtype=np.uint16), np.array(m, dtype="bool")
+    return np.array(r, dtype=np.uint16), np.array(s, dtype=np.uint16), np.array(m, dtype="bool"), np.array(e, dtype="i4")
 
   def mask(self, mask):
     self.receivers = jax.tree_util.tree_map(lambda r, mask: r*mask, self.receivers, mask)

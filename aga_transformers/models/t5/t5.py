@@ -86,8 +86,7 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     return tokenizer, model, graph, graph_ar
 
 
-
-def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, **model_kwargs):
+def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, from_longt5_local=False, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     module_class = FlaxT5ForConditionalGeneration_AUG.module_class
     module_class = tie_relative_pos_bias(module_class, repo_path)
@@ -97,6 +96,9 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         **model_kwargs,
         dtype=dtype,
     )
+    if from_longt5_local:
+        print("adapting parameters from longt5_local")
+        model.params=adapt_parameters_from_longt5_local(FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs).params)
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
         model.params = model.to_bf16(model.params)
@@ -125,7 +127,6 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         graph = None
         graph_ar = None
     return tokenizer, model, graph, graph_ar
-
 
 def preprocess_function(examples, tokenizer, max_length=512, prefix="summarize: ", text_column="transcript", padding='longest'):
     inputs = examples[text_column]

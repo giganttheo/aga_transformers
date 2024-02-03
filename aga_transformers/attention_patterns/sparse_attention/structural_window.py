@@ -154,7 +154,9 @@ class StructuralAttentionPattern(AttentionPattern):
         receivers = np.array(receivers, dtype=np.uint16)
         # print(f"receivers shape {receivers.shape}")
         senders = np.array(senders, dtype=np.uint16)
-        receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
+        edge_labels = np.array(edge_labels, dtype="i4")
+        max_graph_len = (8192 - 66) * 254 + (66 * 8192) # > maximum length
+        receivers, senders, graph_mask, edge_labels = self._padding_graphs([receivers], [senders], graph_edges=[edge_labels], max_graph_len=max_graph_len)
         receivers = np.array(receivers, dtype=np.uint16)
         senders = np.array(senders, dtype=np.uint16)
         graph_mask = np.array(graph_mask, dtype=bool)
