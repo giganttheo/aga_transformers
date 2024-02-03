@@ -66,7 +66,7 @@ class AttentionPattern():
       if graph_edges is not None:
         h = []
         for graph_edges_ in graph_edges:
-          h.append(pad_to(graph_edges, max_graph_len, -1))
+          h.append(pad_to(graph_edges_, max_graph_len, -1))
         e = h
     else: #no heads ==> no padding
       max_graph_len = receivers_heads.shape[0]
