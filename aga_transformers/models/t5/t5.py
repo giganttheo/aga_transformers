@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, FlaxLongT5ForConditionalGeneration
 import jax.numpy as jnp
 
 from .modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
@@ -58,7 +58,7 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     )
     if from_longt5_local:
         print("adapting parameters from longt5_local")
-        model.params=adapt_parameters_from_longt5_local(model.params)
+        model.params=adapt_parameters_from_longt5_local(FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs).params)
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
         model.params = model.to_bf16(model.params)

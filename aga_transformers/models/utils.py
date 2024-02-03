@@ -132,8 +132,8 @@ def adapt_parameters_from_longt5_local(params):
   def _adapt_parameters(tree_params):
     if isinstance(tree_params, dict) and "LocalSelfAttention" in tree_params.keys():
       print("LocalSelfAttention found")
-      assert tree_params['SelfAttention'].keys() == tree_params['LocalSelfAttention'].keys()
-      assert tree_params["SelfAttention"]["k"]["kernel"].shape == tree_params["LocalSelfAttention"]["k"]["kernel"].shape
+      # assert tree_params['SelfAttention'].keys() == tree_params['LocalSelfAttention'].keys()
+      # assert tree_params["SelfAttention"]["k"]["kernel"].shape == tree_params["LocalSelfAttention"]["k"]["kernel"].shape
       tree_params["SelfAttention"] = tree_params.pop("LocalSelfAttention")
     return tree_params
   return jax.tree_util.tree_map(_adapt_parameters, params, is_leaf=is_leaf_attn)
