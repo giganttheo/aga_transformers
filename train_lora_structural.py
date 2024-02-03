@@ -396,7 +396,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
             "senders": np.stack([graph["senders"] for graph in graph_batch], dtype=np.int16),
             "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch], dtype="bool"),
             "n_slides": np.stack([graph["n_slides"] for graph in graph_batch], dtype=np.int16),
-            "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch], dtype=np.int8),
+            "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch], dtype=np.int16),
             } #, dtype=graph_batch[0][k].dtype?
 
         batch = {k: np.array(v) for k, v in batch.items()}
