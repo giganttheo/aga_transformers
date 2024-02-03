@@ -239,6 +239,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 
 #   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
+@partial(jax.jit, static_argnums=[3, 4, 5, 6])
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #batch
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
