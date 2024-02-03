@@ -398,7 +398,6 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
             "n_slides": np.stack([graph["n_slides"] for graph in graph_batch], dtype=np.int16),
             "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch], dtype=np.int8),
             } #, dtype=graph_batch[0][k].dtype?
-        graph_batch = graph_from_path(model.params, graph_batch, {}, {}, layer_wise=False)
 
         batch = {k: np.array(v) for k, v in batch.items()}
         # attention_kwargs= {
@@ -953,9 +952,11 @@ def main():
 
     def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
+        
+        graphs = graph_from_path(model.params, graphs, {}, {}, layer_wise=False)
+        labels = batch.pop("labels")
 
         def compute_loss(params):
-            labels = batch.pop("labels")
             loss, _ = loss_fn_(state.apply_fn, params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
@@ -1054,7 +1055,7 @@ def main():
             # Model forward
             batch, graphs = next(eval_loader)
             labels = batch["labels"]
-
+            graphs = graph_from_path(model.params, graphs, {}, {}, layer_wise=False)
             metrics = eval_step(
                 state.params, batch, graphs
             )
