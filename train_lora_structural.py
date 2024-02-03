@@ -440,7 +440,7 @@ def create_learning_rate_fn(
     return schedule_fn
 
 #TODO: add this to another file
-@jax.jit
+@partial(jax.jit, static_argnums=[3, 4])
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
