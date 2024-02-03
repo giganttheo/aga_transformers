@@ -69,6 +69,7 @@ from aga_transformers.models.utils import add_graph_to_params, repeat_relative_p
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
+from aga_transformers.attention_patterns.utils import graph_from_path
 # from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
 from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch, prepare_window_structural_attn_patterns
 
@@ -367,7 +368,7 @@ class TrainState(train_state.TrainState):
 #         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
 
 
-def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset, model, data_args, batch_size: int, shuffle: bool = False, drop_last=True):
+def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: int, shuffle: bool = False, drop_last=True):
     """
     Returns batches of size `batch_size` from `dataset`. If `drop_last` is set to `False`, the final batch may be incomplete,
     and range in size from 1 to `batch_size`. Shuffle batches if `shuffle` is `True`.
@@ -390,6 +391,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, raw_dataset: Dataset,
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {k: np.stack(v, dtype=v[0].dtype) for k, v in graph_batch.items()}
+        graph_batch = graph_from_path(model.params, graph_batch, {}, {}, layer_wise=False)
 
         batch = {k: np.array(v) for k, v in batch.items()}
         # attention_kwargs= {
@@ -702,7 +704,7 @@ def main():
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
-        train_texts = train_dataset
+        # train_texts = train_dataset
         train_dataset = train_dataset.map(
             preprocess_function,
             batched=True,
@@ -718,7 +720,7 @@ def main():
         if data_args.max_eval_samples is not None:
             max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
             eval_dataset = eval_dataset.select(range(max_eval_samples))
-        eval_texts = eval_dataset
+        # eval_texts = eval_dataset
         eval_dataset = eval_dataset.map(
             preprocess_function,
             batched=True,
@@ -734,7 +736,7 @@ def main():
         if data_args.max_predict_samples is not None:
             max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
             predict_dataset = predict_dataset.select(range(max_predict_samples))
-        predict_texts = predict_dataset
+        # predict_texts = predict_dataset
         predict_dataset = predict_dataset.map(
             preprocess_function,
             batched=True,
@@ -932,7 +934,7 @@ def main():
         train_metrics = []
 
         # Generate an epoch by shuffling sampling indices from the train dataset
-        train_loader = data_loader(input_rng, train_dataset, train_texts, model, data_args, train_batch_size, shuffle=True)
+        train_loader = data_loader(input_rng, train_dataset, model, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
@@ -963,7 +965,7 @@ def main():
         eval_preds = []
         eval_labels = []
         print("Evaluating...")
-        eval_loader = data_loader(input_rng, eval_dataset, eval_texts, model, data_args, eval_batch_size, drop_last=False)
+        eval_loader = data_loader(input_rng, eval_dataset, model, eval_batch_size, drop_last=False)
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
             # Model forward
@@ -1039,7 +1041,7 @@ def main():
         pred_generations = []
         pred_labels = []
 
-        pred_loader = data_loader(input_rng, predict_dataset, predict_texts, model, data_args, eval_batch_size, drop_last=False)
+        pred_loader = data_loader(input_rng, predict_dataset, model, eval_batch_size, drop_last=False)
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward
