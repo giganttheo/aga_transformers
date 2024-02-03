@@ -740,12 +740,12 @@ def main():
             graph = prepare_window_structural_attn_patterns(**attention_kwargs)
             # graph.append(graph)
             #pre-compute the edge bias buckets
-            block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+            block_len = 254//2 + 1 #254+1  #TODO: add in config (radius + 1)
             n_document_tokens = 2 #TODO: add in config
             n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
             graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
-            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, 2, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"])
+            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"])
             graphs.append({**graph, "mask_local": mask_local, "mask_global": mask_global, "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
         model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
