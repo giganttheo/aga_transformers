@@ -747,7 +747,7 @@ def main():
             graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
             print(graph_mask.shape)
             mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"][0], graph["receivers"][0], graph_mask[0], n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"][0])
-            graphs.append({**graph, "mask_local": mask_local, "mask_global": mask_global, "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
+            graphs.append({**graph, "mask_local": mask_local[None], "mask_global": mask_global[None], "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
         model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
         #     inputs, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
