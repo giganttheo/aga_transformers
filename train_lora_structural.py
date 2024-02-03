@@ -670,7 +670,7 @@ def main():
                 # "autoregressive": False,
                 "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
             }
-            graphs.append(prepare_window_structural_attn_patterns(layer_wise=False, from_longt5_local=True **attention_kwargs))
+            graphs.append(prepare_window_structural_attn_patterns(layer_wise=False, from_longt5_local=True, **attention_kwargs))
         model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
         #     inputs, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
