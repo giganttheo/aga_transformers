@@ -653,16 +653,16 @@ def main():
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
         graphs=[]
-        for example, num_slides_ in zip(examples, num_slides):
+        for i in range(len(examples)):
             #graph generation
             attention_kwargs= {
                 "mode": "window",
                 "is_padded": True,
                 # "data_point": raw_dataset[idx],
-                "keyframes": example["keyframes"],
-                "transcript_segments": example["transcript_segments"],
+                "keyframes": examples["keyframes"][i],
+                "transcript_segments": examples["transcript_segments"][i],
                 "tokens": tokenizer(
-                                    slide_token*num_slides_ + prefix + example[text_column], max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
+                                    slide_token*num_slides[i] + prefix + examples[text_column][i], max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
                                     ).tokens(),
                 "max_source_length": data_args.max_source_length,
                 # "max_target_length": data_args.max_target_length,
