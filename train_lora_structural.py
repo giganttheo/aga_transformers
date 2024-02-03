@@ -583,7 +583,7 @@ def main():
     if model_args.model_name_or_path:
         dtype=model_args.dtype
 
-        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
 
     if training_args.gradient_checkpointing:
         print("=============================")
@@ -670,7 +670,7 @@ def main():
                 # "autoregressive": False,
                 "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
             }
-            graphs.append(prepare_window_structural_attn_patterns(layer_wise=False, from_longt5_local=True, **attention_kwargs))
+            graphs.append(prepare_window_structural_attn_patterns(**attention_kwargs))
         model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
         #     inputs, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
