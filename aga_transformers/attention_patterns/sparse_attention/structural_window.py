@@ -37,7 +37,7 @@ class StructuralAttentionPattern(AttentionPattern):
         num_slides = num_slides // merge_factor
         seq_len_q = min(max_source_length - num_slides, len(tokens))
         seq_len_kv = seq_len_q
-        self.n_slides = num_slides
+        self.n_slides = np.array(num_slides)
         # print(f"Number of slides: {num_slides}")
 
         # get the mapping from the segments to the tokens (new_tokens[i] is the tokens ids in segment i)
