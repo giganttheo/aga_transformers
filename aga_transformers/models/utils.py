@@ -127,3 +127,10 @@ def init_augmented_vocab(params, n_heads, vocab_size, dtype="bfloat16"):
   for block in params['encoder']['block'].keys():
     params['encoder']['block'][block]['layer']['0']['SelfAttention']['graph_edge_bias'] = {'embedding': jnp.zeros((vocab_size, n_heads), dtype=dtype)}
   return params
+
+def adapt_parameters_from_longt5_local(params):
+  def _adapt_parameters(tree_params):
+    if isinstance(tree_params, dict) and "LocalSelfAttention" in tree_params.keys:
+      tree_params["SelfAttention"] = tree_params.pop("LocalSelfAttention")
+    return tree_params
+  return jax.tree_util.tree_map(_adapt_parameters, params, is_leaf=is_leaf_attn)

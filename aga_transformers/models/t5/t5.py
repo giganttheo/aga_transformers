@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from .modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
 from .modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
 from .modeling_t5 import FlaxT5ForConditionalGeneration
-from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_layers, tie_relative_pos_bias, init_augmented_vocab
+from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_layers, tie_relative_pos_bias, init_augmented_vocab, adapt_parameters_from_longt5_local
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
@@ -46,7 +46,7 @@ def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attenti
 
 #wrapper to load the model and preprocess the weights
 
-def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, **model_kwargs):
+def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, from_longt5_local=False, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     module_class = FlaxT5ForConditionalGeneration_EFF.module_class
     module_class = tie_relative_pos_bias(module_class, repo_path)
@@ -56,6 +56,9 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         **model_kwargs,
         dtype=dtype,
     )
+    if from_longt5_local:
+        print("adapting parameters from longt5_local")
+        model.params=adapt_parameters_from_longt5_local(model.params)
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
         model.params = model.to_bf16(model.params)
