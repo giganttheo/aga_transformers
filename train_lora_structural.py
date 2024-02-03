@@ -440,8 +440,8 @@ def create_learning_rate_fn(
     return schedule_fn
 
 #TODO: add this to another file
+# @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
 @partial(jax.jit, static_argnums=[3, 4, 5, 6])
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
   #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
@@ -745,7 +745,8 @@ def main():
             n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
             graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
-            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"])
+            print(graph_mask.shape)
+            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"][0], graph["receivers"][0], graph_mask[0], n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"][0])
             graphs.append({**graph, "mask_local": mask_local, "mask_global": mask_global, "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
         model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
