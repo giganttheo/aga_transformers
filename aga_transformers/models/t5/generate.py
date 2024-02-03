@@ -125,7 +125,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
             )
         else:
             best_running_score = state.running_scores[:, :1] / (
-                (state.cur_len).astype(jnp.float16) ** length_penalty
+                (state.cur_len).astype(jnp.float32) ** length_penalty
             )
         worst_finished_score = jnp.where(
             state.is_sent_finished, jnp.min(state.scores, axis=1, keepdims=True), np.array(-1.0e7)
@@ -218,7 +218,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         # - add length penalty
         # - make sure no scores can be added anymore if beam is full
         # - make sure still running sequences cannot be chosen as finalized beam
-        topk_log_probs = topk_log_probs / ((state.cur_len + 1) ** length_penalty)
+        topk_log_probs = topk_log_probs / ((state.cur_len + 1).astype(jnp.float32) ** length_penalty)
         beams_in_batch_are_full = jnp.broadcast_to(
             state.is_sent_finished.all(axis=-1, keepdims=True), did_topk_just_finished.shape
         ) & (early_stopping is True)
