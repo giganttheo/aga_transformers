@@ -130,10 +130,8 @@ def init_augmented_vocab(params, n_heads, vocab_size, dtype="bfloat16"):
 
 def adapt_parameters_from_longt5_local(params):
   def _adapt_parameters(tree_params):
-    if isinstance(tree_params, dict) and "LocalSelfAttention" in tree_params.keys():
-      print("LocalSelfAttention found")
-      # assert tree_params['SelfAttention'].keys() == tree_params['LocalSelfAttention'].keys()
-      # assert tree_params["SelfAttention"]["k"]["kernel"].shape == tree_params["LocalSelfAttention"]["k"]["kernel"].shape
-      tree_params["SelfAttention"] = tree_params.pop("LocalSelfAttention")
+    tree_params["SelfAttention"] = tree_params.pop("LocalSelfAttention")
     return tree_params
-  return jax.tree_util.tree_map(_adapt_parameters, params, is_leaf=is_leaf_attn)
+  def _is_leaf_longt5_local(tree):
+    return isinstance(tree, dict) and "LocalSelfAttention" in tree.keys()
+  return jax.tree_util.tree_map(_adapt_parameters, params, is_leaf=_is_leaf_longt5_local)
