@@ -1021,32 +1021,41 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         if self.has_variable("graph", "receivers"):
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
-            #Graph attention
-            if len(self.variables["graph"]["receivers"].shape) == 3 and self.variables["graph"]["receivers"].shape[1] != self.n_heads:
-                #graph attention pattern is copied head-wise
-                receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
-                senders = einops.repeat(self.variables["graph"]["senders"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
-                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
-                edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
-            elif len(self.variables["graph"]["receivers"].shape) == 3:
-                receivers =self.variables["graph"]["receivers"]
-                senders = self.variables["graph"]["senders"]
-                graph_mask = self.variables["graph"]["graph_mask"]
-            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == batch_size:
-                #graph attention pattern is copied head-wise
-                receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
-                senders = einops.repeat(self.variables["graph"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
-                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
-            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == self.n_heads:
-                #graph attention pattern is copied batch-wise
-                receivers = einops.repeat(self.variables["graph"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
-                senders = einops.repeat(self.variables["graph"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
-                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
-            else:            
-                #graph attention pattern is copied batch and head-wise
-                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+            #precomputed masks and edge biases
+            if self.has_variable("graph", "edge_bias_local"):
+                mask_local = self.variables["graph"]["mask_local"]
+                mask_global = self.variables["graph"]["mask_global"]
+                edge_bias_local = self.variables["graph"]["edge_bias_local"]
+                edge_bias_global = self.variables["graph"]["edge_bias_global"]
+                precomputed=True
+            else:
+                precomputed=False
+                #Graph attention
+                if len(self.variables["graph"]["receivers"].shape) == 3 and self.variables["graph"]["receivers"].shape[1] != self.n_heads:
+                    #graph attention pattern is copied head-wise
+                    receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                    senders = einops.repeat(self.variables["graph"]["senders"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                    graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                    edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                elif len(self.variables["graph"]["receivers"].shape) == 3:
+                    receivers =self.variables["graph"]["receivers"]
+                    senders = self.variables["graph"]["senders"]
+                    graph_mask = self.variables["graph"]["graph_mask"]
+                elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == batch_size:
+                    #graph attention pattern is copied head-wise
+                    receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                    senders = einops.repeat(self.variables["graph"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                    graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == self.n_heads:
+                    #graph attention pattern is copied batch-wise
+                    receivers = einops.repeat(self.variables["graph"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                    senders = einops.repeat(self.variables["graph"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                    graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                else:            
+                    #graph attention pattern is copied batch and head-wise
+                    receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                    senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                    graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
 
             # print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
             # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
@@ -1058,33 +1067,35 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
             value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
-            if attention_mask is not None:
-                # merge the input attention mask with the graph mask
-                graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))
 
-            # for fast decoding causal attention mask should be shifted
-            causal_attention_mask_shift = (
-                self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
-            )
+            if not precomputed:
+                if attention_mask is not None:
+                    # merge the input attention mask with the graph mask
+                    graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))
 
-            if self.causal:
-                # fast decoding for generate requires special attention_mask
-                if self.has_variable("cache", "cached_key"):
-                    # during autoregressive decoding, the current query token was remapped
-                    # to sender 0, but should really be causal_attention_mask_shift
-                    causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
-                else:
-                    causal_mask = jnp.less_equal(receivers, senders)
-                graph_mask = jnp.logical_and(graph_mask, causal_mask)
-
-            # During fast autoregressive decoding, we feed one position at a time,
-            # and cache the keys and values step by step.
-            if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
-                key_states, value_states = self._concatenate_to_cache(
-                    key_states, value_states, query_states
+                # for fast decoding causal attention mask should be shifted
+                causal_attention_mask_shift = (
+                    self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
                 )
-            # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
-            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False, edge_labels)
+
+                if self.causal:
+                    # fast decoding for generate requires special attention_mask
+                    if self.has_variable("cache", "cached_key"):
+                        # during autoregressive decoding, the current query token was remapped
+                        # to sender 0, but should really be causal_attention_mask_shift
+                        causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
+                    else:
+                        causal_mask = jnp.less_equal(receivers, senders)
+                    graph_mask = jnp.logical_and(graph_mask, causal_mask)
+
+                # During fast autoregressive decoding, we feed one position at a time,
+                # and cache the keys and values step by step.
+                if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
+                    key_states, value_states = self._concatenate_to_cache(
+                        key_states, value_states, query_states
+                    )
+                # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
+                mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False, edge_labels)
 
             # replace masked positions with -10_000
             mask_value = jnp.finfo(self.dtype).min
