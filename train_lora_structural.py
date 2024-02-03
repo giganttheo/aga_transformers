@@ -440,7 +440,7 @@ def create_learning_rate_fn(
     return schedule_fn
 
 #TODO: add this to another file
-@partial(jax.jit, static_argnums=[3, 4])
+@partial(jax.jit, static_argnums=[3, 4, 5, 6])
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
@@ -742,7 +742,7 @@ def main():
             #pre-compute the edge bias buckets
             block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
             n_document_tokens = 2 #TODO: add in config
-            n_global_tokens = 32 # static value that should be >= n_document_tokens + n_slides.max()
+            n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
             graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
             mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, 2, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"])
