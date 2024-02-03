@@ -390,8 +390,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
     for idx in batch_idx:
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
-        print([type(graph_batch[0][k]) for k in graph_batch[0].keys()])
-        graph_batch = {k: np.stack([graph[k] for graph in graph_batch], dtype=graph_batch[0][k].dtype) for k in graph_batch[0].keys()}
+        # print([type(graph_batch[0][k]) for k in graph_batch[0].keys()])
+        graph_batch = {k: np.stack([graph[k] for graph in graph_batch]) for k in graph_batch[0].keys()} #, dtype=graph_batch[0][k].dtype?
         graph_batch = graph_from_path(model.params, graph_batch, {}, {}, layer_wise=False)
 
         batch = {k: np.array(v) for k, v in batch.items()}
