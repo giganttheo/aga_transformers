@@ -46,8 +46,10 @@ def main():
         inputs = [(i, v) for i, v in list(enumerate(dataset[split])) if i not in dataset_graphs[split]["id"]]
         # inputs = list(enumerate(dataset[split]))
         print(len(inputs))
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(get_graph, inputs)
+        for input in inputs:
+            get_graph(input)
+        # with concurrent.futures.ThreadPoolExecutor() as executor:
+        #     executor.map(get_graph, inputs)
 
     with open("dependency_graphs_tib_add.pickle", "wb") as outfile:
         pickle.dump(graphs, outfile, protocol=pickle.HIGHEST_PROTOCOL)
