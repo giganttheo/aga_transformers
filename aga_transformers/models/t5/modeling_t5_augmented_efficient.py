@@ -1019,7 +1019,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1])
 
-        if self.has_variable("graph", "receivers"):
+        if self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local"):
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
             #precomputed masks and edge biases
             if self.has_variable("graph", "edge_bias_local"):

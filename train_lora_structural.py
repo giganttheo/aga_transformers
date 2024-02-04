@@ -392,11 +392,15 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
         graph_batch = batch.pop("graph")
         # print([type(graph_batch[0][k]) for k in graph_batch[0].keys()])
         graph_batch = {
-            "receivers": np.stack([graph["receivers"] for graph in graph_batch], dtype=np.int16),
-            "senders": np.stack([graph["senders"] for graph in graph_batch], dtype=np.int16),
-            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch], dtype="bool"),
+            # "receivers": np.stack([graph["receivers"] for graph in graph_batch], dtype=np.int16),
+            # "senders": np.stack([graph["senders"] for graph in graph_batch], dtype=np.int16),
+            # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch], dtype="bool"),
+            # "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch], dtype=np.int8),
             "n_slides": np.stack([graph["n_slides"] for graph in graph_batch], dtype=np.int16),
-            "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch], dtype=np.int16),
+            "mask_local": np.stack([graph["mask_local"] for graph in graph_batch], dtype="bool"),
+            "mask_global": np.stack([graph["mask_global"] for graph in graph_batch], dtype="bool"),
+            "edge_bias_local": np.stack([graph["edge_bias_local"] for graph in graph_batch], dtype=np.int8),
+            "edge_bias_global": np.stack([graph["edge_bias_global"] for graph in graph_batch], dtype=np.int8),
             } #, dtype=graph_batch[0][k].dtype?
 
         batch = {k: np.array(v) for k, v in batch.items()}
@@ -743,17 +747,17 @@ def main():
                 "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
             }
             graph = prepare_window_structural_attn_patterns(**attention_kwargs)
-            graphs.append(graph)
+            # graphs.append(graph)
 
             #pre-compute the edge bias buckets
-            # block_len = 254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-            # n_document_tokens = 2 #TODO: add in config
-            # n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
-            # num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
-            # graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
-            # # print(graph_mask.shape)
-            # mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"][0], graph["receivers"][0], graph_mask[0], n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"][0])
-            # graphs.append({**graph, "mask_local": mask_local[None], "mask_global": mask_global[None], "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
+            block_len = 254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+            n_document_tokens = 2 #TODO: add in config
+            n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
+            num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
+            graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
+            # print(graph_mask.shape)
+            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"][0], graph["receivers"][0], graph_mask[0], n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, graph["edge_labels"][0])
+            graphs.append({**graph, "mask_local": mask_local[None], "mask_global": mask_global[None], "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
         
         model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
