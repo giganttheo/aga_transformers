@@ -929,7 +929,7 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
+    loss_fn_ =  loss_fn#jax.jit(loss_fn, static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
@@ -974,7 +974,7 @@ def main():
         return new_state, metrics
 
     # Define eval fn
-    @jax.jit
+    # @jax.jit
     def eval_step(params, batch, graphs):
         labels = batch.pop("labels")
         loss, _ = loss_fn(apply_fn, params, graph=graphs, train=False, **batch)
@@ -986,7 +986,7 @@ def main():
         metrics = {"loss": loss}
         return metrics
 
-    @jax.jit
+    # @jax.jit
     def generate_step(params, batch):
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
