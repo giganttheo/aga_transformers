@@ -1516,6 +1516,7 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
         for i, layer_module in enumerate(self.blocks):
+            #TODO replace for with jax.lax.scan
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 

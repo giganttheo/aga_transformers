@@ -794,6 +794,7 @@ def main():
         train_dataset = train_dataset.map(
             preprocess_function,
             batched=True,
+            batch_size=100,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
