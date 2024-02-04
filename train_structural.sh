@@ -24,15 +24,15 @@ python ./train_lora_structural.py \
 	--num_train_epochs 4 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 8 \
-	--per_device_eval_batch_size 8 \
+	--per_device_train_batch_size 12 \
+	--per_device_eval_batch_size 12 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
-	--max_train_samples 64 \
-	--max_eval_samples 64 \
 	--gradient_checkpointing \
 	# --resume_from_checkpoint \
 	# --run_id "fv3mirpt"
+	# --max_train_samples 64 \
+	# --max_eval_samples 64 \
