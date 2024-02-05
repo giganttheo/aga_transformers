@@ -187,7 +187,7 @@ def convert_unroll_to_scan(model, params):
             scan_key = k.replace("block/0", "block/FlaxScanLayers")
             stacked_params = []
             # Iterate over the unrolled layers (1,...,N)
-            for i in range(model.config.num_layers)
+            for i in range(model.config.num_layers):
                 print(k.replace("block/0", f"block/{str(i)}"))
                 # Stack the params for the N layers into one super block
                 # and remove the unrolled layer params on the fly
