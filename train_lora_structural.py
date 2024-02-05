@@ -927,9 +927,9 @@ def main():
     
     # Create LoRA model
     apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
-    
+
     from flax.traverse_util import flatten_dict, unflatten_dict
-    print(flatten_dict(lora_params, sep="/").keys())
+    print(flatten_dict(lora_params, sep="/").keys(), '\n')
 
     # apply_fn = model.__call__
     # lora_params = model.params
