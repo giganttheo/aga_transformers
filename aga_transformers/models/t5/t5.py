@@ -58,7 +58,9 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     )
     if from_longt5_local:
         print("adapting parameters from longt5_local")
-        model.params=adapt_parameters_from_longt5_local(FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs).params)
+        long_t5=FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs)
+        model.params=adapt_parameters_from_longt5_local(long_t5.params)
+        del long_t5
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
         model.params = model.to_bf16(model.params)

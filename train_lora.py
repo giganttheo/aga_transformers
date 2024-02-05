@@ -569,7 +569,7 @@ def main():
             "max_target_length": data_args.max_target_length,
             "window_sizes": [254], #[127], # [254]*12,
             "autoregressive": False,
-            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
         tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)

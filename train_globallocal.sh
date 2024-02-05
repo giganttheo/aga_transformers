@@ -225,13 +225,13 @@ wandb login
 
 python ./train_lora.py \
 	--output_dir "./8k-global-local" \
-	--model_name_or_path "google/flan-t5-base" \
-	--tokenizer_name "google/flan-t5-base" \
+	--model_name_or_path "google/long-t5-local-base" \
+	--tokenizer_name "google/long-t5-local-base" \
 	--dataset_name="gigant/tib" \
 	--source_prefix "summarize: " \
 	--do_train \
 	--do_eval \
-	--num_train_epochs 4 \
+	--num_train_epochs 6 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 14 \
@@ -241,8 +241,8 @@ python ./train_lora.py \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
-	--seed 43 \
 	--gradient_checkpointing \
+	# --seed 43 \
 	# --resume_from_checkpoint \
 	# --run_id "fv3mirpt"
 
