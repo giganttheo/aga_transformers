@@ -1520,7 +1520,7 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
 
-        if self.gradient_checkpointing
+        if self.gradient_checkpointing:
             layer_outputs, _ = self.blocks(
                     hidden_states,
                     attention_mask,
