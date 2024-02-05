@@ -1522,7 +1522,7 @@ class FlaxT5BlockCollection(nn.Module):
 
         if self.gradient_checkpointing:
             layer_outputs, _ = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            variable_axes={'params': 0, 'graph': None, 'cache': 0}, in_axes=(nn.broadcast, 0, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
+                            variable_axes={'params': 0, 'graph': nn.broadcast, 'cache': 0}, in_axes=(nn.broadcast, 0, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
                             length=self.config.num_layers, axis_name="")(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                     hidden_states,
                     attention_mask,
@@ -1868,7 +1868,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         return params
 
     def scan_enable(self):
-        
+
         init_fn = partial(self.init_weights, input_shape=self.input_shape)
         params_shape_tree = jax.eval_shape(init_fn, self.key)
 
