@@ -1869,18 +1869,20 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
 
     def scan_enable(self):
 
-        init_fn = partial(self.init_weights, input_shape=self.input_shape)
-        params_shape_tree = jax.eval_shape(init_fn, self.key)
+        # init_fn = partial(self.init_weights, input_shape=self.input_shape)
+        # params_shape_tree = jax.eval_shape(init_fn, self.key)
 
-        # get the shape of the parameters
-        self._params_shape_tree = params_shape_tree
+        # # get the shape of the parameters
+        # self._params_shape_tree = params_shape_tree
 
-        # save required_params as set
-        self._required_params = set(flatten_dict(unfreeze(params_shape_tree)).keys())
+        # # save required_params as set
+        # self._required_params = set(flatten_dict(unfreeze(params_shape_tree)).keys())
 
         # initialize the parameters
         if self._is_initialized:
-            self.params = self.convert_unroll_to_scan(self.params)
+            params = self.convert_unroll_to_scan(self.params)
+            self._required_params = set(flatten_dict(unfreeze(params)).keys())
+            self.params = params
 
     def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
         # init input tensors
