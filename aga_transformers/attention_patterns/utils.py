@@ -11,22 +11,22 @@ def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], la
       #self attention
       if 'encoder' in path:
         if isinstance(enc_self_attn, list):
-          return enc_self_attn[layer_]
+          return enc_self_attn[int(path[2])]
         else:
           return enc_self_attn
       else: #decoder attn
         if isinstance(dec_self_attn, list):
-          return dec_self_attn[layer_]
+          return dec_self_attn[int(path[2])]
         else:
           return dec_self_attn
     else:
       return None
   elif 'EncDecAttention' in path:
-    layer_ = int(path[2])
-    if layer_wise or layer_ == 0:
+    is_first_layer_ = ("FlaxScanLayers" in path[2]) or (int(path[2]) == 0)
+    if layer_wise or is_first_layer_:
       #encoder / decoder cross attention
       if isinstance(encdec_attn, list):
-        return encdec_attn[layer_]
+        return encdec_attn[int(path[2])]
       else:
         return encdec_attn
     else:
