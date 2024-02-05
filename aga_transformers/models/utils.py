@@ -188,7 +188,7 @@ def convert_unroll_to_scan(model, params):
             stacked_params = []
             print(k)
             # Iterate over the unrolled layers (1,...,N)
-            for i in range(model.config.num_blocks):
+            for i in range(model.config.num_layers):
                 # Stack the params for the N layers into one super block
                 # and remove the unrolled layer params on the fly
                 # -> no memory overhead for conversion!
