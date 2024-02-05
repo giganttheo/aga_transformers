@@ -47,7 +47,10 @@ def main():
         # inputs = list(enumerate(dataset[split]))
         print(len(inputs))
         for input in inputs:
-            get_graph(input)
+            try:
+                get_graph(input)
+            except:
+                print("error")
         # with concurrent.futures.ThreadPoolExecutor() as executor:
         #     executor.map(get_graph, inputs)
 
