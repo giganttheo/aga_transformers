@@ -665,7 +665,7 @@ def main():
         print("Enabling gradient checkpointing")
         print("=============================")
         model.enable_gradient_checkpointing()
-        # model.scan_enable()
+        model.scan_enable()
         # model.params = params
 
     if model.config.decoder_start_token_id is None:
