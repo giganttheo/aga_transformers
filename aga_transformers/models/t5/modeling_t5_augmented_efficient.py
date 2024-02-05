@@ -1526,7 +1526,7 @@ class FlaxT5BlockCollection(nn.Module):
                             in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             split_rngs={'params': False},
                             # variable_broadcast=["graphs"],
-                            axis_name=''
+                            axis_name='',
                             length=self.config.num_layers)(name="block", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                                         hidden_states,
                                         attention_mask,
