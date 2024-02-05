@@ -130,16 +130,28 @@ def init_augmented_vocab(params, n_heads, vocab_size, dtype="bfloat16"):
   return params
 
 def adapt_parameters_from_longt5_local(params):
-  def _adapt_parameters(tree_params):
-    if isinstance(tree_params, dict):
-      return {k if k!="LocalSelfAttention" else "SelfAttention": v for k, v in tree_params.items()}
-    return tree_params
-  def _is_leaf_longt5_local(tree):
-    #returns True if the tree is a leaf or at the level we want to modify the trees
-    if not tree is None and ((not isinstance(tree, dict)) or ("LocalSelfAttention" in tree.keys()) or len(tree.keys()) == 0):
-      return True
-    return False
-  return jax.tree_util.tree_map(_adapt_parameters, params, is_leaf=_is_leaf_longt5_local)
+  if isinstance(params, FrozenDict):
+    params = unfreeze(params)
+  params = flatten_dict(params, sep="/")
+  keys = list(params.keys())
+  for k in keys:
+    if "LocalSelfAttention" in k:
+      params[k.replace("LocalSelfAttention", f"SelfAttention")] = params.pop(k)
+  # Finally, unflatten the dict to restore the nested pytree structure
+  params = unflatten_dict(params, sep="/")
+  return params
+  
+  
+  # def _adapt_parameters(tree_params):
+  #   if isinstance(tree_params, dict):
+  #     return {k if k!="LocalSelfAttention" else "SelfAttention": v for k, v in tree_params.items()}
+  #   return tree_params
+  # def _is_leaf_longt5_local(tree):
+  #   #returns True if the tree is a leaf or at the level we want to modify the trees
+  #   if not tree is None and ((not isinstance(tree, dict)) or ("LocalSelfAttention" in tree.keys()) or len(tree.keys()) == 0):
+  #     return True
+  #   return False
+  # return jax.tree_util.tree_map(_adapt_parameters, params, is_leaf=_is_leaf_longt5_local)
 
 def convert_unroll_to_scan(model, params):
     r"""
