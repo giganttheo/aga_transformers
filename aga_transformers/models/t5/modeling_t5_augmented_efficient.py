@@ -1527,7 +1527,7 @@ class FlaxT5BlockCollection(nn.Module):
                             variable_axes={"params": 0, "graphs": 0},
                             split_rngs={"params": True},
                             # metadata_params={nn.PARTITION_NAME: "block"},
-                            # variable_broadcast=["graphs"],
+                            variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                                         hidden_states,
                                         attention_mask,
