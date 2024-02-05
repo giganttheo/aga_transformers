@@ -98,11 +98,16 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         **model_kwargs,
         dtype=dtype,
     )
+    vocab_size = 8
+    model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
+    params=model.params
     if from_longt5_local:
         print("adapting parameters from longt5_local")
         long_t5=FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs)
-        model.params=convert_unroll_to_scan(model, adapt_parameters_from_longt5_local(long_t5.params))
+        model.params=(model, adapt_parameters_from_longt5_local(long_t5.params))
         del long_t5
+    
+    params=convert_unroll_to_scan(model.params)
     
     # scan=True
     # if scan:
@@ -110,7 +115,7 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
 
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
-        model.params = model.to_bf16(model.params)
+        params = model.to_bf16(params)
     if attention_kwargs is None:
         attention_kwargs = {
             "max_source_length": 2048,
@@ -120,8 +125,7 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
 
-    vocab_size = 8
-    model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
+
     #tieing the graph so it is defined for first layer only
     
     # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)#attention_kwargs["autoregressive"])
@@ -136,7 +140,7 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     else:
         graph = None
         graph_ar = None
-    return tokenizer, model, graph, graph_ar
+    return tokenizer, model, graph, graph_ar, params
 
 def preprocess_function(examples, tokenizer, max_length=512, prefix="summarize: ", text_column="transcript", padding='longest'):
     inputs = examples[text_column]

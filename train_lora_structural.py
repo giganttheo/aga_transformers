@@ -658,13 +658,14 @@ def main():
     if model_args.model_name_or_path:
         dtype=model_args.dtype
 
-        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
+        tokenizer, model, graph, graph_ar, params = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
 
     if training_args.gradient_checkpointing:
         print("=============================")
         print("Enabling gradient checkpointing")
         print("=============================")
         model.enable_gradient_checkpointing()
+        model.params = params
 
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
