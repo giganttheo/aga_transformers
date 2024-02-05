@@ -37,10 +37,8 @@ LORA_FULL = -1
 
 #     return model.__call__, frozen_params, lora_params, optimizer
 
-def create_lora(model, optimizer, dtype="bfloat16", params=None):
+def create_lora(model, optimizer, dtype="bfloat16"):
 
-    if params is None:
-        params=model.params
 
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
@@ -58,11 +56,11 @@ def create_lora(model, optimizer, dtype="bfloat16", params=None):
     # - k > 0: The parameter will be LoRA tuned with a rank k update
 
     # Simple_spec is a helper to do this, but you can also create the label pytree yourself
-    lora_spec = lorax.simple_spec(params, decision_fn=decision_fn, tune_vectors=True)
+    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=True)
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
-    lora_params = lorax.init_lora(params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
+    lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
 
     # `wrap_optimizer` uses the spec to freeze the appropriate subset
     # of parameters.

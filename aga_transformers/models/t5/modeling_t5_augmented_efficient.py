@@ -1807,6 +1807,84 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
             dtype=self.dtype,
             gradient_checkpointing=True,
         )
+    
+    def convert_unroll_to_scan(self, params):
+        r"""
+        Convert a `PyTree` of unrolled model parameters to a scanned block of model parameters. This method can be used
+        to explicitly convert the model parameters to scanned format. This returns a new `params` tree and does not
+        convert the `params` in place.
+        To illustrate the workings of this method, take the Flax BERT model. The unrolled structure for the query
+        projection params is as follows:
+            ('bert', 'encoder', 'layer', '0', 'self_attn', 'q_proj') ('bert', 'encoder', 'layer', '1', 'self_attn',
+            'q_proj') ... ('bert', 'encoder', 'layer', '23', 'self_attn', 'q_proj')
+        This method takes each of the `q_proj` matrices for layers (0, ..., 23) and stacks them into a single 'super'
+        matrix, giving a *single* block of weights for all 24 layers compatible with the scanned model:
+            ('bert', 'encoder', 'layer', 'ScanLayers', 'self_attn', 'q_proj')
+        When enabling scan with _do_init=True (default), this method will be called automatically under the hood. With
+        _do_init=False, it will have to be called explicitly (see example below).
+        Arguments:
+            params (`Union[Dict, FrozenDict]`):
+                A `PyTree` of model parameters.
+        Examples:
+        ```python
+        >>> from transformers import FlaxBertModel
+        >>> # Download model and configuration from huggingface.co
+        >>> model, params = FlaxBertModel.from_pretrained("bert-base-cased", _do_init=False)
+        >>> # By default, the model params will be in unrolled format. To illustrate the use of this method,
+        >>> # we'll first convert to scan format and then back to unrolled
+        >>> model.scan_enable()
+        >>> params = model.convert_unroll_to_scan(params)
+        >>> # now convert back to unrolled
+        >>> model.scan_disable()
+        >>> params = model.convert_scan_to_unroll(params)
+        ```"""
+        if isinstance(params, FrozenDict):
+            params = unfreeze(params)
+
+        params = flatten_dict(params, sep="/")
+        keys = list(params.keys())
+
+        for k in keys:
+            # Identify all "unrolled" layers formed as part of the FlaxBertLayerCollection
+            # These params contain the identifier `block` in their key
+            if "block/0" in k:
+                # Squash the keys for the N unrolled layers into one single key:
+                # (layer/0, ..., layer/N) -> layer/FlaxScanLayers
+                scan_key = k.replace("block/0", "block/FlaxScanLayers")
+                stacked_params = []
+                # Iterate over the unrolled layers (1,...,N)
+                for i in range(self.config.num_layers):
+                    print(k.replace("block/0", f"block/{str(i)}"))
+                    # Stack the params for the N layers into one super block
+                    # and remove the unrolled layer params on the fly
+                    # -> no memory overhead for conversion!
+                    if k.replace("block/0", f"block/{str(i)}") in params.keys():
+                        unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
+                    stacked_params.append(unrolled_layer)
+                params[scan_key] = jnp.stack(stacked_params)
+
+        # Finally, unflatten the dict to restore the nested pytree structure
+        params = unflatten_dict(params, sep="/")
+        return params
+
+    def scan_enable(self):
+        self._module = self.module_class(
+            config=self.config,
+            dtype=self.dtype,
+            use_scan=True,
+        )
+        init_fn = partial(self.init_weights, input_shape=self.input_shape)
+        params_shape_tree = jax.eval_shape(init_fn, self.key)
+
+        # get the shape of the parameters
+        self._params_shape_tree = params_shape_tree
+
+        # save required_params as set
+        self._required_params = set(flatten_dict(unfreeze(params_shape_tree)).keys())
+
+        # initialize the parameters
+        if self._is_initialized:
+            self.params = self.convert_unroll_to_scan(self.params)
 
     def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
         # init input tensors

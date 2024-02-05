@@ -658,13 +658,14 @@ def main():
     if model_args.model_name_or_path:
         dtype=model_args.dtype
 
-        tokenizer, model, graph, graph_ar, params = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
+        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
 
     if training_args.gradient_checkpointing:
         print("=============================")
         print("Enabling gradient checkpointing")
         print("=============================")
         model.enable_gradient_checkpointing()
+        model.scan_enable()
         # model.params = params
 
     if model.config.decoder_start_token_id is None:
@@ -925,7 +926,7 @@ def main():
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=2) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16", params=params)
+    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
 
     # apply_fn = model.__call__
     # lora_params = model.params
@@ -959,7 +960,7 @@ def main():
     def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
         
-        graphs = graph_from_path(params, graphs, {}, {}, layer_wise=False)
+        graphs = graph_from_path(model.params, graphs, {}, {}, layer_wise=False)
         labels = batch.pop("labels")
 
         def compute_loss(params):

@@ -109,9 +109,7 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
-        params = model.to_bf16(params)
-
-    params=convert_unroll_to_scan(model, model.params)
+        model.params = model.to_bf16(params)
     
     # scan=True
     # if scan:
@@ -141,7 +139,7 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     else:
         graph = None
         graph_ar = None
-    return tokenizer, model, graph, graph_ar, params
+    return tokenizer, model, graph, graph_ar
 
 def preprocess_function(examples, tokenizer, max_length=512, prefix="summarize: ", text_column="transcript", padding='longest'):
     inputs = examples[text_column]
