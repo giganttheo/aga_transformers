@@ -87,16 +87,27 @@ def tie_graph_layers(module_class, repo_path, autoregressive=False):
       rules.append((source, target))
   return tie(module_class, rules, collections='graph', transpose=False)
 
-def repeat_relative_pos_bias(params):
+def repeat_relative_pos_bias(params, n_heads=12):
   #copy the relative attention bias embeddings from the block 0 to other blocks
   #this is not ideal for finetuning because the embeddings will no longer be the same
-  first_block_relative_attention_bias = {k: params[k]['block']['0']['layer']['0']['SelfAttention']['relative_attention_bias'] for k in ['encoder', 'decoder']}
-  def copy_relative_attention_bias_on_blocks(tree, path=[]):
-    if not isinstance(tree, dict):
-      return tree
-    if 'SelfAttention' in path:
-      return {**tree, 'relative_attention_bias': first_block_relative_attention_bias[path[0]]}
-    return {k: copy_relative_attention_bias_on_blocks(t, path=path+[k]) for (k, t) in tree.items()}
+  if isinstance(params, FrozenDict):
+    params = unfreeze(params)
+  params = flatten_dict(params, sep="/")
+  keys = list(params.keys())
+  for k in keys:
+    if "relative_attention_bias" in k:
+      for i in range(1, n_heads):
+        params[k.replace("block/0", f"block/{str(i)}")] = params[k]
+  # Finally, unflatten the dict to restore the nested pytree structure
+  params = unflatten_dict(params, sep="/")
+  return params
+  # first_block_relative_attention_bias = {k: params[k]['block']['0']['layer']['0']['SelfAttention']['relative_attention_bias'] for k in ['encoder', 'decoder']}
+  # def copy_relative_attention_bias_on_blocks(tree, path=[]):
+  #   if not isinstance(tree, dict):
+  #     return tree
+  #   if 'SelfAttention' in path:
+  #     return {**tree, 'relative_attention_bias': first_block_relative_attention_bias[path[0]]}
+  #   return {k: copy_relative_attention_bias_on_blocks(t, path=path+[k]) for (k, t) in tree.items()}
   
 
 # def repeat_relative_pos_bias(params):
