@@ -61,7 +61,7 @@ _CHECKPOINT_FOR_DOC = "t5-small"
 _CONFIG_FOR_DOC = "T5Config"
 
 remat = nn_partitioning.remat
-scan_with_axes = nn_partitioning.scan_with_axes
+scan = nn_partitioning.scan
 
 
 
@@ -1522,9 +1522,9 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
         if self.gradient_checkpointing:
-            layer_outputs, other_outputs = scan_with_axes(FlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(nn.broadcast, 0, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': False},
-                            length=self.config.num_layers, axis_name="")(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
+            layer_outputs, other_outputs = scan(FlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+                            in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': False},
+                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                     hidden_states,
                     attention_mask,
                     position_bias,
