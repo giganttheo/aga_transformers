@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from .modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
 from .modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
 from .modeling_t5 import FlaxT5ForConditionalGeneration
-from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_layers, tie_relative_pos_bias, init_augmented_vocab, adapt_parameters_from_longt5_local
+from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_layers, tie_relative_pos_bias, init_augmented_vocab, adapt_parameters_from_longt5_local, convert_unroll_to_scan
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
@@ -101,8 +101,13 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     if from_longt5_local:
         print("adapting parameters from longt5_local")
         long_t5=FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs)
-        model.params=adapt_parameters_from_longt5_local(long_t5.params)
+        model.params=convert_unroll_to_scan(model, adapt_parameters_from_longt5_local(long_t5.params))
         del long_t5
+    
+    # scan=True
+    # if scan:
+    #     model.params = convert_unroll_to_scan(model, model.params)
+
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
         model.params = model.to_bf16(model.params)
@@ -118,7 +123,8 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     vocab_size = 8
     model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
     #tieing the graph so it is defined for first layer only
-    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)#attention_kwargs["autoregressive"])
+    
+    # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)#attention_kwargs["autoregressive"])
     
     graph_ar = {}
     if attention_mode == "led":
