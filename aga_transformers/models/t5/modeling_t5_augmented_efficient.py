@@ -1465,7 +1465,7 @@ class FlaxT5LayerCollection(nn.Module):
             output_attentions=output_attentions,
             deterministic=deterministic,
             init_cache=init_cache,
-        ), _
+        ), None
 
 
 class FlaxT5BlockCollection(nn.Module):
