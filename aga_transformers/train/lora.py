@@ -74,4 +74,6 @@ def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
     lora_model = lorax.lora(model)
     apply_fn = lora_model.__call__
     
+
+    return model.__call__, model.params, optimizer #bypass
     return apply_fn, lora_params, lora_optimizer
