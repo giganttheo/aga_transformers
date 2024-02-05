@@ -1473,34 +1473,35 @@ class FlaxT5BlockCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
 
-    def setup(self):
-        self.causal = self.config.causal
-        if self.gradient_checkpointing:
-            #remat + scan
-            self.blocks = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            variable_axes={'params': 0, 'graph': 0, 'cache': 0}, in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
-                            length=self.config.num_layers, axis_name="")(name="blocks", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)
-            # FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)) #?, variables=["params", "graph"]
-            # self.blocks = [
-            #     FlaxT5CheckpointLayer(
-            #         self.config,
-            #         has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
-            #         dtype=self.dtype,
-            #         name=str(i),
-            #     )
-            #     for i in range(self.config.num_layers)
-            # ]
-        else:
-            self.blocks = [
-                FlaxT5LayerCollection(
-                    self.config,
-                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
-                    dtype=self.dtype,
-                    name=str(i),
-                )
-                for i in range(self.config.num_layers)
-            ]
+    # def setup(self):
+    #     self.causal = self.config.causal
+    #     if self.gradient_checkpointing:
+    #         #remat + scan
+    #         self.blocks = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+    #                         variable_axes={'params': 0, 'graph': 0, 'cache': 0}, in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
+    #                         length=self.config.num_layers, axis_name="")(name="blocks", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)
+    #         # FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)) #?, variables=["params", "graph"]
+    #         # self.blocks = [
+    #         #     FlaxT5CheckpointLayer(
+    #         #         self.config,
+    #         #         has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
+    #         #         dtype=self.dtype,
+    #         #         name=str(i),
+    #         #     )
+    #         #     for i in range(self.config.num_layers)
+    #         # ]
+    #     else:
+    #         self.blocks = [
+    #             FlaxT5LayerCollection(
+    #                 self.config,
+    #                 has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
+    #                 dtype=self.dtype,
+    #                 name=str(i),
+    #             )
+    #             for i in range(self.config.num_layers)
+    #         ]
 
+    @nn.compact
     def __call__(
         self,
         hidden_states=None,
@@ -1512,6 +1513,7 @@ class FlaxT5BlockCollection(nn.Module):
         deterministic: bool = True,
         init_cache: bool = False,
     ):
+        self.causal = self.config.causal
         # Prepare head mask if needed
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
@@ -1519,9 +1521,10 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
-
         if self.gradient_checkpointing:
-            layer_outputs, _ = self.blocks.apply(
+            layer_outputs, _ = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+                            variable_axes={'params': 0, 'graph': 0, 'cache': 0}, in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
+                            length=self.config.num_layers, axis_name="")(name="blocks", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                     hidden_states,
                     attention_mask,
                     position_bias,
@@ -1535,12 +1538,16 @@ class FlaxT5BlockCollection(nn.Module):
             hidden_states = layer_outputs[0]
             position_bias = layer_outputs[1]
         else:
-            for i, layer_module in enumerate(self.blocks):
-                #TODO replace for with jax.lax.scan
+            for i in range(self.config.num_layers):
                 if output_hidden_states:
                     all_hidden_states = all_hidden_states + (hidden_states,)
 
-                layer_outputs, _ = layer_module(
+                layer_outputs, _ = FlaxT5LayerCollection(
+                    self.config,
+                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                    dtype=self.dtype,
+                    name=str(i),
+                )(
                     hidden_states,
                     attention_mask,
                     position_bias,
