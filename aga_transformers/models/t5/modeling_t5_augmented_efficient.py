@@ -1479,7 +1479,7 @@ class FlaxT5BlockCollection(nn.Module):
             #remat + scan
             self.block = scan_with_axes(partial(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)), self.config, has_relative_attention_bias=True, dtype=self.dtype,),
                             variable_axes={'params': 0, 'graph': 0}, in_axes=(nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
-                            length=self.config.num_layers, axis_name="")(config=self.config, name="blocks")
+                            length=self.config.num_layers, axis_name="")(name="blocks")
             # FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)) #?, variables=["params", "graph"]
             # self.blocks = [
             #     FlaxT5CheckpointLayer(
@@ -1519,12 +1519,7 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
-        for i, layer_module in enumerate(self.blocks):
-            #TODO replace for with jax.lax.scan
-            if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states,)
-
-            layer_outputs = layer_module(
+        layer_outputs = self.blocks(
                 hidden_states,
                 attention_mask,
                 position_bias,
@@ -1533,23 +1528,42 @@ class FlaxT5BlockCollection(nn.Module):
                 encoder_decoder_position_bias,
                 output_attentions,
                 deterministic,
-                init_cache,
-            )
+                init_cache,)
+        
+        hidden_states = layer_outputs[0]
+        position_bias = layer_outputs[1]
 
-            hidden_states = layer_outputs[0]
+        # for i, layer_module in enumerate(self.blocks):
+        #     #TODO replace for with jax.lax.scan
+        #     if output_hidden_states:
+        #         all_hidden_states = all_hidden_states + (hidden_states,)
 
-            # We share the position biases between the layers - the first layer store them
-            # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
-            # (cross-attention position bias), (cross-attention weights)
-            position_bias = layer_outputs[1]
+        #     layer_outputs = layer_module(
+        #         hidden_states,
+        #         attention_mask,
+        #         position_bias,
+        #         encoder_hidden_states,
+        #         encoder_attention_mask,
+        #         encoder_decoder_position_bias,
+        #         output_attentions,
+        #         deterministic,
+        #         init_cache,
+        #     )
 
-            if self.causal and encoder_hidden_states is not None:
-                encoder_decoder_position_bias = layer_outputs[3 if output_attentions else 2]
+        #     hidden_states = layer_outputs[0]
 
-            if output_attentions:
-                all_attentions = all_attentions + (layer_outputs[2],)
-                if self.causal:
-                    all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
+        #     # We share the position biases between the layers - the first layer store them
+        #     # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
+        #     # (cross-attention position bias), (cross-attention weights)
+        #     position_bias = layer_outputs[1]
+
+        #     if self.causal and encoder_hidden_states is not None:
+        #         encoder_decoder_position_bias = layer_outputs[3 if output_attentions else 2]
+
+        #     if output_attentions:
+        #         all_attentions = all_attentions + (layer_outputs[2],)
+        #         if self.causal:
+        #             all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
 
         return FlaxBaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
