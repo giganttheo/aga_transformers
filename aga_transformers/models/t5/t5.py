@@ -104,18 +104,19 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     if from_longt5_local:
         print("adapting parameters from longt5_local")
         long_t5=FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs)
-        model.params=(model, adapt_parameters_from_longt5_local(long_t5.params))
+        model.params=adapt_parameters_from_longt5_local(long_t5.params)
         del long_t5
     
-    params=convert_unroll_to_scan(model.params)
+    if dtype == "bfloat16":
+        print("adapting parameters to bfloat16...")
+        params = model.to_bf16(params)
+
+    params=convert_unroll_to_scan(model, model.params)
     
     # scan=True
     # if scan:
     #     model.params = convert_unroll_to_scan(model, model.params)
 
-    if dtype == "bfloat16":
-        print("adapting parameters to bfloat16...")
-        params = model.to_bf16(params)
     if attention_kwargs is None:
         attention_kwargs = {
             "max_source_length": 2048,
