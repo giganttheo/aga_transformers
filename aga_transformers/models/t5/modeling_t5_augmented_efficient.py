@@ -1526,7 +1526,7 @@ class FlaxT5BlockCollection(nn.Module):
                             in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0, "graphs": 0} ,
                             split_rngs={'params': True},
-                            metadata_params={nn.Partitioned.AXIS_NAME: "block"},
+                            metadata_params={nn.PARTITION_NAME: "block"},
                             # variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="block", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                                         hidden_states,
