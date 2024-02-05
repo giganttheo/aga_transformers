@@ -1476,16 +1476,20 @@ class FlaxT5BlockCollection(nn.Module):
     def setup(self):
         self.causal = self.config.causal
         if self.gradient_checkpointing:
-            FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)) #?, variables=["params", "graph"]
-            self.blocks = [
-                FlaxT5CheckpointLayer(
-                    self.config,
-                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
-                    dtype=self.dtype,
-                    name=str(i),
-                )
-                for i in range(self.config.num_layers)
-            ]
+            #remat + scan
+            self.block = nn.scan_with_axes(partial(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)), self.config, has_relative_attention_bias=True, dtype=self.dtype,),
+                            variable_axes={'params': 0, 'graph': 0}, in_axes=(nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
+                            length=self.config.num_layers, axis_name="")(config=self.config, name="blocks")
+            # FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)) #?, variables=["params", "graph"]
+            # self.blocks = [
+            #     FlaxT5CheckpointLayer(
+            #         self.config,
+            #         has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
+            #         dtype=self.dtype,
+            #         name=str(i),
+            #     )
+            #     for i in range(self.config.num_layers)
+            # ]
         else:
             self.blocks = [
                 FlaxT5LayerCollection(
