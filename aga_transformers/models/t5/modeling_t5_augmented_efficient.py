@@ -1455,7 +1455,7 @@ class FlaxT5LayerCollection(nn.Module):
         deterministic=True,
         init_cache=False,
     ):
-        return self.layer(
+        outputs = self.layer(
             hidden_states,
             attention_mask=attention_mask,
             position_bias=position_bias,
@@ -1465,7 +1465,8 @@ class FlaxT5LayerCollection(nn.Module):
             output_attentions=output_attentions,
             deterministic=deterministic,
             init_cache=init_cache,
-        ), None
+        )
+        return outputs[0], outputs[1:]
 
 
 class FlaxT5BlockCollection(nn.Module):
@@ -1521,7 +1522,7 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
         if self.gradient_checkpointing:
-            layer_outputs, _ = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, other_outputs = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             variable_axes={'params': 0, 'graph': 0, 'cache': 0}, in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
                             length=self.config.num_layers, axis_name="")(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                     hidden_states,
@@ -1534,8 +1535,8 @@ class FlaxT5BlockCollection(nn.Module):
                     deterministic,
                     init_cache,)
             
-            hidden_states = layer_outputs[0]
-            position_bias = layer_outputs[1]
+            hidden_states = layer_outputs
+            position_bias = other_outputs[0]
         else:
             for i in range(self.config.num_layers):
                 if output_hidden_states:
