@@ -1473,8 +1473,8 @@ class FlaxT5BlockCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
 
-    # def setup(self):
-    #     self.causal = self.config.causal
+    def setup(self):
+        self.causal = self.config.causal
     #     if self.gradient_checkpointing:
     #         #remat + scan
     #         self.blocks = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
@@ -1513,7 +1513,6 @@ class FlaxT5BlockCollection(nn.Module):
         deterministic: bool = True,
         init_cache: bool = False,
     ):
-        self.causal = self.config.causal
         # Prepare head mask if needed
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
