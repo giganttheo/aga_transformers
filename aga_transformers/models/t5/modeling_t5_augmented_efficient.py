@@ -61,6 +61,7 @@ _CHECKPOINT_FOR_DOC = "t5-small"
 _CONFIG_FOR_DOC = "T5Config"
 
 remat = nn_partitioning.remat
+scan_with_axes = nn_partitioning.scan_with_axes
 
 
 
@@ -1521,9 +1522,12 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
         if self.gradient_checkpointing:
-            layer_outputs, other_outputs = nn.scan(FlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), split_rngs={'params': False}, #, variable_broadcast=["graph"]
-                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
+            layer_outputs, other_outputs = scan_with_axes(FlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+                            in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
+                            split_rngs={'params': False},
+                            # variable_broadcast=["graphs"],
+                            axis_name=''
+                            length=self.config.num_layers)(name="block", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                                         hidden_states,
                                         attention_mask,
                                         position_bias,
@@ -1854,15 +1858,12 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
                 stacked_params = []
                 # Iterate over the unrolled layers (1,...,N)
                 for i in range(self.config.num_layers):
-                    print(k.replace("block/0", f"block/{str(i)}"))
                     # Stack the params for the N layers into one super block
                     # and remove the unrolled layer params on the fly
                     # -> no memory overhead for conversion!
                     unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
                     stacked_params.append(unrolled_layer)
                 params[scan_key] = jnp.stack(stacked_params)
-                print(f"Shape of param scanned: ({scan_key})", params[scan_key].shape)
-
         # Finally, unflatten the dict to restore the nested pytree structure
         params = unflatten_dict(params, sep="/")
         return params
@@ -1883,7 +1884,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         self._params_shape_tree = jax.tree_util.tree_structure(params)
         self._required_params = set(flatten_dict(unfreeze(params)).keys())
         self.params = params
-        print(self._required_params)
+        # print(self._required_params)
 
     def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
         # init input tensors

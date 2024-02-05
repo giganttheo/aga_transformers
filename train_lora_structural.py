@@ -665,7 +665,7 @@ def main():
         print("Enabling gradient checkpointing")
         print("=============================")
         model.enable_gradient_checkpointing()
-        model.scan_enable()
+        # model.scan_enable()
         # model.params = params
 
     if model.config.decoder_start_token_id is None:
@@ -928,7 +928,7 @@ def main():
     # Create LoRA model
     apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
 
-    print(lora_params)
+    # print(lora_params)
 
     # apply_fn = model.__call__
     # lora_params = model.params
