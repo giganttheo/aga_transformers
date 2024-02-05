@@ -1522,17 +1522,17 @@ class FlaxT5BlockCollection(nn.Module):
 
         if self.gradient_checkpointing or True:
             layer_outputs, other_outputs = nn.scan(FlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': False},
+                            in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), split_rngs={'params': False}, #, variable_broadcast=["graph"]
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
-                    hidden_states,
-                    attention_mask,
-                    position_bias,
-                    encoder_hidden_states,
-                    encoder_attention_mask,
-                    encoder_decoder_position_bias,
-                    output_attentions,
-                    deterministic,
-                    init_cache,)
+                                        hidden_states,
+                                        attention_mask,
+                                        position_bias,
+                                        encoder_hidden_states,
+                                        encoder_attention_mask,
+                                        encoder_decoder_position_bias,
+                                        output_attentions,
+                                        deterministic,
+                                        init_cache,)
             
             hidden_states = layer_outputs
             position_bias = other_outputs[0]
