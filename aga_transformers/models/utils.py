@@ -180,11 +180,11 @@ def convert_unroll_to_scan(model, params):
 
     for k in keys:
         # Identify all "unrolled" layers formed as part of the FlaxBertLayerCollection
-        # These params contain the identifier `layer` in their key
+        # These params contain the identifier `block` in their key
         if "block/0" in k:
             # Squash the keys for the N unrolled layers into one single key:
             # (layer/0, ..., layer/N) -> layer/FlaxScanLayers
-            scan_key = k.replace("0", "FlaxScanLayers")
+            scan_key = k.replace("block/0", "block/FlaxScanLayers")
             stacked_params = []
 
             # Iterate over the unrolled layers (1,...,N)
@@ -192,7 +192,7 @@ def convert_unroll_to_scan(model, params):
                 # Stack the params for the N layers into one super block
                 # and remove the unrolled layer params on the fly
                 # -> no memory overhead for conversion!
-                unrolled_layer = params.pop(k.replace("0", str(i)))
+                unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
                 stacked_params.append(unrolled_layer)
 
             params[scan_key] = jnp.stack(stacked_params)
@@ -244,7 +244,6 @@ def convert_scan_to_unroll(model, params):
         if "FlaxScanLayers" in k:
             # Remove the scan layer from the PyTree of params
             scan_layer = params.pop(k)
-
             # Unroll the key for the stacked scan matrix into N separate keys, indexed by layer number
             # layer/FlaxScanLayers -> (layer/0, ..., layer/N)
             for i in range(model.config.num_hidden_layers):
