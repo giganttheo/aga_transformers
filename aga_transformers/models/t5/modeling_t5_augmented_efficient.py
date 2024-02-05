@@ -1880,7 +1880,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
 
         # initialize the parameters
         params = self.convert_unroll_to_scan(self.params)
-        self._params_shape_tree = params.shape
+        self._params_shape_tree = jax.tree_util.tree_structure(params)
         self._required_params = set(flatten_dict(unfreeze(params)).keys())
         self.params = params
 
