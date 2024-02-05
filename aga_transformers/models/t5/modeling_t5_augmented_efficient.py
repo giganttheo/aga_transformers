@@ -1858,8 +1858,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
                     # Stack the params for the N layers into one super block
                     # and remove the unrolled layer params on the fly
                     # -> no memory overhead for conversion!
-                    if k.replace("block/0", f"block/{str(i)}") in params.keys():
-                        unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
+                    unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
                     stacked_params.append(unrolled_layer)
                 params[scan_key] = jnp.stack(stacked_params)
 
