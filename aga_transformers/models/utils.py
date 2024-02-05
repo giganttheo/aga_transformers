@@ -192,7 +192,8 @@ def convert_unroll_to_scan(model, params):
                 # Stack the params for the N layers into one super block
                 # and remove the unrolled layer params on the fly
                 # -> no memory overhead for conversion!
-                unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
+                if k.replace("block/0", f"block/{str(i)}") in params.keys():
+                  unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
                 stacked_params.append(unrolled_layer)
 
             params[scan_key] = jnp.stack(stacked_params)
