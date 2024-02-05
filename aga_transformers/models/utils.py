@@ -97,7 +97,7 @@ def repeat_relative_pos_bias(params, n_heads=12):
   for k in keys:
     if "relative_attention_bias" in k:
       for i in range(1, n_heads):
-        print(f"block/0 ==> block/{str(i)}")
+        print(f"block/0 ==> block/{str(i)}, in {k}")
         params[k.replace("block/0", f"block/{str(i)}")] = params[k]
   # Finally, unflatten the dict to restore the nested pytree structure
   params = unflatten_dict(params, sep="/")
