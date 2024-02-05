@@ -97,7 +97,6 @@ def repeat_relative_pos_bias(params, n_heads=12):
   for k in keys:
     if "relative_attention_bias" in k:
       for i in range(1, n_heads):
-        # print(f"block/0 ==> block/{str(i)}, in {k}")
         params[k.replace("block/0", f"block/{str(i)}")] = params[k]
   # Finally, unflatten the dict to restore the nested pytree structure
   params = unflatten_dict(params, sep="/")
@@ -211,7 +210,6 @@ def convert_unroll_to_scan(model, params):
             stacked_params = []
             # Iterate over the unrolled layers (1,...,N)
             for i in range(model.config.num_layers):
-                print(k.replace("block/0", f"block/{str(i)}"))
                 # Stack the params for the N layers into one super block
                 # and remove the unrolled layer params on the fly
                 # -> no memory overhead for conversion!

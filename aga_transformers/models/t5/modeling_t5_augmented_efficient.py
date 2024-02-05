@@ -1861,6 +1861,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
                     unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
                     stacked_params.append(unrolled_layer)
                 params[scan_key] = jnp.stack(stacked_params)
+                print(f"Shape of param scanned: ({scan_key})", params[scan_key].shape)
 
         # Finally, unflatten the dict to restore the nested pytree structure
         params = unflatten_dict(params, sep="/")
