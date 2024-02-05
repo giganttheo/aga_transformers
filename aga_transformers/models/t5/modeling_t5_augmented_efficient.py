@@ -1883,6 +1883,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         self._params_shape_tree = jax.tree_util.tree_structure(params)
         self._required_params = set(flatten_dict(unfreeze(params)).keys())
         self.params = params
+        print(self._required_params)
 
     def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
         # init input tensors
