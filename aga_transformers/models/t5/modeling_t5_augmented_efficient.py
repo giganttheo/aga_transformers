@@ -1868,11 +1868,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         return params
 
     def scan_enable(self):
-        self._module = self.module_class(
-            config=self.config,
-            dtype=self.dtype,
-            use_scan=True,
-        )
+        
         init_fn = partial(self.init_weights, input_shape=self.input_shape)
         params_shape_tree = jax.eval_shape(init_fn, self.key)
 
