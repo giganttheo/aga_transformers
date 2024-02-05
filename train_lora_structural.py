@@ -925,7 +925,7 @@ def main():
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=2) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16", params=params)
 
     # apply_fn = model.__call__
     # lora_params = model.params
