@@ -188,14 +188,13 @@ def convert_unroll_to_scan(model, params):
             stacked_params = []
             print(k)
             # Iterate over the unrolled layers (1,...,N)
-            for i in range(model.config.num_layers):
+            for i in range(model.config.num_hidden_layers):
                 # Stack the params for the N layers into one super block
                 # and remove the unrolled layer params on the fly
                 # -> no memory overhead for conversion!
                 if k.replace("block/0", f"block/{str(i)}") in params.keys():
                   unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
                 stacked_params.append(unrolled_layer)
-
             params[scan_key] = jnp.stack(stacked_params)
 
     # Finally, unflatten the dict to restore the nested pytree structure
