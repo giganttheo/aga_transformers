@@ -181,7 +181,7 @@ def convert_unroll_to_scan(model, params):
     for k in keys:
         # Identify all "unrolled" layers formed as part of the FlaxBertLayerCollection
         # These params contain the identifier `layer` in their key
-        if "layer/0" in k:
+        if "block/0" in k:
             # Squash the keys for the N unrolled layers into one single key:
             # (layer/0, ..., layer/N) -> layer/FlaxScanLayers
             scan_key = k.replace("0", "FlaxScanLayers")
