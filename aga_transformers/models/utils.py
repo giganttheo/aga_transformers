@@ -141,7 +141,6 @@ def adapt_parameters_from_longt5_local(params):
     return False
   return jax.tree_util.tree_map(_adapt_parameters, params, is_leaf=_is_leaf_longt5_local)
 
-
 def convert_unroll_to_scan(model, params):
     r"""
     Convert a `PyTree` of unrolled model parameters to a scanned block of model parameters. This method can be used

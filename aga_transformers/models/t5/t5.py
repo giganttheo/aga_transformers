@@ -91,8 +91,11 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
 def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, from_longt5_local=False, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     module_class = FlaxT5ForConditionalGeneration_AUG.module_class
-    module_class = tie_relative_pos_bias(module_class, repo_path)
-    FlaxT5ForConditionalGeneration_AUG.module_class = module_class
+
+    #tie the relative positional bias
+    # module_class = tie_relative_pos_bias(module_class, repo_path)
+    # FlaxT5ForConditionalGeneration_AUG.module_class = module_class
+
     model = FlaxT5ForConditionalGeneration_AUG.from_pretrained(
         repo_path,
         **model_kwargs,
