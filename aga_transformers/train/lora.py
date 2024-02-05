@@ -37,7 +37,7 @@ LORA_FULL = -1
 
 #     return model.__call__, frozen_params, lora_params, optimizer
 
-def create_lora(model, optimizer, dtype="bfloat16"):
+def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
 
 
     # This function defines a spec which tells lorax how each parameter should be handled

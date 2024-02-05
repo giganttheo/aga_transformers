@@ -6,7 +6,7 @@ def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], la
   if not isinstance(tree, dict):
     return None
   if 'SelfAttention' in path:
-    is_first_layer_ = (path[2]=="FlaxScanLayers") or (int(path[2]) == 0)
+    is_first_layer_ = ("FlaxScanLayers" in path[2]) or (int(path[2]) == 0)
     if layer_wise or is_first_layer_:
       #self attention
       if 'encoder' in path:
