@@ -1478,7 +1478,7 @@ class FlaxT5BlockCollection(nn.Module):
         if self.gradient_checkpointing:
             #remat + scan
             self.blocks = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            variable_axes={'params': 0, 'graph': 0}, in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
+                            variable_axes={'params': 0, 'graph': 0, 'cache': 0}, in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': True},
                             length=self.config.num_layers, axis_name="")(name="blocks", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)
             # FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)) #?, variables=["params", "graph"]
             # self.blocks = [
