@@ -1520,7 +1520,7 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
-        if self.gradient_checkpointing:
+        if self.gradient_checkpointing or True:
             layer_outputs, other_outputs = nn.scan(FlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, 1, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), variable_broadcast="graph", split_rngs={'params': False},
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
