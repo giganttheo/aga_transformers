@@ -1523,7 +1523,7 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
         if self.gradient_checkpointing:
-            layer_outputs, other_outputs = qax.use_implicit_args(nn.scan)(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, other_outputs = qax.use_implicit_args(nn.scan)(FlaxT5LayerCollection,#remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0, "graphs": 0},
                             split_rngs={"params": True},
