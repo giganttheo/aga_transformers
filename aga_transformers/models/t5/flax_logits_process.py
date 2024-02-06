@@ -58,7 +58,6 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         data=jnp.ones((all_update_indices.shape[0], ) , dtype="bool")
         return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
-    @sparse.sparsify
     def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor) -> jnp.ndarray:
         """
         Determines which tokens must be banned given latest tokens and the transition tensor (i.e. the previously seen
@@ -68,29 +67,33 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         member). Then, for each batch member, finds which tokens have been generated after the last token. Combining
         the two, we have the forbidden ngrams.
         """
-        batch_size = latest_tokens.shape[0]
+        @sparse.sparsify
+        def inner_fn(latest_tokens, transition_tensor):
+            batch_size = latest_tokens.shape[0]
 
-        # 1. Get a mask that tell us whether `latest_tokens` has been generated yet. shape: [batch_size, 1]
-        # creates the indexing for the batch and the n-th member of the ngram
-        previously_generated_mask = jnp.ones((batch_size, 1), dtype=jnp.bool)
-        for i in range(self.ngram_size - 2):
+            # 1. Get a mask that tell us whether `latest_tokens` has been generated yet. shape: [batch_size, 1]
+            # creates the indexing for the batch and the n-th member of the ngram
+            previously_generated_mask = jnp.ones((batch_size, 1), dtype=jnp.bool)
+
+            for i in range(self.ngram_size - 2):
+                gather_indices = jnp.stack(
+                    (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
+                )
+                # AND is equivalent to multiplying boolean masks
+                previously_generated_mask &= jnp.expand_dims(
+                    transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))], axis=1
+                )
+
+            # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
+            # `latest_tokens`, in the last position of the ngram. shape: [batch_size, vocab_size]
             gather_indices = jnp.stack(
-                (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
+                (jnp.ones((batch_size), dtype=jnp.int32) * self.ngram_size - 2, latest_tokens[:, -1]), axis=1
             )
+            next_forbidden_mask = transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))]
+            
             # AND is equivalent to multiplying boolean masks
-            previously_generated_mask &= jnp.expand_dims(
-                transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))], axis=1
-            )
-
-        # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
-        # `latest_tokens`, in the last position of the ngram. shape: [batch_size, vocab_size]
-        gather_indices = jnp.stack(
-            (jnp.ones((batch_size), dtype=jnp.int32) * self.ngram_size - 2, latest_tokens[:, -1]), axis=1
-        )
-        next_forbidden_mask = transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))]
-        
-        # AND is equivalent to multiplying boolean masks
-        return previously_generated_mask & next_forbidden_mask
+            return previously_generated_mask & next_forbidden_mask
+        return inner_fn(latest_tokens, transition_tensor).to_dense()
 
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
         _, vocab_size = scores.shape
