@@ -104,7 +104,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             latest_tokens = input_ids[:, cur_len - self.ngram_size + 1 : cur_len]
             banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
 
-            scores = jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
+            return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         return jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
 
 
