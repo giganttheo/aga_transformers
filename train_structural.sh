@@ -1,5 +1,5 @@
 
-conda activate train-jax
+conda activate train-lora
 
 export http_proxy=http://webproxy.lab-ia.fr:8080
 export https_proxy=http://webproxy.lab-ia.fr:8080
