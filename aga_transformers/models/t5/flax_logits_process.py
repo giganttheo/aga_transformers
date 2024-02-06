@@ -57,7 +57,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         all_update_indices = jnp.stack(all_update_indices, axis=1)
         print(all_update_indices.shape)
         data=jnp.ones_like(all_update_indices, dtype="bool")
-        return sparse.BCOO(data, all_update_indices, shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
+        return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
     @sparse.sparsify
     def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor: jnp.ndarray) -> jnp.ndarray:
