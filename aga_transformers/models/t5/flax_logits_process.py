@@ -48,7 +48,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 (batch_indexing, ngram_indexing, current_token_indexing, next_token_indexing), axis=1
             )
 
-            transition_tensor = transition_tensor.at[update_indices].set(jnp.ones(update_indices.shape[0], dtype="bool"))
+            transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
 
         return transition_tensor
 
@@ -65,7 +65,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
 
         # 1. Get a mask that tell us whether `latest_tokens` has been generated yet. shape: [batch_size, 1]
         # creates the indexing for the batch and the n-th member of the ngram
-        previously_generated_mask = tf.ones((batch_size, 1), dtype=tf.bool)
+        previously_generated_mask = jnp.ones((batch_size, 1), dtype=jnp.bool)
         for i in range(self.ngram_size - 2):
             gather_indices = jnp.stack(
                 (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
