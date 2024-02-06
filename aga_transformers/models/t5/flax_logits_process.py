@@ -73,7 +73,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
 
             # 1. Get a mask that tell us whether `latest_tokens` has been generated yet. shape: [batch_size, 1]
             # creates the indexing for the batch and the n-th member of the ngram
-            previously_generated_mask = jnp.ones((batch_size, 1), dtype=jnp.bool)
+            previously_generated_mask = jnp.ones((batch_size, 1), dtype="bool")
 
             for i in range(self.ngram_size - 2):
                 gather_indices = jnp.stack(
