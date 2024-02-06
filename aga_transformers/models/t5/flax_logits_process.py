@@ -96,13 +96,14 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         return inner_fn(latest_tokens, transition_tensor).to_dense()
 
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
-        _, vocab_size = scores.shape
-        transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
+        if cur_len >= self.ngram_size - 1:
+            _, vocab_size = scores.shape
+            transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
 
-        latest_tokens = input_ids[:, cur_len - self.ngram_size + 1 : cur_len]
-        banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
+            latest_tokens = input_ids[:, cur_len - self.ngram_size + 1 : cur_len]
+            banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
 
-        scores = jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
+            scores = jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         return scores
 
 
