@@ -19,7 +19,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
         self.ngram_size = ngram_size
 
-    def get_transition_tensor(self, input_ids: jnp.ndarray, vocab_size: int) -> jnp.ndarray:
+    def get_transition_tensor(self, input_ids: jnp.ndarray, vocab_size: int):
         """
         Gets a transition tensor of shape [batch_size, ngram_size-1, vocab_size, vocab_size]. It is a tensor containing
         booleans, which answers the question: if the k-th token in an ngram is x, has it been followed by token y in a
@@ -55,12 +55,11 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             all_update_indices.append(update_indices)
             # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
         all_update_indices = jnp.concatenate(all_update_indices, axis=0)
-        print(all_update_indices.shape)
         data=jnp.ones((all_update_indices.shape[0], ) , dtype="bool")
         return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
     @sparse.sparsify
-    def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor: jnp.ndarray) -> jnp.ndarray:
+    def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor) -> jnp.ndarray:
         """
         Determines which tokens must be banned given latest tokens and the transition tensor (i.e. the previously seen
         ngrams).
