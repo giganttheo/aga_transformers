@@ -30,35 +30,32 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         """
         batch_size, seq_len = input_ids.shape
         # transition_tensor = jnp.zeros((batch_size, self.ngram_size - 1, vocab_size, vocab_size), dtype="bool")
-        transition_tensor = sparse.BCOO((jnp.array([], dtype="bool"), jnp.zeros((0, 0, 0, 0), dtype="int32")), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
-        @sparse.sparsify
-        def update_transition_tensor(transition_tensor):
-            # if `input_ids` is padded this will do some useless computations, but that is fine (avoids XLA recompilation)
-            for i in range(seq_len - (self.ngram_size - 1)):
-            
-                ngrams = input_ids[:, i : i + self.ngram_size]
+        # if `input_ids` is padded this will do some useless computations, but that is fine (avoids XLA recompilation)
+        all_update_indices = []
+        for i in range(seq_len - (self.ngram_size - 1)):
+        
+            ngrams = input_ids[:, i : i + self.ngram_size]
 
-                # creates the indexing for the batch and the n-th member of the ngram
-                batch_indexing, ngram_indexing = jnp.meshgrid(jnp.arange(ngrams.shape[0]), jnp.arange(ngrams.shape[1] - 1))
-                batch_indexing = jnp.reshape(jnp.transpose(batch_indexing), (-1,))
-                ngram_indexing = jnp.reshape(jnp.transpose(ngram_indexing), (-1,))
+            # creates the indexing for the batch and the n-th member of the ngram
+            batch_indexing, ngram_indexing = jnp.meshgrid(jnp.arange(ngrams.shape[0]), jnp.arange(ngrams.shape[1] - 1))
+            batch_indexing = jnp.reshape(jnp.transpose(batch_indexing), (-1,))
+            ngram_indexing = jnp.reshape(jnp.transpose(ngram_indexing), (-1,))
 
-                # creates the indexing for the current -> next token pairs
-                curr_tokens = ngrams[:, :-1]
-                next_tokens = ngrams[:, 1:]
-                current_token_indexing = jnp.reshape(curr_tokens, (-1,))
-                next_token_indexing = jnp.reshape(next_tokens, (-1,))
+            # creates the indexing for the current -> next token pairs
+            curr_tokens = ngrams[:, :-1]
+            next_tokens = ngrams[:, 1:]
+            current_token_indexing = jnp.reshape(curr_tokens, (-1,))
+            next_token_indexing = jnp.reshape(next_tokens, (-1,))
 
-                # scatters the observed ngrams into the transition tensor
-                update_indices = jnp.stack(
-                    (batch_indexing, ngram_indexing, current_token_indexing, next_token_indexing), axis=1
-                )
-
-                transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
-
-            return transition_tensor
-        return update_transition_tensor(transition_tensor)
+            # scatters the observed ngrams into the transition tensor
+            update_indices = jnp.stack(
+                (batch_indexing, ngram_indexing, current_token_indexing, next_token_indexing), axis=1
+            )
+            all_update_indices.append(update_indices)
+            # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
+        all_update_indices = jnp.stack(all_update_indices, axis=1)
+        return sparse.BCOO(jnp.ones(all_update_indices.shape, dtype="bool"), all_update_indices, shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
     @sparse.sparsify
     def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor: jnp.ndarray) -> jnp.ndarray:
