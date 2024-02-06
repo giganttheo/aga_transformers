@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import jax
 from jax.experimental import sparse
 
 from transformers.generation.flax_logits_process import FlaxLogitsProcessor
@@ -96,7 +97,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         return inner_fn(latest_tokens, transition_tensor).to_dense()
 
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
-        if cur_len >= self.ngram_size - 1:
+        def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
 
@@ -104,8 +105,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
 
             scores = jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
-        return scores
-
+        return jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
 
 
 # import jax.numpy as jnp
