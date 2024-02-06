@@ -30,7 +30,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         """
         batch_size, seq_len = input_ids.shape
         # transition_tensor = jnp.zeros((batch_size, self.ngram_size - 1, vocab_size, vocab_size), dtype="bool")
-        transition_tensor = sparse.BCOO((jnp.array([]), jnp.array([])), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size), dtype="bool")
+        transition_tensor = sparse.BCOO((jnp.array([], dtype="bool"), jnp.array([])), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
         @sparse.sparsify
         def update_transition_tensor(transition_tensor):
@@ -58,8 +58,9 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
 
             return transition_tensor
-        update_transition_tensor(transition_tensor)
+        return update_transition_tensor(transition_tensor)
 
+    @sparse.sparsify
     def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor: jnp.ndarray) -> jnp.ndarray:
         """
         Determines which tokens must be banned given latest tokens and the transition tensor (i.e. the previously seen
@@ -98,7 +99,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
 
         latest_tokens = input_ids[:, cur_len - self.ngram_size + 1 : cur_len]
-        banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
+        banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor).to_dense()
 
         scores = jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         return scores
