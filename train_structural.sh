@@ -29,12 +29,12 @@ python ./train_lora_structural.py \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
-	--max_source_length 8192 \
+	--max_source_length 512 \
 	--val_max_target_length 512 \
 	--max_train_samples 64 \
 	--max_eval_samples 64 \
 	--gradient_checkpointing \
-	# --resume_from_checkpoint \
+	# --resume_from_checkpoint \#8192 \
 	# --run_id "fv3mirpt"
 	# --max_train_samples 64 \
 	# --max_eval_samples 64 \
