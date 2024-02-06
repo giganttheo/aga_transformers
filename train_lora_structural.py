@@ -963,7 +963,7 @@ def main():
     def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
         
-        graphs = graph_from_path(model.params, graphs, {}, {}, layer_wise=False)
+        graphs = graph_from_path(state.params, graphs, {}, {}, layer_wise=False)
         labels = batch.pop("labels")
 
         def compute_loss(params):
@@ -1065,7 +1065,7 @@ def main():
             # Model forward
             batch, graphs = next(eval_loader)
             labels = batch["labels"]
-            graphs = graph_from_path(params, graphs, {}, {}, layer_wise=False)
+            graphs = graph_from_path(state.params, graphs, {}, {}, layer_wise=False)
             metrics = eval_step(
                 state.params, batch, graphs
             )
