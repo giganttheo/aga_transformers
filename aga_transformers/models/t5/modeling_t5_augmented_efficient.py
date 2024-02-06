@@ -29,6 +29,7 @@ from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
 from jax.random import PRNGKey
+import qax
 from functools import partial
 import math
 
@@ -1522,7 +1523,7 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
         if self.gradient_checkpointing:
-            layer_outputs, other_outputs = nn.scan(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, other_outputs = qax.use_implicit_args(nn.scan)(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0, "graphs": 0},
                             split_rngs={"params": True},
