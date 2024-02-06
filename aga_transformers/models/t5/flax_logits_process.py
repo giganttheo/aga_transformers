@@ -56,7 +56,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
         all_update_indices = jnp.stack(all_update_indices, axis=1)
         print(all_update_indices.shape)
-        data=jnp.ones_like(all_update_indices, dtype="bool")
+        data=jnp.ones(tuple(all_update_indices.shape) + (vocab_size,) , dtype="bool")
         return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
     @sparse.sparsify
