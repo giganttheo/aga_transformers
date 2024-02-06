@@ -33,7 +33,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             ngrams = input_ids[:, i : i + self.ngram_size]
 
             # creates the indexing for the batch and the n-th member of the ngram
-            batch_indexing, ngram_indexing = jnp.meshgrid(jnp.range(ngrams.shape[0]), jnp.range(ngrams.shape[1] - 1))
+            batch_indexing, ngram_indexing = jnp.meshgrid(jnp.arange(ngrams.shape[0]), jnp.arange(ngrams.shape[1] - 1))
             batch_indexing = jnp.reshape(jnp.transpose(batch_indexing), (-1,))
             ngram_indexing = jnp.reshape(jnp.transpose(ngram_indexing), (-1,))
 
