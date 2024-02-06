@@ -30,7 +30,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         """
         batch_size, seq_len = input_ids.shape
         # transition_tensor = jnp.zeros((batch_size, self.ngram_size - 1, vocab_size, vocab_size), dtype="bool")
-        transition_tensor = sparse.BCOO((jnp.array([], dtype="bool"), jnp.array([])), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
+        transition_tensor = sparse.BCOO((jnp.array([], dtype="bool"), jnp.array([], dtype="int32")), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
         @sparse.sparsify
         def update_transition_tensor(transition_tensor):
