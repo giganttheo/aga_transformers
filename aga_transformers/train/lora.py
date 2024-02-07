@@ -119,8 +119,8 @@ def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
     # lorax.lora wraps a callable so that the arguments can be lorax.LoraWeight
     # instances. (It's actually just an alias for qax.use_implicit_args, so
     # the wrapped function can handle other qax types as well)
-    lora_model = lorax.lora(model)
-    apply_fn = lora_model.__call__
+    # lora_model = lorax.lora(model)
+    apply_fn = lorax.lora(model.__call__)
     
 
     # return model.__call__, model.params, optimizer #bypass
