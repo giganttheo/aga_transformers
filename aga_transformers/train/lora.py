@@ -90,7 +90,7 @@ def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
 
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
-        if 'embedding' in path:
+        if 'embedding' in [p.key for p in path] or 'layer_norm' in [p.key for p in path]:
             # print(f'Fully finetuning param {path}')
             return LORA_FULL
         dim = 64 # 64 > 256 (test 128?)
