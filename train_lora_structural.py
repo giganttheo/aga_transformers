@@ -392,11 +392,11 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
         graph_batch = batch.pop("graph")
         # print([type(graph_batch[0][k]) for k in graph_batch[0].keys()])
         graph_batch = {
-            "receivers": np.stack([graph["receivers"] for graph in graph_batch], dtype=np.int16),
-            "senders": np.stack([graph["senders"] for graph in graph_batch], dtype=np.int16),
-            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch], dtype="bool"),
-            "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch], dtype=np.int8),
-            "n_slides": np.stack([graph["n_slides"] for graph in graph_batch], dtype=np.int16),
+            "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+            "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
+            "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch]).astype(np.int8),
+            "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
             # "mask_local": np.stack([graph["mask_local"] for graph in graph_batch], dtype="bool"),
             # "mask_global": np.stack([graph["mask_global"] for graph in graph_batch], dtype="bool"),
             # "edge_bias_local": np.stack([graph["edge_bias_local"] for graph in graph_batch], dtype=np.int8),

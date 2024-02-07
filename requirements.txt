@@ -1,8 +1,6 @@
 transformers==4.33.0
 numpy
 matplotlib
-jax
-jaxlib
 jaxtyping
 flax
 einops
@@ -11,5 +9,8 @@ sentencepiece
 datasets
 rouge_score
 evaluate
-jax-lorax
+wandb
 benepar
+jax-lorax
+jax
+jaxlib
