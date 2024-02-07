@@ -1538,7 +1538,7 @@ class FlaxT5BlockCollection(nn.Module):
                             split_rngs={"params": True},
                             variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
-                                        (hidden_states, position_bias, encoder_decoder_position_bias),
+                                        carry_,
                                         attention_mask,
                                         encoder_hidden_states,
                                         encoder_attention_mask,
