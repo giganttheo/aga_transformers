@@ -1273,6 +1273,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # apply output matrix
         attn_output = self.o(attn_output)
 
+        position_bias = None #tmp fix
         outputs = (attn_output, position_bias)
 
         if output_attentions:
