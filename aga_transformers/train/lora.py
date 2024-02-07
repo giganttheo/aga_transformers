@@ -93,11 +93,9 @@ def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
         if 'embedding' in [p.key for p in path] or 'layer_norm' in [p.key for p in path]:
             # print(f'Fully finetuning param {path}')
             return LORA_FULL
-        if 'kernel' in [p.key for p in path]:
-            dim = 64 # 64 > 256 (test 128?)
-            # print(f'Using LoRA with dim={dim} for param {path}')
-            return dim
-        return LORA_FULL
+        dim = 64 # 64 > 256 (test 128?)
+        # print(f'Using LoRA with dim={dim} for param {path}')
+        return dim
 
     # Create a pytree with the same shape as params indicating how each parameter should be handled
     # Each leaf will be given one of the following values:

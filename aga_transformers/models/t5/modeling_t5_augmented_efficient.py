@@ -1467,7 +1467,7 @@ class FlaxT5LayerCollection(nn.Module):
             deterministic=deterministic,
             init_cache=init_cache,
         )
-        return outputs[0], outputs[1:]
+        return outputs[0], None#outputs[1:]
 
 
 class FlaxT5BlockCollection(nn.Module):
@@ -1540,7 +1540,7 @@ class FlaxT5BlockCollection(nn.Module):
                                         init_cache,)
             
             hidden_states = layer_outputs
-            position_bias = other_outputs[0]
+            position_bias = None#other_outputs[0]
         else:
             for i in range(self.config.num_layers):
                 if output_hidden_states:
