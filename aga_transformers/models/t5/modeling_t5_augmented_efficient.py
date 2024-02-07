@@ -1454,7 +1454,11 @@ class FlaxT5LayerCollection(nn.Module):
         deterministic=True,
         init_cache=False,
     ):
-        hidden_states, position_bias, encoder_decoder_position_bias = carry_
+        if self.causal and encoder_hidden_states is not None:
+            hidden_states, position_bias, encoder_decoder_position_bias = carry_
+        else:
+            hidden_states, position_bias = carry_
+            encoder_decoder_position_bias=None
         outputs = self.layer(
             hidden_states,
             attention_mask=attention_mask,
@@ -1524,6 +1528,10 @@ class FlaxT5BlockCollection(nn.Module):
         output_attentions = False #tmp fix
 
         if self.gradient_checkpointing:
+            carry_ = (hidden_states, position_bias)
+            if self.causal and encoder_hidden_states is not None:
+                carry_ += (encoder_decoder_position_bias, )
+
             layer_outputs, _ = nn.scan(FlaxT5LayerCollection,#remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0, "graphs": 0},
