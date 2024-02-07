@@ -1,7 +1,11 @@
 # adapted from https://github.com/davisyoshida/lorax/blob/master/examples/huggingface_gpt2.py
 
 import jax
+import jax.numpy as jnp
+
 import lorax
+from lorax.constants import LORA_FREEZE, LORA_FULL
+from lorax.transform import LoraWeight
 
 # import optax
 
@@ -37,6 +41,50 @@ LORA_FULL = -1
 
 #     return model.__call__, frozen_params, lora_params, optimizer
 
+
+#Custom init_lora for scanned_functions
+def init_lora(param_tree, spec, rng, stddev=0.01, dtype=jnp.float32, alpha=1., is_leaf=None):
+    def iter_keys(key):
+        while True:
+            key, out_key = jax.random.split(key)
+            yield out_key
+
+    key_it = iter_keys(rng)
+
+    def get_param(path, param, spec_val):
+        if spec_val in (LORA_FREEZE, LORA_FULL):
+            return param
+
+        if len(param.shape) == 1:
+            raise ValueError(f'Vectors must either be frozen or fully tuned, but got spec value {spec} for param with path {path}')
+
+        if len(param.shape) == 2:
+            b_dim, a_dim = param.shape
+
+            b = jnp.zeros((b_dim, spec_val), dtype=dtype)
+            a = jax.random.normal(next(key_it), (spec_val, a_dim), dtype=dtype) * stddev
+            return LoraWeight(w=param, a=a, b=b, alpha=alpha)
+
+        if len(param.shape) == 3:
+            layer_dim, b_dim, a_dim = param.shape
+
+            b = jnp.zeros((layer_dim, b_dim, spec_val), dtype=dtype)
+            a = jax.random.normal(next(key_it), (layer_dim, spec_val, a_dim), dtype=dtype) * stddev
+            return LoraWeight(w=param, a=a, b=b, alpha=alpha)
+
+        # conv case
+        *window_shape, in_channels, out_channels = param.shape
+
+        a = jnp.zeros((
+            *(1 for _ in range(len(window_shape))),
+            spec_val,
+            out_channels
+        ), dtype=param.dtype)
+        b = jax.random.normal(rng, (*window_shape, in_channels, spec_val), dtype=param.dtype) * stddev
+        return LoraWeight(param, a, b, alpha=alpha)
+
+    return jax.tree_util.tree_map_with_path(get_param, param_tree, spec, is_leaf=is_leaf)
+
 def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
 
 
@@ -60,7 +108,7 @@ def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
-    lora_params = lorax.init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
+    lora_params = init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
 
     # `wrap_optimizer` uses the spec to freeze the appropriate subset
     # of parameters.
