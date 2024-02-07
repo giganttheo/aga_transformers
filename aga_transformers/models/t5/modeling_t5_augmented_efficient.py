@@ -1454,7 +1454,7 @@ class FlaxT5LayerCollection(nn.Module):
         deterministic=True,
         init_cache=False,
     ):
-        if self.causal and encoder_hidden_states is not None:
+        if len(carry_)==3:
             hidden_states, position_bias, encoder_decoder_position_bias = carry_
         else:
             hidden_states, position_bias = carry_
