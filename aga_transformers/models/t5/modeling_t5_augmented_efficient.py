@@ -1561,12 +1561,10 @@ class FlaxT5BlockCollection(nn.Module):
                     dtype=self.dtype,
                     name=str(i),
                 )(
-                    hidden_states,
+                    (hidden_states, position_bias, encoder_decoder_position_bias),
                     attention_mask,
-                    position_bias,
                     encoder_hidden_states,
                     encoder_attention_mask,
-                    encoder_decoder_position_bias,
                     output_attentions,
                     deterministic,
                     init_cache,
