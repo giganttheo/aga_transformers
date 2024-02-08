@@ -85,7 +85,7 @@ def init_lora(param_tree, spec, rng, stddev=0.01, dtype=jnp.float32, alpha=1., i
 
     return jax.tree_util.tree_map_with_path(get_param, param_tree, spec, is_leaf=is_leaf)
 
-def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
+def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
 
     # # This function defines a spec which tells lorax how each parameter should be handled
     # def decision_fn(path, param):
@@ -118,11 +118,11 @@ def create_lora(model, optimizer, dtype="bfloat16", scanned=False):
     # - k > 0: The parameter will be LoRA tuned with a rank k update
 
     # Simple_spec is a helper to do this, but you can also create the label pytree yourself
-    lora_spec = lorax.simple_spec(model.params, decision_fn=decision_fn, tune_vectors=True)
+    lora_spec = lorax.simple_spec(params, decision_fn=decision_fn, tune_vectors=True)
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
-    lora_params = init_lora(model.params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
+    lora_params = init_lora(params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
 
     # `wrap_optimizer` uses the spec to freeze the appropriate subset
     # of parameters.

@@ -665,7 +665,7 @@ def main():
         print("Enabling gradient checkpointing")
         print("=============================")
         model.enable_gradient_checkpointing()
-        model.scan_enable()
+        params = model.convert_unroll_to_scan(model.params) #model.scan_enable()
         # model.params = params
 
     if model.config.decoder_start_token_id is None:
@@ -926,7 +926,7 @@ def main():
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=2) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="float32")
+    apply_fn, lora_params, optimizer = create_lora(model, params, optimizer, dtype="float32")
 
     from flax.traverse_util import flatten_dict, unflatten_dict
     print(flatten_dict(lora_params, sep="/").keys(), '\n')

@@ -1465,8 +1465,8 @@ class FlaxT5BlockCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
 
-    def setup(self):
-        self.causal = self.config.causal
+    # def setup(self):
+    #     self.causal = self.config.causal
     #     if self.gradient_checkpointing:
     #         #remat + scan
     #         self.blocks = scan_with_axes(remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
@@ -1508,13 +1508,13 @@ class FlaxT5BlockCollection(nn.Module):
         # Prepare head mask if needed
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
-        all_cross_attentions = () if (output_attentions and self.causal) else None
+        all_cross_attentions = () if (output_attentions and self.config.causal) else None
         position_bias = None
         encoder_decoder_position_bias = None
 
         output_attentions = False #tmp fix
         carry_ = (hidden_states, position_bias)
-        if self.causal and encoder_hidden_states is not None:
+        if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
         if self.gradient_checkpointing:
@@ -1538,12 +1538,12 @@ class FlaxT5BlockCollection(nn.Module):
             # (cross-attention position bias), (cross-attention weights)
             position_bias = layer_outputs[1]
 
-            if self.causal and encoder_hidden_states is not None:
+            if self.config.causal and encoder_hidden_states is not None:
                 encoder_decoder_position_bias = layer_outputs[3  if output_attentions else 2]
 
             if output_attentions:
                 all_attentions = all_attentions + (layer_outputs[2],)
-                if self.causal:
+                if self.config.causal:
                     all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
 
         else:
