@@ -1410,6 +1410,11 @@ class ScannableFlaxT5LayerCollection(nn.Module):
     has_relative_attention_bias: bool
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
+    def setup(self):
+        self.layer = FlaxT5Block(
+            self.config, has_relative_attention_bias=self.has_relative_attention_bias, dtype=self.dtype
+        )
+
     @nn.compact
     def __call__(
         self,
@@ -1429,7 +1434,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
         assert isinstance(hidden_states, jnp.ndarray)
-        outputs = FlaxT5LayerCollection(self.config, self.has_relative_attention_bias, self.dtype)(
+        outputs = self.layer(
             hidden_states,
             attention_mask=attention_mask,
             position_bias=position_bias,
