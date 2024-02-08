@@ -391,6 +391,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
         batch = dataset[idx]
         #broadcast to all layers
         # print([type(graph_batch[0][k]) for k in graph_batch[0].keys()])
+        graph_batch = batch.pop("graph")
         graph_batch = {
             "receivers": np.stack([np.stack([graph["receivers"] for graph in graph_batch])]*model.config.num_layers).astype(np.int16),
             "senders": np.stack([np.stack([graph["senders"] for graph in graph_batch])]*model.config.num_layers).astype(np.int16),
