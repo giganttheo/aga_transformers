@@ -1518,9 +1518,9 @@ class FlaxT5BlockCollection(nn.Module):
         if self.gradient_checkpointing:
             layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(0, 0, 0, nn.broadcast, nn.broadcast, nn.broadcast),
-                            variable_axes={"params": 0},#, "graphs": 0},
+                            variable_axes={"params": 0, "graphs": 0},
                             split_rngs={"params": True},
-                            # variable_broadcast=["graphs"],
+                            variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                                         carry_,
                                         None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
