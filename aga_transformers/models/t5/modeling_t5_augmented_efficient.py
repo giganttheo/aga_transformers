@@ -1428,7 +1428,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             encoder_decoder_position_bias=None
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
-        print(hidden_states)
+        assert isinstance(hidden_states, jnp.ndarray)
         outputs = FlaxT5LayerCollection(self.config, self.has_relative_attention_bias, self.dtype)(
             hidden_states,
             attention_mask=attention_mask,
