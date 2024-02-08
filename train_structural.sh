@@ -25,13 +25,13 @@ python ./train_lora_structural.py \
 	--num_train_epochs 10 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 10 \
-	--per_device_eval_batch_size 10 \
+	--per_device_train_batch_size 4 \
+	--per_device_eval_batch_size 4 \
 	--overwrite_output_dir \
 	--dtype "float32" \
-	--max_target_length 512 \
-	--max_source_length 512 \
-	--val_max_target_length 512 \
+	--max_target_length 256 \
+	--max_source_length 256 \
+	--val_max_target_length 256 \
 	--max_train_samples 64 \
 	--max_eval_samples 64 \
 	--gradient_checkpointing \
