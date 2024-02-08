@@ -1384,7 +1384,7 @@ class FlaxT5LayerCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
-        self.layer = FlaxT5BlockVanilla(
+        self.layer = FlaxT5Block(
             self.config, has_relative_attention_bias=self.has_relative_attention_bias, dtype=self.dtype
         )
 
@@ -1419,7 +1419,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
-        self.layer = FlaxT5Block(
+        self.layer = FlaxT5BlockVanilla(
             self.config, has_relative_attention_bias=self.has_relative_attention_bias, dtype=self.dtype
         )
 
