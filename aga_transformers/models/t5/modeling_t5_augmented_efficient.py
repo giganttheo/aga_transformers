@@ -996,18 +996,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         """
         batch_size, seq_length = hidden_states.shape[:2]
 
-        block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        
-        #"slide" tokens are added at the beginning of the document
-        if self.has_variable("graph", "n_slides"):
-            n_slides = self.variables["graph"]["n_slides"]
-        else:
-            n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
-        #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
-        n_document_tokens = 2 #TODO: add in config
-        n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
-        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
-
         # q, k, v projections
         query_states = self.q(hidden_states)  # (batch_size, n_heads, seq_length, dim_per_head)
         key_states = self.k(hidden_states) if key_value_states is None else self.k(key_value_states)
@@ -1022,6 +1010,18 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         query_states *= jnp.sqrt(query_states.shape[-1])
 
         if self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local"):
+            block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+            
+            #"slide" tokens are added at the beginning of the document
+            if self.has_variable("graph", "n_slides"):
+                n_slides = self.variables["graph"]["n_slides"]
+            else:
+                n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
+            #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
+            n_document_tokens = 2 #TODO: add in config
+            n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
+            num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+            
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
             #precomputed masks and edge biases
             if self.has_variable("graph", "edge_bias_local"):
@@ -1274,7 +1274,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # apply output matrix
         attn_output = self.o(attn_output)
 
-        position_bias = None #tmp fix
         outputs = (attn_output, position_bias)
 
         if output_attentions:
