@@ -1526,9 +1526,9 @@ class FlaxT5BlockCollection(nn.Module):
                                         None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
-                                        None if output_attentions is None else einops.repeat(output_attentions, '... -> l ...', l=self.config.num_layers),
-                                        None if deterministic is None else einops.repeat(deterministic, '... -> l ...', l=self.config.num_layers),
-                                        None if init_cache is None else einops.repeat(init_cache, '... -> l ...', l=self.config.num_layers),
+                                        None if output_attentions is None else einops.repeat(jnp.array(output_attentions), '... -> l ...', l=self.config.num_layers),
+                                        None if deterministic is None else einops.repeat(jnp.array(deterministic), '... -> l ...', l=self.config.num_layers),
+                                        None if init_cache is None else einops.repeat(jnp.array(init_cache), '... -> l ...', l=self.config.num_layers),
                                         )
             hidden_states = layer_outputs[0]
 
