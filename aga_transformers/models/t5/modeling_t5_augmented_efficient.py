@@ -1448,20 +1448,18 @@ class FlaxT5LayerCollection(nn.Module):
 
     def __call__(
         self,
-        carry_,
+        hidden_states,
         attention_mask=None,
+        position_bias=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
+        encoder_decoder_position_bias=None,
         output_attentions=False,
+        return_dict=True,
         deterministic=True,
         init_cache=False,
     ):
-        if len(carry_)==3:
-            hidden_states, position_bias, encoder_decoder_position_bias = carry_
-        else:
-            hidden_states, position_bias = carry_
-            encoder_decoder_position_bias=None
-        outputs = self.layer(
+        return self.layer(
             hidden_states,
             attention_mask=attention_mask,
             position_bias=position_bias,
@@ -1472,6 +1470,40 @@ class FlaxT5LayerCollection(nn.Module):
             deterministic=deterministic,
             init_cache=init_cache,
         )
+
+class ScannableFlaxT5LayerCollection(nn.Module):
+    config: T5Config
+    has_relative_attention_bias: bool
+    dtype: jnp.dtype = jnp.float32  # the dtype of the computation
+
+    @nn.compact
+    def __call__(
+        self,
+        carry_,
+        attention_mask=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        output_attentions=False,
+        deterministic=True,
+        init_cache=False,
+      ):
+        if len(carry_)==3:
+            hidden_states, position_bias, encoder_decoder_position_bias = carry_
+        else:
+            hidden_states, position_bias = carry_
+            encoder_decoder_position_bias=None
+        outputs = FlaxT5LayerCollection(self.config, self.has_relative_attention_bias, self.dtype)(
+            hidden_states,
+            attention_mask=attention_mask,
+            position_bias=position_bias,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            encoder_decoder_position_bias=encoder_decoder_position_bias,
+            output_attentions=output_attentions,
+            deterministic=deterministic,
+            init_cache=init_cache,
+        )
+        outputs = (outputs[0], None,) + tuple(outputs[2:]) #fix to be able to use scan
         return outputs, None
 
 
@@ -1534,7 +1566,7 @@ class FlaxT5BlockCollection(nn.Module):
             if self.causal and encoder_hidden_states is not None:
                 carry_ += (encoder_decoder_position_bias, )
 
-            layer_outputs, _ = nn.scan(FlaxT5LayerCollection,#remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0, "graphs": 0},
                             split_rngs={"params": True},
