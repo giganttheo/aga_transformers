@@ -811,71 +811,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    # def compute_edge_bias_global(self, query_length, key_length, n_slides, n_document_tokens, in_window=False):
-    #     """Compute edge label bias"""
-    #     # context_position = jnp.arange(query_length, dtype="i4")[:, None]
-    #     # memory_position = jnp.arange(key_length, dtype="i4")[None, :]
-
-    #     graph_edge_buckets = jnp.full((query_length, key_length), -1)
-    #     #TODO define multiple types of edge labels
-        
-    #     # slide_tokens = slice(n_slides)
-    #     # document_tokens = slice(n_slides, n_global_tokens)
-    #     axis_0 = jnp.arange(query_length)[:, None]
-    #     axis_1 = jnp.arange(key_length)[None]
-
-    #     n_global_tokens = n_slides + n_document_tokens
-
-    #     if in_window:
-    #         #local -> document edge
-    #         # graph_edge_buckets = graph_edge_buckets.at[:, n_slides:n_global_tokens].set(1)
-    #         tmp = jnp.less_equal(n_slides, axis_1)
-    #         tmp_2 = jnp.less(axis_1, n_global_tokens)
-    #         graph_edge_buckets = jnp.where(jnp.logical_and(tmp, tmp_2), 1, graph_edge_buckets)
-    #         # graph_edge_buckets = jnp.where(n_slides <= axis_1 < n_global_tokens, 1, graph_edge_buckets)
-    #         #local -> slide edge
-    #         # graph_edge_buckets = graph_edge_buckets.at[:,:n_slides].set(3)
-    #         graph_edge_buckets = jnp.where(jnp.less(axis_1, n_slides), 3, graph_edge_buckets)
-    #     else:
-    #         # document -> local edge
-    #         # graph_edge_buckets = graph_edge_buckets.at[n_slides:n_global_tokens, :].set(0)
-    #         tmp = jnp.less_equal(n_slides, axis_0)
-    #         tmp_2 = jnp.less(axis_0, n_global_tokens)
-    #         graph_edge_buckets = jnp.where(jnp.logical_and(tmp, tmp_2), 0, graph_edge_buckets)
-    #         # slide -> local edge
-    #         # graph_edge_buckets = graph_edge_buckets.at[:n_slides, :].set(2)
-    #         graph_edge_buckets = jnp.where(jnp.less(axis_0, n_slides), 2, graph_edge_buckets)
-
-    #         for doc_token in jnp.arange(n_document_tokens):
-    #             #document -> document edge
-    #             # graph_edge_buckets = graph_edge_buckets.at[doc_token, n_slides:n_global_tokens].set(7)
-    #             doc_token = n_slides + doc_token
-    #             is_in_range = jnp.less(doc_token, n_global_tokens)
-    #             tmp = jnp.equal(axis_0, doc_token)
-    #             tmp_2 = jnp.less_equal(n_slides, axis_1)
-    #             tmp_3 = jnp.less(axis_1, n_global_tokens)
-    #             graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, jnp.logical_and(tmp_2, tmp_3))), 7, graph_edge_buckets)
-    #             #document -> slide edge
-    #             # graph_edge_buckets = graph_edge_buckets.at[doc_token, :n_slides].set(4)
-    #             tmp_2 = jnp.less(axis_1, n_slides)
-    #             graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, tmp_2)), 4, graph_edge_buckets)
-    #         for sl_token in jnp.arange(query_length):
-    #             #slide -> document edge
-    #             # graph_edge_buckets = graph_edge_buckets.at[sl_token, n_slides:n_global_tokens].set(5)
-    #             is_in_range = jnp.less(sl_token, n_slides)
-    #             tmp = jnp.equal(axis_0, sl_token)
-    #             tmp_2 = jnp.less_equal(n_slides, axis_1)
-    #             tmp_3 = jnp.less(axis_1, n_global_tokens)
-    #             graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, jnp.logical_and(tmp_2, tmp_3))), 5, graph_edge_buckets)
-    #             #slide -> slide edge
-    #             # graph_edge_buckets = graph_edge_buckets.at[sl_token, :n_slides].set(6)
-    #             tmp_2 = jnp.less(axis_1, n_slides)
-    #             graph_edge_buckets = jnp.where(jnp.logical_and(is_in_range, jnp.logical_and(tmp, tmp_2)), 6, graph_edge_buckets)
-
-    #     values = jnp.where(graph_edge_buckets[..., None]>=0, self.graph_edge_bias(graph_edge_buckets), jnp.zeros(tuple(graph_edge_buckets.shape) + (1,)))
-    #     values = values.transpose((2, 0, 1))#[None, :, :, :]
-    #     return values
-
     def compute_bias(self, query_length, key_length, offset=jnp.array(0, dtype="i4")):
         """Compute binned relative position bias"""
         context_position = jnp.arange(query_length, dtype="i4")[:, None] + offset.astype("i4")
@@ -1243,11 +1178,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
                 if attention_mask is not None:
                     position_bias = position_bias + attention_mask
-            else:
-                #for initialization
-                _ = self._create_position_bias(
-                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
-                )
+            # else:
+            #     #for initialization
+            #     _ = self._create_position_bias(
+            #         key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
+            #     )
 
             # create dropout rng
             dropout_rng = None
