@@ -1516,19 +1516,18 @@ class FlaxT5BlockCollection(nn.Module):
             carry_ += (encoder_decoder_position_bias, )
 
         if self.gradient_checkpointing:
-            layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(0, 0, 0, 0, 0, 0),
+            layer_outputs, _ = partial(nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+                            in_axes=(0, 0, 0),
                             variable_axes={"params": 0, "graphs": 0},
                             split_rngs={"params": True},
                             # variable_broadcast=["graphs"],
-                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
+                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,), 
+                            output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache
+                            )(
                                         carry_,
                                         None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
-                                        None if output_attentions is None else einops.repeat(jnp.array(output_attentions), '... -> l ...', l=self.config.num_layers),
-                                        None if deterministic is None else einops.repeat(jnp.array(deterministic), '... -> l ...', l=self.config.num_layers),
-                                        None if init_cache is None else einops.repeat(jnp.array(init_cache), '... -> l ...', l=self.config.num_layers),
                                         )
             hidden_states = layer_outputs[0]
 
