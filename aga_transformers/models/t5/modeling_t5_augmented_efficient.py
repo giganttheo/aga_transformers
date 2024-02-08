@@ -1587,12 +1587,12 @@ class FlaxT5BlockCollection(nn.Module):
             # (cross-attention position bias), (cross-attention weights)
             position_bias = carry_[1]
 
-            if self.causal and encoder_hidden_states is not None:
+            if self.config.causal and encoder_hidden_states is not None:
                 encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
 
             if output_attentions:
                 all_attentions = all_attentions + (carry_[2],)
-                if self.causal:
+                if self.config.causal:
                     all_cross_attentions = all_cross_attentions + (carry_[4],)
 
         return FlaxBaseModelOutputWithPastAndCrossAttentions(
