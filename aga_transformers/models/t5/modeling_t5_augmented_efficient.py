@@ -1441,7 +1441,6 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             encoder_decoder_position_bias=None
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
-        assert isinstance(hidden_states, jnp.ndarray)
         
         outputs = self.layer(
             hidden_states,
@@ -1455,7 +1454,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             init_cache=init_cache,
         )
         if len(carry_)==3:
-            outputs = (outputs[0], None, outputs[2]) #fix to be able to use scan
+            outputs = (outputs[0], None, encoder_decoder_position_bias)#outputs[2]) #fix to be able to use scan
         else:
             outputs = (outputs[0], None)
         return outputs, None
