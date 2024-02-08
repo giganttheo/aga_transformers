@@ -69,7 +69,7 @@ from aga_transformers.models.utils import add_graph_to_params, repeat_relative_p
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
-from aga_transformers.attention_patterns.utils import graph_from_path
+from aga_transformers.attention_patterns.utils import graph_from_path, unroll_graph_to_scan
 # from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
 from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch, prepare_window_structural_attn_patterns
 
@@ -389,7 +389,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
 
     for idx in batch_idx:
         batch = dataset[idx]
-        graph_batch = batch.pop("graph")
+        #broadcast to all layers
+        graph_batch = unroll_graph_to_scan(batch.pop("graph"), model.config.num_layers)
         # print([type(graph_batch[0][k]) for k in graph_batch[0].keys()])
         graph_batch = {
             "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),

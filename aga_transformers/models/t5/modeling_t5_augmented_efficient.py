@@ -1515,10 +1515,10 @@ class FlaxT5BlockCollection(nn.Module):
         if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
-        #broadcast graph
-        if self.has_variable("graph", "edge_bias_local"):
-            for k in self.variables["graph"].keys():
-                self.variable["graph"][k] = einops.repeat(self.variable["graph"][k], "... -> l ...", l=self.config.num_layers)
+        # #broadcast graph
+        # if self.has_variable("graph", "edge_bias_local"):
+        #     for k in self.variables["graph"].keys():
+        #         self.variable["graph"][k] = einops.repeat(self.variable["graph"][k], "... -> l ...", l=self.config.num_layers)
 
         if self.gradient_checkpointing:
             layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),

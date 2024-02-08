@@ -1,5 +1,10 @@
+import jax.numpy as jnp
 from unidecode import unidecode
 import re
+
+from flax.core.frozen_dict import FrozenDict, freeze, unfreeze
+from flax.traverse_util import flatten_dict, unflatten_dict
+
 
 def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], layer_wise=True):
   # creates a tree of graph attention patterns, given a tree with path
@@ -75,3 +80,20 @@ def get_new_token_ids(tokenized_1, tokenized_2, normalize_fn=normalize):
   for i, segment in enumerate(segments_2):
     mapping[segment].append(i)
   return mapping
+
+
+def unroll_graph_to_scan(graph, num_layers=12):
+  if isinstance(graph, FrozenDict):
+    graph = unfreeze(graph)
+
+  graph = flatten_dict(graph, sep="/")
+  keys = list(graph.keys())
+
+  for k in keys:
+    stacked_gaphs = []
+    # Iterate over the unrolled layers (1,...,N)
+    if len(graph[k].keys()) > 0:
+      graph[k] = jnp.stack([graph[k]] * num_layers)
+  # Finally, unflatten the dict to restore the nested pytree structure
+  graph = unflatten_dict(graph, sep="/")
+  return graph
