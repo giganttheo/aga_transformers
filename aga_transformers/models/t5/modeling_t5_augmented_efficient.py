@@ -953,7 +953,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1])
 
-        if False: #self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local"):
+        if self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local"):
             block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
             
             #"slide" tokens are added at the beginning of the document
@@ -1230,21 +1230,21 @@ class FlaxT5LayerSelfAttention(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
-        # if self.config.causal:
-        self.SelfAttention = FlaxT5Attention( #FlaxT5EfficientBlockGraphSelfAttention(
-            self.config,
-            has_relative_attention_bias=self.has_relative_attention_bias,
-            causal=self.config.causal,
-            dtype=self.dtype,
-        )
-        # else:
-        #     #Encoder Self-Attention, with Efficient Block Graph attn, inspired by LongT5
-        #     self.SelfAttention = FlaxT5Attention( #FlaxT5EfficientBlockGraphSelfAttention(
-        #         self.config,
-        #         has_relative_attention_bias=self.has_relative_attention_bias,
-        #         causal=self.config.causal,
-        #         dtype=self.dtype,
-        #     )
+        if self.config.causal:
+            self.SelfAttention = FlaxT5Attention(
+                self.config,
+                has_relative_attention_bias=self.has_relative_attention_bias,
+                causal=self.config.causal,
+                dtype=self.dtype,
+            )
+        else:
+            #Encoder Self-Attention, with Efficient Block Graph attn, inspired by LongT5
+            self.SelfAttention = FlaxT5EfficientBlockGraphSelfAttention( #FlaxT5EfficientBlockGraphSelfAttention(
+                self.config,
+                has_relative_attention_bias=self.has_relative_attention_bias,
+                causal=self.config.causal,
+                dtype=self.dtype,
+            )
         self.layer_norm = FlaxT5LayerNorm(self.config.d_model, eps=self.config.layer_norm_epsilon, dtype=self.dtype)
         self.dropout = nn.Dropout(self.config.dropout_rate)
 
@@ -1376,8 +1376,6 @@ class FlaxT5Block(nn.Module):
         # (cross-attention position bias), (cross-attention weights)
         return outputs
 
-from transformers.models.t5.modeling_flax_t5 import FlaxT5Block as FlaxT5BlockVanilla
-
 class FlaxT5LayerCollection(nn.Module):
     config: T5Config
     has_relative_attention_bias: bool
@@ -1419,7 +1417,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
-        self.layer = FlaxT5BlockVanilla(
+        self.layer = FlaxT5Block(
             self.config, has_relative_attention_bias=self.has_relative_attention_bias, dtype=self.dtype
         )
 
