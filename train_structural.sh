@@ -28,7 +28,7 @@ python ./train_lora_structural.py \
 	--per_device_train_batch_size 10 \
 	--per_device_eval_batch_size 10 \
 	--overwrite_output_dir \
-	--dtype "bfloat16" \
+	--dtype "float32" \
 	--max_target_length 512 \
 	--max_source_length 512 \
 	--val_max_target_length 512 \

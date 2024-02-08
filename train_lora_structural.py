@@ -208,11 +208,11 @@ class ModelArguments:
         metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
     )
     dtype: Optional[str] = field(
-        default="bfloat16",
+        default="float32",
         metadata={
             "help": (
                 "Floating-point format in which the model weights should be initialized and trained. Choose one of"
-                " `[float32, float16, bfloat16]`."
+                " `[float32, float16, float32]`."
             )
         },
     )
@@ -658,7 +658,7 @@ def main():
     if model_args.model_name_or_path:
         dtype=model_args.dtype
 
-        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
+        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="float32", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
 
     if training_args.gradient_checkpointing:
         print("=============================")
@@ -926,7 +926,7 @@ def main():
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=2) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_lora(model, optimizer, dtype="float32")
 
     from flax.traverse_util import flatten_dict, unflatten_dict
     print(flatten_dict(lora_params, sep="/").keys(), '\n')
@@ -973,7 +973,7 @@ def main():
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
         (loss, _), grad = grad_fn(state.params)
 
-        grad = jax.tree_map(lambda x: x.astype(jnp.bfloat16), grad) #? TODO
+        grad = jax.tree_map(lambda x: x.astype(jnp.float32), grad) #? TODO
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
         loss.block_until_ready()
