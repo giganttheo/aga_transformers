@@ -208,7 +208,7 @@ class ModelArguments:
         metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
     )
     dtype: Optional[str] = field(
-        default="float32",
+        default="bfloat16",
         metadata={
             "help": (
                 "Floating-point format in which the model weights should be initialized and trained. Choose one of"
@@ -658,7 +658,7 @@ def main():
     if model_args.model_name_or_path:
         dtype=model_args.dtype
 
-        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="float32", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
+        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
 
     if training_args.gradient_checkpointing:
         print("=============================")
@@ -926,7 +926,7 @@ def main():
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=2) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, params, optimizer, dtype="float32")
+    apply_fn, lora_params, optimizer = create_lora(model, params, optimizer, dtype="bfloat16")
 
     from flax.traverse_util import flatten_dict, unflatten_dict
     print(flatten_dict(lora_params, sep="/").keys(), '\n')
