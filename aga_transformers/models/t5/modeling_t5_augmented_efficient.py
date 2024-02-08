@@ -944,7 +944,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1])
 
-        if self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local"):
+        if False: #self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local"):
             block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
             
             #"slide" tokens are added at the beginning of the document
@@ -1434,6 +1434,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
         assert isinstance(hidden_states, jnp.ndarray)
+        
         outputs = self.layer(
             hidden_states,
             attention_mask=attention_mask,
