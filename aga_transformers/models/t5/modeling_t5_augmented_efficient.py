@@ -1542,16 +1542,18 @@ class FlaxT5BlockCollection(nn.Module):
                 if self.causal and encoder_hidden_states is not None:
                     carry_ += (encoder_decoder_position_bias, )
 
-                layer_outputs, _ = FlaxT5LayerCollection(
+                layer_outputs = FlaxT5LayerCollection(
                     self.config,
                     has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
                     dtype=self.dtype,
                     name=str(i),
                 )(
-                    carry_,
+                    hidden_states,
                     attention_mask,
+                    position_bias,
                     encoder_hidden_states,
                     encoder_attention_mask,
+                    encoder_decoder_position_bias,
                     output_attentions,
                     deterministic,
                     init_cache,
