@@ -1376,6 +1376,7 @@ class FlaxT5Block(nn.Module):
         # (cross-attention position bias), (cross-attention weights)
         return outputs
 
+from transformers.models.t5.modeling_flax_t5 import FlaxT5Block as FlaxT5BlockVanilla
 
 class FlaxT5LayerCollection(nn.Module):
     config: T5Config
@@ -1383,7 +1384,7 @@ class FlaxT5LayerCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
-        self.layer = FlaxT5Block(
+        self.layer = FlaxT5BlockVanilla(
             self.config, has_relative_attention_bias=self.has_relative_attention_bias, dtype=self.dtype
         )
 
