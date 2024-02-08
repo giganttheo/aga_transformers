@@ -1513,12 +1513,11 @@ class FlaxT5BlockCollection(nn.Module):
         encoder_decoder_position_bias = None
 
         output_attentions = False #tmp fix
+        carry_ = (hidden_states, position_bias)
+        if self.causal and encoder_hidden_states is not None:
+            carry_ += (encoder_decoder_position_bias, )
 
         if self.gradient_checkpointing:
-            carry_ = (hidden_states, position_bias)
-            if self.causal and encoder_hidden_states is not None:
-                carry_ += (encoder_decoder_position_bias, )
-
             layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0},#, "graphs": 0},
@@ -1549,44 +1548,52 @@ class FlaxT5BlockCollection(nn.Module):
 
         else:
             for i in range(self.config.num_layers):
-                if output_hidden_states:
-                    all_hidden_states = all_hidden_states + (hidden_states,)
+                carry_, _ = ScannableFlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype)(                              
+                            carry_,
+                            attention_mask,
+                            encoder_hidden_states,
+                            encoder_attention_mask,
+                            output_attentions,
+                            deterministic,
+                            init_cache,)
+                # if output_hidden_states:
+                #     all_hidden_states = all_hidden_states + (hidden_states,)
 
-                carry_ = (hidden_states, position_bias)
-                if self.causal and encoder_hidden_states is not None:
-                    carry_ += (encoder_decoder_position_bias, )
+                # carry_ = (hidden_states, position_bias)
+                # if self.causal and encoder_hidden_states is not None:
+                #     carry_ += (encoder_decoder_position_bias, )
 
-                layer_outputs = FlaxT5LayerCollection(
-                    self.config,
-                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
-                    dtype=self.dtype,
-                    name=str(i),
-                )(
-                    hidden_states,
-                    attention_mask,
-                    position_bias,
-                    encoder_hidden_states,
-                    encoder_attention_mask,
-                    encoder_decoder_position_bias,
-                    output_attentions,
-                    deterministic,
-                    init_cache,
-                )
+                # layer_outputs = FlaxT5LayerCollection(
+                #     self.config,
+                #     has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                #     dtype=self.dtype,
+                #     name=str(i),
+                # )(
+                #     hidden_states,
+                #     attention_mask,
+                #     position_bias,
+                #     encoder_hidden_states,
+                #     encoder_attention_mask,
+                #     encoder_decoder_position_bias,
+                #     output_attentions,
+                #     deterministic,
+                #     init_cache,
+                # )
 
-                hidden_states = layer_outputs[0]
+            hidden_states = carry_[0]
 
-                # We share the position biases between the layers - the first layer store them
-                # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
-                # (cross-attention position bias), (cross-attention weights)
-                position_bias = layer_outputs[1]
+            # We share the position biases between the layers - the first layer store them
+            # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
+            # (cross-attention position bias), (cross-attention weights)
+            position_bias = carry_[1]
 
-                if self.causal and encoder_hidden_states is not None:
-                    encoder_decoder_position_bias = layer_outputs[3  if output_attentions else 2]
+            if self.causal and encoder_hidden_states is not None:
+                encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
 
-                if output_attentions:
-                    all_attentions = all_attentions + (layer_outputs[2],)
-                    if self.causal:
-                        all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
+            if output_attentions:
+                all_attentions = all_attentions + (carry_[2],)
+                if self.causal:
+                    all_cross_attentions = all_cross_attentions + (carry_[4],)
 
         return FlaxBaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
