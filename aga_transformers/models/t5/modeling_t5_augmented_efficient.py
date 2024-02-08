@@ -1525,9 +1525,9 @@ class FlaxT5BlockCollection(nn.Module):
                             # variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                                         carry_,
-                                        einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
-                                        einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
-                                        einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
+                                        None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
+                                        None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
+                                        None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
                                         output_attentions,
                                         deterministic,
                                         init_cache,)
