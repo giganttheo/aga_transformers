@@ -1509,8 +1509,7 @@ class FlaxT5BlockCollection(nn.Module):
             layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0},#, "graphs": 0},
-                            split_rngs={"params": True},
-                            # variable_broadcast=["graphs"],
+                            split_rngs={"params": True}, #variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(
                                         carry_,
                                         attention_mask,
