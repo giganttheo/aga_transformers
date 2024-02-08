@@ -934,6 +934,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         output_attentions=False,
         deterministic=True,
         init_cache=False,
+        mask_local=None,
+        mask_global=None,
+        edge_bias_local=None,
+        edge_bias_global=None,
     ):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
@@ -953,7 +957,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1])
 
-        if self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local"):
+        if self.has_variable("graph", "receivers") or self.has_variable("graph", "edge_bias_local") or mask_local is not None:
             block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
             
             #"slide" tokens are added at the beginning of the document
@@ -968,7 +972,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
             #precomputed masks and edge biases
-            if self.has_variable("graph", "edge_bias_local"):
+            if mask_local is not None:
+                precomputed=True
+            elif self.has_variable("graph", "edge_bias_local"):
                 mask_local = self.variables["graph"]["mask_local"].astype("bool")
                 mask_global = self.variables["graph"]["mask_global"].astype("bool")
                 edge_bias_local = self.variables["graph"]["edge_bias_local"].astype(jnp.int8)
@@ -1256,16 +1262,34 @@ class FlaxT5LayerSelfAttention(nn.Module):
         output_attentions=False,
         deterministic=True,
         init_cache=False,
+        mask_local=None,
+        mask_global=None,
+        edge_bias_local=None,
+        edge_bias_global=None,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
-        attention_output = self.SelfAttention(
-            normed_hidden_states,
-            attention_mask=attention_mask,
-            position_bias=position_bias,
-            output_attentions=output_attentions,
-            deterministic=deterministic,
-            init_cache=init_cache,
-        )
+        if self.config.causal:
+            attention_output = self.SelfAttention(
+                normed_hidden_states,
+                attention_mask=attention_mask,
+                position_bias=position_bias,
+                output_attentions=output_attentions,
+                deterministic=deterministic,
+                init_cache=init_cache,
+            )
+        else:
+            attention_output = self.SelfAttention(
+                normed_hidden_states,
+                attention_mask=attention_mask,
+                position_bias=position_bias,
+                output_attentions=output_attentions,
+                deterministic=deterministic,
+                init_cache=init_cache,
+                mask_local=mask_local,
+                mask_global=mask_global,
+                edge_bias_local=edge_bias_local,
+                edge_bias_global=edge_bias_global,
+            )
         hidden_states = hidden_states + self.dropout(attention_output[0], deterministic=deterministic)
         outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
         return outputs
@@ -1338,6 +1362,10 @@ class FlaxT5Block(nn.Module):
         return_dict=True,
         deterministic=True,
         init_cache=False,
+        mask_local=None,
+        mask_global=None,
+        edge_bias_local=None,
+        edge_bias_global=None,
     ):
         self_attention_outputs = self.layer[0](
             hidden_states,
@@ -1346,6 +1374,10 @@ class FlaxT5Block(nn.Module):
             output_attentions=output_attentions,
             deterministic=deterministic,
             init_cache=init_cache,
+            mask_local=mask_local,
+            mask_global=mask_global,
+            edge_bias_local=edge_bias_local,
+            edge_bias_global=edge_bias_global,
         )
         hidden_states = self_attention_outputs[0]
         attention_outputs = self_attention_outputs[1:]  # Keep self-attention outputs and relative position weights
@@ -1431,6 +1463,10 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         output_attentions=False,
         deterministic=True,
         init_cache=False,
+        mask_local=None,
+        mask_global=None,
+        edge_bias_local=None,
+        edge_bias_global=None,
       ):
         if len(carry_)==3:
             hidden_states, position_bias, encoder_decoder_position_bias = carry_
@@ -1450,6 +1486,10 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             output_attentions=output_attentions,
             deterministic=deterministic,
             init_cache=init_cache,
+            mask_local=mask_local,
+            mask_global=mask_global,
+            edge_bias_local=edge_bias_local,
+            edge_bias_global=edge_bias_global,
         )
         if len(carry_)==3:
             outputs = (outputs[0], None, encoder_decoder_position_bias)#outputs[2]) #fix to be able to use scan
@@ -1515,10 +1555,21 @@ class FlaxT5BlockCollection(nn.Module):
         if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
+        if self.has_variable("graph", "FlaxScanLayers"):
+            mask_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_local"].astype("bool")
+            mask_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_global"].astype("bool")
+            edge_bias_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_local"].astype(jnp.int8)
+            edge_bias_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_global"].astype(jnp.int8)
+        else:
+            mask_local=None
+            mask_global=None
+            edge_bias_local=None
+            edge_bias_global=None
+
         if self.gradient_checkpointing:
             layer_outputs, _ = partial(nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(0, 0, 0),
-                            variable_axes={"params": 0, "graphs": 0},
+                            in_axes=(0, 0, 0, 0, 0, 0, 0),
+                            variable_axes={"params": 0}, #, "graphs": 0
                             split_rngs={"params": True},
                             # variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,), 
@@ -1528,6 +1579,11 @@ class FlaxT5BlockCollection(nn.Module):
                                         None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
+                                        None if mask_local is None else einops.repeat(mask_local, '... -> l ...', l=self.config.num_layers),
+                                        None if mask_global is None else einops.repeat(mask_global, '... -> l ...', l=self.config.num_layers),
+                                        None if edge_bias_local is None else einops.repeat(edge_bias_local, '... -> l ...', l=self.config.num_layers),
+                                        None if edge_bias_global is None else einops.repeat(edge_bias_global, '... -> l ...', l=self.config.num_layers),
+                                        
                                         )
             hidden_states = layer_outputs[0]
 
