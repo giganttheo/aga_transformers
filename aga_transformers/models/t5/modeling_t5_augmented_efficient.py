@@ -1521,7 +1521,7 @@ class FlaxT5BlockCollection(nn.Module):
         #         self.variable["graph"][k] = einops.repeat(self.variable["graph"][k], "... -> l ...", l=self.config.num_layers)
 
         if self.gradient_checkpointing:
-            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(0, 0, 0, nn.broadcast, nn.broadcast, nn.broadcast),
                             variable_axes={"params": 0, "graphs": 0},
                             split_rngs={"params": True},
