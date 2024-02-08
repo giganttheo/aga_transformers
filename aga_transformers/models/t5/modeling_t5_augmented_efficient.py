@@ -1488,9 +1488,11 @@ class ScannableFlaxT5LayerCollection(nn.Module):
       ):
         if len(carry_)==3:
             hidden_states, position_bias, encoder_decoder_position_bias = carry_
-        else:
+        elif len(carry_)==2:
             hidden_states, position_bias = carry_
             encoder_decoder_position_bias=None
+        else:
+            raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
         outputs = FlaxT5LayerCollection(self.config, self.has_relative_attention_bias, self.dtype)(
             hidden_states,
             attention_mask=attention_mask,
@@ -1502,7 +1504,10 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             deterministic=deterministic,
             init_cache=init_cache,
         )
-        outputs = (outputs[0], None,) + tuple(outputs[2:]) #fix to be able to use scan
+        if len(carry_)==3:
+            outputs = (outputs[0], None, outputs[2]) #fix to be able to use scan
+        else:
+            outputs = (outputs[0], None)
         return outputs, None
 
 
