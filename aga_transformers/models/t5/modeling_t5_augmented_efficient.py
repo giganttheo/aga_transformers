@@ -1231,7 +1231,7 @@ class FlaxT5LayerSelfAttention(nn.Module):
 
     def setup(self):
         if self.config.causal:
-            self.SelfAttention = FlaxT5EfficientBlockGraphSelfAttention(
+            self.SelfAttention = FlaxT5Attention( #FlaxT5EfficientBlockGraphSelfAttention(
                 self.config,
                 has_relative_attention_bias=self.has_relative_attention_bias,
                 causal=self.config.causal,
@@ -1239,7 +1239,7 @@ class FlaxT5LayerSelfAttention(nn.Module):
             )
         else:
             #Encoder Self-Attention, with Efficient Block Graph attn, inspired by LongT5
-            self.SelfAttention = FlaxT5EfficientBlockGraphSelfAttention(
+            self.SelfAttention = FlaxT5Attention( #FlaxT5EfficientBlockGraphSelfAttention(
                 self.config,
                 has_relative_attention_bias=self.has_relative_attention_bias,
                 causal=self.config.causal,
