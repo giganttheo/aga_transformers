@@ -1483,7 +1483,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         if len(carry_)==2:
             hidden_states, encoder_decoder_position_bias = carry_
         elif len(carry_)==1:
-            hidden_states = carry_
+            hidden_states = carry_[0]
             encoder_decoder_position_bias=None
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
