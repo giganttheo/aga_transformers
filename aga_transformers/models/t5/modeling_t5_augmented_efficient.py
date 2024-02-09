@@ -1633,7 +1633,8 @@ class FlaxT5BlockCollection(nn.Module):
 
         else:
             for i in range(self.config.num_layers):
-                carry_, _ = ScannableFlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype)(                              
+                carry_, _ = ScannableFlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                                                           output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache,)(                              
                             carry_,
                             attention_mask,
                             encoder_hidden_states,
