@@ -1570,7 +1570,7 @@ class FlaxT5BlockCollection(nn.Module):
             layer_outputs, _ = partial(nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0}, #, "graphs": 0
-                            split_rngs={"params": True},
+                            split_rngs={"params": True, "dropout": True},
                             # variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,), 
                             output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache
