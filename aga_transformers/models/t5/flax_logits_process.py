@@ -82,6 +82,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 # )
                 gather_indices = jnp.stack([jnp.ones((batch_size, ), dtype=jnp.int32)]*i + [latest_tokens[:, i], latest_tokens[:, i+1]], axis=1)
                 assert len(gather_indices.shape) == 2
+                print(gather_indices.shape)
                 # AND is equivalent to multiplying boolean masks
                 previously_generated_mask *= transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))][:, None]
 
@@ -90,6 +91,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             gather_indices = jnp.stack(
                 [jnp.ones((batch_size), dtype=jnp.int32)] * (self.ngram_size - 2) + [latest_tokens[:, -1]], axis=1
             )
+            print(gather_indices.shape)
             # gather_indices = jnp.concatenate([jnp.ones((batch_size, self.ngram_size - 2), dtype=jnp.int32), latest_tokens[:, -1][:, None]], axis=1)
             next_forbidden_mask = transition_tensor[jnp.moveaxis(gather_indices, -1, 0)]
             print(next_forbidden_mask.shape)
