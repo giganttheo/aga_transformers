@@ -1567,23 +1567,24 @@ class FlaxT5BlockCollection(nn.Module):
             edge_bias_global=None
 
         if self.gradient_checkpointing:
-            layer_outputs, _ = partial(nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(0, 0, 0, 0, 0, 0, 0),
+            layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+                            in_axes=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0}, #, "graphs": 0
                             split_rngs={"params": True, "dropout": True},
                             # variable_broadcast=["graphs"],
-                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,), 
-                            output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache
+                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
                             )(
                                         carry_,
                                         None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
+                                        output_attentions,
+                                        deterministic,
+                                        init_cache,
                                         None if mask_local is None else einops.repeat(mask_local, '... -> l ...', l=self.config.num_layers),
                                         None if mask_global is None else einops.repeat(mask_global, '... -> l ...', l=self.config.num_layers),
                                         None if edge_bias_local is None else einops.repeat(edge_bias_local, '... -> l ...', l=self.config.num_layers),
                                         None if edge_bias_global is None else einops.repeat(edge_bias_global, '... -> l ...', l=self.config.num_layers),
-                                        
                                         )
             hidden_states = layer_outputs[0]
 
