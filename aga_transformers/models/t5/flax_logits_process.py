@@ -76,7 +76,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # creates the indexing for the batch and the n-th member of the ngram
             previously_generated_mask = jnp.ones((batch_size, 1), dtype="bool")
 
-            for i in range(min(latest_tokens.shape[1] - 1, self.ngram_size - 2)):
+            for i in range(self.ngram_size - 2): #min(latest_tokens.shape[1] - 1, 
                 # for each
                 # gather_indices = jnp.stack(
                 #     (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
