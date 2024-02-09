@@ -132,5 +132,5 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
     # lora_model = lorax.lora(model)
     apply_fn = lorax.lora(model.__call__)
     
-    return model.__call__, model.params, optimizer #bypass
+    # return model.__call__, model.params, optimizer #bypass
     return apply_fn, lora_params, lora_optimizer
