@@ -1472,14 +1472,23 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         edge_bias_local=None,
         edge_bias_global=None,
       ):
-        if len(carry_)==3:
-            hidden_states, position_bias, encoder_decoder_position_bias = carry_
-        elif len(carry_)==2:
-            hidden_states, position_bias = carry_
+        # if len(carry_)==3:
+        #     hidden_states, position_bias, encoder_decoder_position_bias = carry_
+        # elif len(carry_)==2:
+        #     hidden_states, position_bias = carry_
+        #     encoder_decoder_position_bias=None
+        # else:
+        #     raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
+        
+        if len(carry_)==2:
+            hidden_states, encoder_decoder_position_bias = carry_
+        elif len(carry_)==1:
+            hidden_states = carry_
             encoder_decoder_position_bias=None
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
         
+
         # output_attentions=False
         # deterministic=True
         # init_cache=False
@@ -1487,7 +1496,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         outputs = self.layer(
             hidden_states,
             attention_mask=attention_mask,
-            position_bias=position_bias,
+            position_bias=None, #position_bias,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             encoder_decoder_position_bias=encoder_decoder_position_bias,
@@ -1499,12 +1508,15 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             edge_bias_local=edge_bias_local,
             edge_bias_global=edge_bias_global,
         )
-        if len(carry_)==3:
-            outputs = (outputs[0], None, encoder_decoder_position_bias)#outputs[2]) #fix to be able to use scan
+        # if len(carry_)==3:
+        #     outputs = (outputs[0], None, encoder_decoder_position_bias)#outputs[2]) #fix to be able to use scan
+        # else:
+        #     outputs = (outputs[0], None)
+        if len(carry_)==2:
+            outputs = (outputs[0], encoder_decoder_position_bias) #outputs[2]) #fix to be able to use scan
         else:
-            outputs = (outputs[0], None)
+            outputs = outputs[0]
         return outputs, None
-
 
 class FlaxT5BlockCollection(nn.Module):
     config: T5Config
