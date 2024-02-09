@@ -668,8 +668,8 @@ def main():
         model.enable_gradient_checkpointing()
         model.scan_enable()
         # params = model.convert_unroll_to_scan(model.params) #model.scan_enable()
-        # model.params = params
-
+        params = model.params
+        
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
 
