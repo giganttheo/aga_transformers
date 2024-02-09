@@ -90,7 +90,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 i_previously_generated = jax.vmap(lambda mat, x, y: mat[i, x, y])(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1])
                 # assert i_previously_generated.shape == (batch_size, 1)
                 print(i_previously_generated.shape)
-                previously_generated_mask *= i_previously_generated
+                previously_generated_mask *= i_previously_generated[:, None]
 
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
             # `latest_tokens`, in the last position of the ngram. shape: [batch_size, vocab_size]
