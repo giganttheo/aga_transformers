@@ -75,12 +75,15 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # creates the indexing for the batch and the n-th member of the ngram
             previously_generated_mask = jnp.ones((batch_size, 1), dtype="bool")
 
-            for i in range(max(0, min(latest_tokens.shape[1] - 1, self.ngram_size - 2))):
-                gather_indices = jnp.stack(
-                    (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
-                )
+            for i in range(self.ngram_size - 2):
+                # for each
+                # gather_indices = jnp.stack(
+                #     (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
+                # )
+                gather_indices = jnp.stack([jnp.ones((batch_size, ), dtype=jnp.int32)]*i + [latest_tokens[:, i], latest_tokens[:, i+1]], axis=1)
+                assert len(gather_indices.shape) == 2
                 # AND is equivalent to multiplying boolean masks
-                previously_generated_mask &= jnp.expand_dims(
+                previously_generated_mask *= jnp.expand_dims(
                     transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))], axis=1
                 )
 
@@ -91,12 +94,15 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             )
             # gather_indices = jnp.concatenate([jnp.ones((batch_size, self.ngram_size - 2), dtype=jnp.int32), latest_tokens[:, -1][:, None]], axis=1)
             next_forbidden_mask = sparse.bcoo_todense(transition_tensor[jnp.moveaxis(gather_indices, -1, 0)])
-            
+            print(next_forbidden_mask.shape)
             # AND is equivalent to multiplying boolean masks
-            return previously_generated_mask & next_forbidden_mask
+            return previously_generated_mask * next_forbidden_mask
         return inner_fn(latest_tokens, transition_tensor)
 
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
+
+        #input_ids
+        
         def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
