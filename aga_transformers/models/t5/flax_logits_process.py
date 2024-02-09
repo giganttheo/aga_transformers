@@ -80,21 +80,24 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 # gather_indices = jnp.stack(
                 #     (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
                 # )
-                gather_indices = jnp.stack([jnp.ones((batch_size, ), dtype=jnp.int32)]*i + [latest_tokens[:, i], latest_tokens[:, i+1]], axis=1)
-                assert len(gather_indices.shape) == 2
-                print(gather_indices.shape)
+                # gather_indices = jnp.stack([jnp.ones((batch_size, ), dtype=jnp.int32)] * i + [latest_tokens[:, i], latest_tokens[:, i+1]], axis=1)
+                # assert len(gather_indices.shape) == 2
+                # print(gather_indices.shape)
                 # AND is equivalent to multiplying boolean masks
-                previously_generated_mask *= transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))][:, None]
+                # transition_tensor[bs, ngs - 1, vs, vs] ==> so we want to access [b, i, latest_tokens[b, i], latest_tokens[b, i+1]]
+                # previously_generated_mask *= transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))][:, None]
+                previously_generated_mask *= jax.vmap(lambda mat, x, y: mat[i, x, y])(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1])
 
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
             # `latest_tokens`, in the last position of the ngram. shape: [batch_size, vocab_size]
-            gather_indices = jnp.stack(
-                [jnp.ones((batch_size), dtype=jnp.int32)] * (self.ngram_size - 2) + [latest_tokens[:, -1]], axis=1
-            )
-            print(gather_indices.shape)
+            next_forbidden_mask =  jax.vmap(lambda mat, x: mat[-1, x])(transition_tensor, latest_tokens[:, -1])
+            # gather_indices = jnp.stack(
+            #     [jnp.ones((batch_size), dtype=jnp.int32)] * (self.ngram_size - 2) + [latest_tokens[:, -1]], axis=1
+            # )
+            # print(gather_indices.shape)
             # gather_indices = jnp.concatenate([jnp.ones((batch_size, self.ngram_size - 2), dtype=jnp.int32), latest_tokens[:, -1][:, None]], axis=1)
-            next_forbidden_mask = transition_tensor[jnp.moveaxis(gather_indices, -1, 0)]
-            print(next_forbidden_mask.shape)
+            # next_forbidden_mask = transition_tensor[jnp.moveaxis(gather_indices, -1, 0)]
+            # print(next_forbidden_mask.shape)
             # AND is equivalent to multiplying boolean masks
             return sparse.bcoo_todense(previously_generated_mask * next_forbidden_mask)
         return inner_fn(latest_tokens, transition_tensor)
