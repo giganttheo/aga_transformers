@@ -1565,6 +1565,7 @@ class FlaxT5BlockCollection(nn.Module):
             edge_bias_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_local"].astype(jnp.int8)
             edge_bias_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_global"].astype(jnp.int8)
             print(mask_local.shape)
+            _ = self.variables.pop("graph")
         else:
             mask_local=None
             mask_global=None
