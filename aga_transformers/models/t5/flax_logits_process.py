@@ -88,6 +88,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 # transition_tensor[bs, ngs - 1, vs, vs] ==> so we want to access [b, i, latest_tokens[b, i], latest_tokens[b, i+1]]
                 # previously_generated_mask *= transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))][:, None]
                 previously_generated_mask *= jax.vmap(lambda mat, x, y: mat[i, x, y])(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1])
+                print("shape: ", previously_generated_mask.shape)
 
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
             # `latest_tokens`, in the last position of the ngram. shape: [batch_size, vocab_size]
