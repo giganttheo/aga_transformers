@@ -68,6 +68,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         member). Then, for each batch member, finds which tokens have been generated after the last token. Combining
         the two, we have the forbidden ngrams.
         """
+        @sparse.sparsify
         def inner_fn(latest_tokens, transition_tensor):
             batch_size = latest_tokens.shape[0]
 
@@ -99,8 +100,8 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # next_forbidden_mask = transition_tensor[jnp.moveaxis(gather_indices, -1, 0)]
             # print(next_forbidden_mask.shape)
             # AND is equivalent to multiplying boolean masks
-            return sparse.bcoo_todense(previously_generated_mask * next_forbidden_mask)
-        return inner_fn(latest_tokens, transition_tensor)
+            return previously_generated_mask * next_forbidden_mask
+        return sparse.bcoo_todense(inner_fn(latest_tokens, transition_tensor))
 
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
 
