@@ -88,7 +88,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 # previously_generated_mask *= transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))][:, None]
                 i_previously_generated = sparse.bcoo_todense(sparse.sparsify(jax.vmap(lambda mat, x, y: mat[i, x, y]))(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1]))
                 # assert i_previously_generated.shape == (batch_size, 1)
-                print(i_previously_generated.shape)
+                # print(i_previously_generated.shape)
                 previously_generated_mask *= i_previously_generated[:, None]
 
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
@@ -105,6 +105,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             return previously_generated_mask * next_forbidden_mask
         return inner_fn(latest_tokens, transition_tensor)
 
+    @jax.jit
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
 
         #input_ids
