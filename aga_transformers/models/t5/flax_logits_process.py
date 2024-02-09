@@ -39,21 +39,25 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             ngrams = input_ids[:, i : i + self.ngram_size]
 
             # creates the indexing for the batch and the n-th member of the ngram
-            batch_indexing, ngram_indexing = jnp.meshgrid(jnp.arange(ngrams.shape[0]), jnp.arange(ngrams.shape[1] - 1))
-            batch_indexing = jnp.reshape(jnp.transpose(batch_indexing), (-1,))
-            ngram_indexing = jnp.reshape(jnp.transpose(ngram_indexing), (-1,))
+            # batch_indexing, ngram_indexing = jnp.meshgrid(jnp.arange(ngrams.shape[0]), jnp.arange(ngrams.shape[1] - 1))
+            # batch_indexing = jnp.reshape(jnp.transpose(batch_indexing), (-1,))
+            # ngram_indexing = jnp.reshape(jnp.transpose(ngram_indexing), (-1,))
 
             # creates the indexing for the current -> next token pairs
             curr_tokens = ngrams[:, :-1]
             next_tokens = ngrams[:, 1:]
-            current_token_indexing = jnp.reshape(curr_tokens, (-1,))
-            next_token_indexing = jnp.reshape(next_tokens, (-1,))
+            # indices = [[curr_tokens[k], next_tokens[k]]for k in range(self.ngram_size - 1)]
+            # should be [bs, ngs - 1, vocab_size, vocab_size] if input_ids is [bs, seq_len, vocab_size]
+            indices = jax.vmap(jax.vmap(lambda curr_token, next_token :jnp.array([curr_token, next_token])))(curr_tokens, next_tokens)
+            all_update_indices.append(indices)
+            # current_token_indexing = jnp.reshape(curr_tokens, (-1,))
+            # next_token_indexing = jnp.reshape(next_tokens, (-1,))
 
-            # scatters the observed ngrams into the transition tensor
-            update_indices = jnp.stack(
-                (batch_indexing, ngram_indexing, current_token_indexing, next_token_indexing), axis=1
-            )
-            all_update_indices.append(update_indices)
+            # # scatters the observed ngrams into the transition tensor
+            # update_indices = jnp.stack(
+            #     (batch_indexing, ngram_indexing, current_token_indexing, next_token_indexing), axis=1
+            # )
+            # all_update_indices.append(update_indices)
             # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
         all_update_indices = jnp.concatenate(all_update_indices, axis=0)
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
