@@ -1447,6 +1447,10 @@ class ScannableFlaxT5LayerCollection(nn.Module):
     config: T5Config
     has_relative_attention_bias: bool
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
+    output_attentions: bool = False
+    deterministic: bool = False
+    init_cache: bool = False
+
 
     def setup(self):
         self.layer = FlaxT5Block(
@@ -1460,9 +1464,9 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         attention_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        output_attentions=False,
-        deterministic=True,
-        init_cache=False,
+        # output_attentions=False,
+        # deterministic=True,
+        # init_cache=False,
         mask_local=None,
         mask_global=None,
         edge_bias_local=None,
@@ -1487,9 +1491,9 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             encoder_decoder_position_bias=encoder_decoder_position_bias,
-            output_attentions=output_attentions,
-            deterministic=deterministic,
-            init_cache=init_cache,
+            output_attentions=self.output_attentions,
+            deterministic=self.deterministic,
+            init_cache=self.init_cache,
             mask_local=mask_local,
             mask_global=mask_global,
             edge_bias_local=edge_bias_local,
@@ -1579,14 +1583,15 @@ class FlaxT5BlockCollection(nn.Module):
                             split_rngs={"params": True, "dropout": True},
                             # variable_broadcast=["graphs"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                                                           output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache,
                             )(
                                         carry_,
                                         None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
-                                        None if output_attentions is None else einops.repeat(jnp.array(output_attentions), '... -> l ...', l=self.config.num_layers),
-                                        None if deterministic is None else einops.repeat(jnp.array(deterministic), '... -> l ...', l=self.config.num_layers),
-                                        None if init_cache is None else einops.repeat(jnp.array(init_cache), '... -> l ...', l=self.config.num_layers),
+                                        # None if output_attentions is None else einops.repeat(jnp.array(output_attentions), '... -> l ...', l=self.config.num_layers),
+                                        # None if deterministic is None else einops.repeat(jnp.array(deterministic), '... -> l ...', l=self.config.num_layers),
+                                        # None if init_cache is None else einops.repeat(jnp.array(init_cache), '... -> l ...', l=self.config.num_layers),
                                         # # output_attentions,
                                         # # deterministic,
                                         # # init_cache,
