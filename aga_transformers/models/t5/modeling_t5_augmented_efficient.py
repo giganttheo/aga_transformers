@@ -1476,9 +1476,9 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
         
-        output_attentions=False
-        deterministic=True
-        init_cache=False
+        # output_attentions=False
+        # deterministic=True
+        # init_cache=False
 
         outputs = self.layer(
             hidden_states,
