@@ -56,7 +56,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             all_update_indices.append(update_indices)
             # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
         all_update_indices = jnp.concatenate(all_update_indices, axis=0)
-        data=jnp.ones((all_update_indices.shape[0], ) , dtype="bool")
+        data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
         return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
     def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor) -> jnp.ndarray:
@@ -114,7 +114,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
             # assert cur_len > self.ngram_size + 1
             latest_tokens = input_ids[:, max(cur_len - self.ngram_size + 1, 0) : min(self.ngram_size, cur_len)]
-            banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
+            banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor).astype("bool")
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         
         return jax.lax.cond((cur_len > self.ngram_size + 1), true_fn, lambda: scores)
