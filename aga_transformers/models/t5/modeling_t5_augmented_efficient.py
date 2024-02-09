@@ -1622,13 +1622,14 @@ class FlaxT5BlockCollection(nn.Module):
                             attention_mask,
                             encoder_hidden_states,
                             encoder_attention_mask,
-                            mask_local,
-                            mask_global,
-                            edge_bias_local,
-                            edge_bias_global,
-                            output_attentions,
-                            deterministic,
-                            init_cache,)
+                            # mask_local,
+                            # mask_global,
+                            # edge_bias_local,
+                            # edge_bias_global,
+                            # output_attentions,
+                            # deterministic,
+                            # init_cache,
+                            )
                 # if output_hidden_states:
                 #     all_hidden_states = all_hidden_states + (hidden_states,)
 
