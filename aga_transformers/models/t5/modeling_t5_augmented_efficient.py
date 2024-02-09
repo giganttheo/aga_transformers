@@ -1570,8 +1570,12 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
+        # output_attentions = False #tmp fix
+        # carry_ = (hidden_states, position_bias)
+        # if self.config.causal and encoder_hidden_states is not None:
+        #     carry_ += (encoder_decoder_position_bias, )
         output_attentions = False #tmp fix
-        carry_ = (hidden_states, position_bias)
+        carry_ = (hidden_states, )
         if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
@@ -1614,18 +1618,18 @@ class FlaxT5BlockCollection(nn.Module):
                                         )
             hidden_states = layer_outputs[0]
 
-            # We share the position biases between the layers - the first layer store them
-            # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
-            # (cross-attention position bias), (cross-attention weights)
-            position_bias = layer_outputs[1]
+            # # We share the position biases between the layers - the first layer store them
+            # # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
+            # # (cross-attention position bias), (cross-attention weights)
+            # position_bias = layer_outputs[1]
 
-            if self.config.causal and encoder_hidden_states is not None:
-                encoder_decoder_position_bias = layer_outputs[3  if output_attentions else 2]
+            # if self.config.causal and encoder_hidden_states is not None:
+            #     encoder_decoder_position_bias = layer_outputs[3  if output_attentions else 2]
 
-            if output_attentions:
-                all_attentions = all_attentions + (layer_outputs[2],)
-                if self.config.causal:
-                    all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
+            # if output_attentions:
+            #     all_attentions = all_attentions + (layer_outputs[2],)
+            #     if self.config.causal:
+            #         all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
 
         else:
             for i in range(self.config.num_layers):
@@ -1671,15 +1675,15 @@ class FlaxT5BlockCollection(nn.Module):
             # We share the position biases between the layers - the first layer store them
             # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
             # (cross-attention position bias), (cross-attention weights)
-            position_bias = carry_[1]
+            # position_bias = carry_[1]
 
-            if self.config.causal and encoder_hidden_states is not None:
-                encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
+            # if self.config.causal and encoder_hidden_states is not None:
+            #     encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
 
-            if output_attentions:
-                all_attentions = all_attentions + (carry_[2],)
-                if self.config.causal:
-                    all_cross_attentions = all_cross_attentions + (carry_[4],)
+            # if output_attentions:
+            #     all_attentions = all_attentions + (carry_[2],)
+            #     if self.config.causal:
+            #         all_cross_attentions = all_cross_attentions + (carry_[4],)
 
         return FlaxBaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
