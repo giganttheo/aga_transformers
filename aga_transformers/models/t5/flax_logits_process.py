@@ -88,7 +88,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
             # `latest_tokens`, in the last position of the ngram. shape: [batch_size, vocab_size]
             gather_indices = jnp.stack(
-                [jnp.ones((batch_size), dtype=jnp.int32)] * (self.ngram_size - 2) + latest_tokens[:, -1], axis=1
+                [jnp.ones((batch_size), dtype=jnp.int32)] * (self.ngram_size - 2) + [latest_tokens[:, -1]], axis=1
             )
             # gather_indices = jnp.concatenate([jnp.ones((batch_size, self.ngram_size - 2), dtype=jnp.int32), latest_tokens[:, -1][:, None]], axis=1)
             next_forbidden_mask = transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))]
