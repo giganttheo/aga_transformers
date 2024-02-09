@@ -101,7 +101,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
-            assert cur_len > self.ngram_size + 1
+            # assert cur_len > self.ngram_size + 1
             latest_tokens = input_ids[:, max(cur_len - self.ngram_size + 1, 0) : min(self.ngram_size, cur_len)]
             print(latest_tokens.shape)
             banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
