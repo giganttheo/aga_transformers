@@ -90,7 +90,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 [jnp.ones((batch_size), dtype=jnp.int32)] * (self.ngram_size - 2) + [latest_tokens[:, -1]], axis=1
             )
             # gather_indices = jnp.concatenate([jnp.ones((batch_size, self.ngram_size - 2), dtype=jnp.int32), latest_tokens[:, -1][:, None]], axis=1)
-            next_forbidden_mask = sparse.bcoo_todense(transition_tensor.take(jnp.moveaxis(gather_indices, -1, 0)))
+            next_forbidden_mask = sparse.bcoo_todense(transition_tensor[jnp.moveaxis(gather_indices, -1, 0)])
             
             # AND is equivalent to multiplying boolean masks
             return previously_generated_mask & next_forbidden_mask
