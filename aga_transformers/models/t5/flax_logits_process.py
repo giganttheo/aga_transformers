@@ -105,7 +105,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             return previously_generated_mask * next_forbidden_mask
         return inner_fn(latest_tokens, transition_tensor)
 
-    @jax.jit
+    # @jax.jit
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
 
         #input_ids
