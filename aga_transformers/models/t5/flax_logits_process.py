@@ -101,12 +101,12 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
-
+            assert cur_len > self.ngram_size + 1
             latest_tokens = input_ids[:, cur_len - self.ngram_size + 1 : cur_len]
             print(latest_tokens.shape)
             banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, transition_tensor)
-
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
+        
         return jax.lax.cond((cur_len > self.ngram_size + 1), true_fn, lambda: scores)
 
 
