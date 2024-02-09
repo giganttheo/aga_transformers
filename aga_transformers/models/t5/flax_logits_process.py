@@ -68,7 +68,6 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         member). Then, for each batch member, finds which tokens have been generated after the last token. Combining
         the two, we have the forbidden ngrams.
         """
-        @sparse.sparsify
         def inner_fn(latest_tokens, transition_tensor):
             batch_size = latest_tokens.shape[0]
 
@@ -87,14 +86,14 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 # AND is equivalent to multiplying boolean masks
                 # transition_tensor[bs, ngs - 1, vs, vs] ==> so we want to access [b, i, latest_tokens[b, i], latest_tokens[b, i+1]]
                 # previously_generated_mask *= transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))][:, None]
-                i_previously_generated = jax.vmap(lambda mat, x, y: mat[i, x, y])(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1])
+                i_previously_generated = sparse.bcoo_todense(sparse.sparsify(jax.vmap(lambda mat, x, y: mat[i, x, y]))(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1]))
                 # assert i_previously_generated.shape == (batch_size, 1)
                 print(i_previously_generated.shape)
                 previously_generated_mask *= i_previously_generated[:, None]
 
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
             # `latest_tokens`, in the last position of the ngram. shape: [batch_size, vocab_size]
-            next_forbidden_mask =  jax.vmap(lambda mat, x: mat[-1, x])(transition_tensor, latest_tokens[:, -1])
+            next_forbidden_mask = sparse.bcoo_todense(sparse.sparsify(jax.vmap(lambda mat, x: mat[-1, x]))(transition_tensor, latest_tokens[:, -1]))
             # gather_indices = jnp.stack(
             #     [jnp.ones((batch_size), dtype=jnp.int32)] * (self.ngram_size - 2) + [latest_tokens[:, -1]], axis=1
             # )
@@ -104,7 +103,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # print(next_forbidden_mask.shape)
             # AND is equivalent to multiplying boolean masks
             return previously_generated_mask * next_forbidden_mask
-        return sparse.bcoo_todense(inner_fn(latest_tokens, transition_tensor))
+        return inner_fn(latest_tokens, transition_tensor)
 
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
 
