@@ -10,15 +10,15 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test").select(range(10))
+test_dataset = load_dataset("gigant/tib", split="test").select(range(3))
 
 generation_config = {
     "num_beams": 2, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
-    "length_penalty": -3.0,
+    "length_penalty": 1.0,
     "early_stopping": True,
-    "no_repeat_ngram_size": 3
+    "no_repeat_ngram_size": 2
 }
 
 # generation_config = transformers.GenerationConfig(**generation_config)
