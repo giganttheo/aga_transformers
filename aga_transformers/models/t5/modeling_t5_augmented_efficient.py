@@ -1559,7 +1559,7 @@ class FlaxT5BlockCollection(nn.Module):
         if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
-        if self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
+        if False: #self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
             mask_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_local"].astype("bool")
             mask_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_global"].astype("bool")
             edge_bias_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_local"].astype(jnp.int8)
