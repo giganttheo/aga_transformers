@@ -1574,7 +1574,7 @@ class FlaxT5BlockCollection(nn.Module):
 
         if self.gradient_checkpointing:
             layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                            in_axes=(0, 0, 0,), # 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0}, #, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
                             # variable_broadcast=["graphs"],
