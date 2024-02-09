@@ -93,7 +93,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             next_forbidden_mask = sparse.sparsify(lambda transition_tensor, gather_indices: transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))])(transition_tensor, gather_indices)
             
             # AND is equivalent to multiplying boolean masks
-            return previously_generated_mask[..., None] & next_forbidden_mask.to_dense()
+            return previously_generated_mask[..., None] & next_forbidden_mask
         return inner_fn(latest_tokens, transition_tensor)
 
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
