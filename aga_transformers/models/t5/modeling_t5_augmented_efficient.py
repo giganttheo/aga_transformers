@@ -1476,6 +1476,10 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
         
+        output_attentions=False
+        deterministic=True
+        init_cache=False
+
         outputs = self.layer(
             hidden_states,
             attention_mask=attention_mask,
@@ -1578,9 +1582,12 @@ class FlaxT5BlockCollection(nn.Module):
                                         None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
                                         None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
-                                        output_attentions,
-                                        deterministic,
-                                        init_cache,
+                                        None if output_attentions is None else einops.repeat(jnp.array(output_attentions), '... -> l ...', l=self.config.num_layers),
+                                        None if deterministic is None else einops.repeat(jnp.array(deterministic), '... -> l ...', l=self.config.num_layers),
+                                        None if init_cache is None else einops.repeat(jnp.array(init_cache), '... -> l ...', l=self.config.num_layers),
+                                        # output_attentions,
+                                        # deterministic,
+                                        # init_cache,
                                         None if mask_local is None else einops.repeat(mask_local, '... -> l ...', l=self.config.num_layers),
                                         None if mask_global is None else einops.repeat(mask_global, '... -> l ...', l=self.config.num_layers),
                                         None if edge_bias_local is None else einops.repeat(edge_bias_local, '... -> l ...', l=self.config.num_layers),
