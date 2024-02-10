@@ -10,8 +10,8 @@ import en_core_web_trf
 import benepar
 from spacy.tokens import Doc
 nlp = en_core_web_trf.load()
-benepar.download('benepar_en3')
-nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
+# benepar.download('benepar_en3')
+# nlp.add_pipe('benepar', config={'model': 'benepar_en3'})
 
 sentencizer = en_core_web_trf.load()
 sentencizer.add_pipe('sentencizer')
