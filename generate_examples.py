@@ -13,11 +13,11 @@ import jax
 test_dataset = load_dataset("gigant/tib", split="test").select(range(3))
 
 generation_config = {
-    "num_beams": 2, #instead of 2?
-    "max_new_tokens": 512,
+    "num_beams": 4, #instead of 2?
+    "max_new_tokens": 20,
     # "min_length": 1,
-    "length_penalty": 1.0,
-    "early_stopping": True,
+    "length_penalty": 0,
+    "early_stopping": False,
     "no_repeat_ngram_size": 2
 }
 
