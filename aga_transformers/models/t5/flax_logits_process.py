@@ -125,7 +125,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             # latest_tokens = latest_tokens.at[:, cur_len - (self.ngram_size - 1) : cur_len].set(input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
             latest_tokens = jax.lax.dynamic_update_slice(latest_tokens, jax.lax.dynamic_slice(input_ids, (0, cur_len - (self.ngram_size - 1)), (input_ids.shape[0], (self.ngram_size - 1))), (0, 0))
-            jax.debug.print("{latest_tokens}", latest_tokens)
+            jax.debug.print("{latest_tokens}", latest_tokens=latest_tokens)
             banned_tokens_indices_mask = jnp.isclose(self.get_banned_tokens_mask(latest_tokens, transition_tensor), 1)
             jax.debug.print("{x} banned 2-grams", x=jnp.count_nonzero(banned_tokens_indices_mask))
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
