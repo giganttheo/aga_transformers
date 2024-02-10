@@ -81,20 +81,11 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # creates the indexing for the batch and the n-th member of the ngram
             previously_generated_mask = jnp.ones((batch_size, 1), dtype="bool")
 
-            for i in range(self.ngram_size - 2): #min(latest_tokens.shape[1] - 1, 
-                # for each
-                # gather_indices = jnp.stack(
-                #     (jnp.ones((batch_size), dtype=jnp.int32) * i, latest_tokens[:, i], latest_tokens[:, i + 1]), axis=1
-                # )
-                # gather_indices = jnp.stack([jnp.ones((batch_size, ), dtype=jnp.int32)] * i + [latest_tokens[:, i], latest_tokens[:, i+1]], axis=1)
-                # assert len(gather_indices.shape) == 2
-                # print(gather_indices.shape)
-                # AND is equivalent to multiplying boolean masks
-                # transition_tensor[bs, ngs - 1, vs, vs] ==> so we want to access [b, i, latest_tokens[b, i], latest_tokens[b, i+1]]
-                # previously_generated_mask *= transition_tensor[tuple(jnp.moveaxis(gather_indices, -1, 0))][:, None]
+            for i in range(self.ngram_size - 2):
                 i_previously_generated = sparse.bcoo_todense(sparse.sparsify(jax.vmap(lambda mat, x, y: mat[i, x, y]))(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1]))
-                # assert i_previously_generated.shape == (batch_size, 1)
-                # print(i_previously_generated.shape)
+                # i_previously_generated = jnp.array([[b, i, latest_tokens[b, i], latest_tokens[b, i+1]] for b in range(batch_size)])
+                # jnp.greater_equal(jnp.count_nonzero(jnp.array([0, 0, 23, 4]) == bcoo_mat.indices), 1)
+                jax.debug.print("ngrams previously generated in {x} beams", x=jnp.count_nonzero(i_previously_generated))
                 previously_generated_mask *= i_previously_generated[:, None]
 
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
@@ -119,7 +110,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
-            # jax.debug.print("transition_tensor data shape: {x}", x=transition_tensor.data.shape)
+            jax.debug.print("transition_tensor data: {x}", x=transition_tensor.data)
             # assert cur_len > self.ngram_size + 1
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             # latest_tokens = latest_tokens.at[:, cur_len - (self.ngram_size - 1) : cur_len].set(input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
