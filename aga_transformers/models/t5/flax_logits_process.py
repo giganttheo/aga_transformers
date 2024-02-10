@@ -48,8 +48,10 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             next_tokens = ngrams[:, 1:]
             # indices = [[curr_tokens[k], next_tokens[k]]for k in range(self.ngram_size - 1)]
             # should be [bs, ngs - 1, vocab_size, vocab_size] if input_ids is [bs, seq_len, vocab_size]
-            indices = jax.vmap(jax.vmap(lambda curr_token, next_token :jnp.array([[curr_token], [next_token]])))(curr_tokens, next_tokens)
-            all_update_indices.append(indices)
+            #indices should be [..., 4] with coords [bs, ngs-1, vocab_size, vocab_size]
+            # [n, 4]
+            indices = [jnp.array([b, k, curr_tokens[b, k], next_tokens[b, k]]) for b in range(batch_size) for k in range(self.ngram_size)]
+            all_update_indices.extend(indices)
             # current_token_indexing = jnp.reshape(curr_tokens, (-1,))
             # next_token_indexing = jnp.reshape(next_tokens, (-1,))
 
