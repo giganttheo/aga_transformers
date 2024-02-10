@@ -62,6 +62,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # all_update_indices.append(update_indices)
             # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
         all_update_indices = jnp.stack(all_update_indices, axis=0)
+        jax.debug.print("shape of update indces: {x.shape}", x=all_update_indices)
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
         return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
