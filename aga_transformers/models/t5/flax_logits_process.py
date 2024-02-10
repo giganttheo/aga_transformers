@@ -62,7 +62,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # all_update_indices.append(update_indices)
             # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
         all_update_indices = jnp.stack(all_update_indices, axis=0)
-        jax.debug.print("shape of update indces: {x.shape}", x=all_update_indices)
+        # jax.debug.print("shape of update indces: {x.shape}", x=all_update_indices)
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
         return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
@@ -120,12 +120,13 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
-            jax.debug.print("transition_tensor data shape: {x}", x=transition_tensor.data.shape)
+            # jax.debug.print("transition_tensor data shape: {x}", x=transition_tensor.data.shape)
             # assert cur_len > self.ngram_size + 1
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             # latest_tokens = latest_tokens.at[:, cur_len - (self.ngram_size - 1) : cur_len].set(input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
             latest_tokens = jax.lax.dynamic_update_slice(latest_tokens, jax.lax.dynamic_slice(input_ids, (0, cur_len - (self.ngram_size - 1)), (input_ids.shape[0], (self.ngram_size - 1))), (0, 0))
-            banned_tokens_indices_mask = jnp.equal(self.get_banned_tokens_mask(latest_tokens, transition_tensor), 1)
+            
+            banned_tokens_indices_mask = jnp.isclose(self.get_banned_tokens_mask(latest_tokens, transition_tensor), 1)
             jax.debug.print("{x} banned 2-grams", x=jnp.count_nonzero(banned_tokens_indices_mask))
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         output = jax.lax.cond((cur_len > self.ngram_size + 1), true_fn, lambda: scores)
