@@ -110,7 +110,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
-            jax.debug.print("transition_tensor data: {x}", x=transition_tensor.data)
+            jax.debug.print("transition_tensor idces: {x}", x=transition_tensor.indices)
             # assert cur_len > self.ngram_size + 1
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             # latest_tokens = latest_tokens.at[:, cur_len - (self.ngram_size - 1) : cur_len].set(input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
