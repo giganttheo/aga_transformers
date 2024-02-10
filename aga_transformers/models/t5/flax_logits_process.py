@@ -10,6 +10,8 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
     [`TFLogitsProcessor`] that enforces no repetition of n-grams. See
     [Fairseq](https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345).
 
+    implementation inspired by https://github.com/huggingface/transformers/pull/18769
+
     Args:
         ngram_size (`int`):
             All ngrams of size `ngram_size` can only occur once.
@@ -46,10 +48,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # creates the indexing for the current -> next token pairs
             curr_tokens = ngrams[:, :-1]
             next_tokens = ngrams[:, 1:]
-            # indices = [[curr_tokens[k], next_tokens[k]]for k in range(self.ngram_size - 1)]
-            # should be [bs, ngs - 1, vocab_size, vocab_size] if input_ids is [bs, seq_len, vocab_size]
-            #indices should be [..., 4] with coords [bs, ngs-1, vocab_size, vocab_size]
-            # [n, 4]
+
             indices = [jnp.array([b, k, curr_tokens[b, k], next_tokens[b, k]]) for b in range(batch_size) for k in range(self.ngram_size)]
             all_update_indices.extend(indices)
             # current_token_indexing = jnp.reshape(curr_tokens, (-1,))
@@ -125,13 +124,13 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             # latest_tokens = latest_tokens.at[:, cur_len - (self.ngram_size - 1) : cur_len].set(input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
             
-            jax.debug.print("input_ids sliced: {x}", x=input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
             latest_tokens = jax.lax.dynamic_update_slice(latest_tokens, jax.lax.dynamic_slice(input_ids, (0, cur_len - (self.ngram_size - 1)), (input_ids.shape[0], (self.ngram_size - 1))), (0, 0))
-            jax.debug.print("{latest_tokens}", latest_tokens=latest_tokens)
             banned_tokens_indices_mask = jnp.isclose(self.get_banned_tokens_mask(latest_tokens, transition_tensor), 1)
+            
             jax.debug.print("{x} banned 2-grams", x=jnp.count_nonzero(banned_tokens_indices_mask))
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
-        output = jax.lax.cond((cur_len > self.ngram_size + 1), true_fn, lambda: scores)
+        
+        output = jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
         return output
 
 
