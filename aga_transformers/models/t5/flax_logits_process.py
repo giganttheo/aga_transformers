@@ -48,7 +48,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             next_tokens = ngrams[:, 1:]
             # indices = [[curr_tokens[k], next_tokens[k]]for k in range(self.ngram_size - 1)]
             # should be [bs, ngs - 1, vocab_size, vocab_size] if input_ids is [bs, seq_len, vocab_size]
-            indices = jax.vmap(jax.vmap(lambda curr_token, next_token :jnp.array([curr_token, next_token])))(curr_tokens, next_tokens)
+            indices = jax.vmap(jax.vmap(lambda curr_token, next_token :jnp.array([[curr_token], [next_token]])))(curr_tokens, next_tokens)
             all_update_indices.append(indices)
             # current_token_indexing = jnp.reshape(curr_tokens, (-1,))
             # next_token_indexing = jnp.reshape(next_tokens, (-1,))
@@ -59,7 +59,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # )
             # all_update_indices.append(update_indices)
             # transition_tensor = transition_tensor.at[update_indices].set(jnp.array(1, dtype="bool"))
-        all_update_indices = jnp.concatenate(all_update_indices, axis=0)
+        all_update_indices = jnp.stack(all_update_indices, axis=0)
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
         return sparse.BCOO((data, all_update_indices), shape=(batch_size, self.ngram_size - 1, vocab_size, vocab_size))
 
