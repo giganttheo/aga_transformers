@@ -1593,7 +1593,7 @@ class FlaxT5BlockCollection(nn.Module):
 
         if self.gradient_checkpointing:
             for i in range(self.config.num_layers):
-                carry_, _ = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8))(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                carry_ = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8))(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
                                                            )(                              
                             hidden_states,
                             attention_mask,
@@ -1648,7 +1648,7 @@ class FlaxT5BlockCollection(nn.Module):
 
         else:
             for i in range(self.config.num_layers):
-                carry_, _ = FlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                carry_ = FlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
                             )(                              
                             hidden_states,
                             attention_mask,
