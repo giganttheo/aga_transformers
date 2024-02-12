@@ -639,9 +639,9 @@ def main():
         n_global_tokens = 2 #TODO: add in config
         seq_length = data_args.max_source_length
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
-        senders=einops.repeat(graph["senders"], 'e -> bs h e', bs=1, h=model.config.n_heads)
-        receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.n_heads)
-        graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.n_heads)
+        senders=einops.repeat(graph["senders"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+        receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+        graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.num_heads)
         mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
         graph= {"mask_local": mask_local, "mask_global": mask_global}
         graph = graph_from_path(model.params, graph, {}, {}, layer_wise=True)
