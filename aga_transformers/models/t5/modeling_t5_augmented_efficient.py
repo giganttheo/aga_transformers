@@ -1447,9 +1447,9 @@ class ScannableFlaxT5LayerCollection(nn.Module):
     config: T5Config
     has_relative_attention_bias: bool
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
-    output_attentions: bool = False
-    deterministic: bool = False
-    init_cache: bool = False
+    # output_attentions: bool = False
+    # deterministic: bool = False
+    # init_cache: bool = False
 
 
     def setup(self):
@@ -1464,9 +1464,9 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         attention_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        # output_attentions=False,
-        # deterministic=True,
-        # init_cache=False,
+        output_attentions=False,
+        deterministic=True,
+        init_cache=False,
         mask_local=None,
         mask_global=None,
         edge_bias_local=None,
@@ -1500,9 +1500,9 @@ class ScannableFlaxT5LayerCollection(nn.Module):
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             encoder_decoder_position_bias=encoder_decoder_position_bias,
-            output_attentions=self.output_attentions,
-            deterministic=self.deterministic,
-            init_cache=self.init_cache,
+            output_attentions=output_attentions,
+            deterministic=deterministic,
+            init_cache=init_cache,
             mask_local=mask_local,
             mask_global=mask_global,
             edge_bias_local=edge_bias_local,
@@ -1579,7 +1579,7 @@ class FlaxT5BlockCollection(nn.Module):
         if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
-        if self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
+        if False: #self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
             mask_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_local"].astype("bool")
             mask_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_global"].astype("bool")
             edge_bias_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_local"].astype(jnp.int8)
@@ -1595,18 +1595,18 @@ class FlaxT5BlockCollection(nn.Module):
         if self.gradient_checkpointing:
             for i in range(self.config.num_layers):
                 carry_, _ = remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6))(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
-                                                           output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache,)(                              
+                                                           )(                              
                             carry_,
                             attention_mask,
                             encoder_hidden_states,
                             encoder_attention_mask,
-                            mask_local,
-                            mask_global,
-                            edge_bias_local,
-                            edge_bias_global,
-                            # output_attentions,
-                            # deterministic,
-                            # init_cache,
+                            output_attentions,
+                            deterministic,
+                            init_cache,
+                            # mask_local,
+                            # mask_global,
+                            # edge_bias_local,
+                            # edge_bias_global,
                             )
             # layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
             #                 in_axes=(0, 0, 0,), # 0, 0, 0, 0, 0, 0, 0),
@@ -1648,19 +1648,18 @@ class FlaxT5BlockCollection(nn.Module):
 
         else:
             for i in range(self.config.num_layers):
-                carry_, _ = ScannableFlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
-                                                           output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache,)(                              
+                carry_, _ = ScannableFlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(                              
                             carry_,
                             attention_mask,
                             encoder_hidden_states,
                             encoder_attention_mask,
-                            mask_local,
-                            mask_global,
-                            edge_bias_local,
-                            edge_bias_global,
-                            # output_attentions,
-                            # deterministic,
-                            # init_cache,
+                            # mask_local,
+                            # mask_global,
+                            # edge_bias_local,
+                            # edge_bias_global,
+                            output_attentions,
+                            deterministic,
+                            init_cache,
                             )
                 # if output_hidden_states:
                 #     all_hidden_states = all_hidden_states + (hidden_states,)
