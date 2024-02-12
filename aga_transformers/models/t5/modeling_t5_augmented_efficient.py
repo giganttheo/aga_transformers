@@ -963,6 +963,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #"slide" tokens are added at the beginning of the document
             if self.has_variable("graph", "n_slides"):
                 n_slides = self.variables["graph"]["n_slides"]
+                assert n_slides.shape[0] == batch_size
             else:
                 n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
             #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
