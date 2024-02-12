@@ -913,7 +913,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if self.has_variable("graph", "receivers") or self.has_variable("graph", "mask_local"):
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
             #Graph attention
-            if self.has_variable("graph", "edge_bias_local"):
+            if self.has_variable("graph", "mask_local"):
                 mask_local = self.variables["graph"]["mask_local"].astype("bool")
                 mask_global = self.variables["graph"]["mask_global"].astype("bool")
                 precomputed=True
