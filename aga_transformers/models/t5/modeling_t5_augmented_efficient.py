@@ -1488,7 +1488,6 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         else:
             raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
         
-
         # output_attentions=False
         # deterministic=True
         # init_cache=False
@@ -1594,10 +1593,11 @@ class FlaxT5BlockCollection(nn.Module):
 
         if self.gradient_checkpointing:
             for i in range(self.config.num_layers):
-                carry_, _ = remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6))(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                carry_, _ = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8))(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
                                                            )(                              
-                            carry_,
+                            hidden_states,
                             attention_mask,
+                            position_bias,
                             encoder_hidden_states,
                             encoder_attention_mask,
                             output_attentions,
@@ -1648,19 +1648,49 @@ class FlaxT5BlockCollection(nn.Module):
 
         else:
             for i in range(self.config.num_layers):
-                carry_, _ = ScannableFlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(                              
-                            carry_,
+                carry_, _ = FlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                            )(                              
+                            hidden_states,
                             attention_mask,
+                            position_bias,
                             encoder_hidden_states,
                             encoder_attention_mask,
+                            output_attentions,
+                            deterministic,
+                            init_cache,
                             # mask_local,
                             # mask_global,
                             # edge_bias_local,
                             # edge_bias_global,
-                            output_attentions,
-                            deterministic,
-                            init_cache,
                             )
+                hidden_states = carry_[0]
+
+                # We share the position biases between the layers - the first layer store them
+                # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
+                # (cross-attention position bias), (cross-attention weights)
+                position_bias = carry_[1]
+
+                if self.config.causal and encoder_hidden_states is not None:
+                    encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
+
+                if output_attentions:
+                    all_attentions = all_attentions + (carry_[2],)
+                    if self.config.causal:
+                        all_cross_attentions = all_cross_attentions + (carry_[4],)
+
+                # carry_, _ = ScannableFlaxT5LayerCollection(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,)(                              
+                #             carry_,
+                #             attention_mask,
+                #             encoder_hidden_states,
+                #             encoder_attention_mask,
+                #             # mask_local,
+                #             # mask_global,
+                #             # edge_bias_local,
+                #             # edge_bias_global,
+                #             output_attentions,
+                #             deterministic,
+                #             init_cache,
+                #             )
                 # if output_hidden_states:
                 #     all_hidden_states = all_hidden_states + (hidden_states,)
 
@@ -1690,15 +1720,15 @@ class FlaxT5BlockCollection(nn.Module):
             # We share the position biases between the layers - the first layer store them
             # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
             # (cross-attention position bias), (cross-attention weights)
-            # position_bias = carry_[1]
+            position_bias = carry_[1]
 
-            # if self.config.causal and encoder_hidden_states is not None:
-            #     encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
+            if self.config.causal and encoder_hidden_states is not None:
+                encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
 
-            # if output_attentions:
-            #     all_attentions = all_attentions + (carry_[2],)
-            #     if self.config.causal:
-            #         all_cross_attentions = all_cross_attentions + (carry_[4],)
+            if output_attentions:
+                all_attentions = all_attentions + (carry_[2],)
+                if self.config.causal:
+                    all_cross_attentions = all_cross_attentions + (carry_[4],)
 
         return FlaxBaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
