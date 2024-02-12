@@ -63,6 +63,14 @@ increasing dilation only on 2 heads. This gives the model the ability to directl
 to distant tokens without sacrificing local context.
 """
 
+def prepare_led_attn_patterns(max_source_length, max_target_length, window_sizes=[32], sentence_tokens=[0, 1]):
+  return LongformerAttentionPattern(
+                                    seq_len_q=max_source_length,
+                                    seq_len_kv=max_source_length,
+                                    window_size=window_sizes[0],
+                                    sentence_tokens=sentence_tokens,
+                                    ).get_attention_graph()
+
 def create_led_attn_patterns(model, max_source_length, max_target_length, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], autoregressive=False, layer_wise=False,  **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_led_attn_patterns')

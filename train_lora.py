@@ -47,6 +47,7 @@ from flax.training.common_utils import shard_prng_key, stack_forest
 # from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize, to_state_dict, from_state_dict
 import pickle
 from huggingface_hub import Repository, create_repo
+import einops
 import zlib
 from tqdm import tqdm
 import wandb
@@ -69,6 +70,9 @@ from aga_transformers.models.utils import add_graph_to_params, repeat_relative_p
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
+from aga_transformers.attention_patterns.sparse_attention.led import prepare_led_attn_patterns
+from aga_transformers.attention_patterns.utils import graph_from_path
+
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -98,6 +102,62 @@ except (LookupError, OSError):
 
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+
+def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
+    mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
+    mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+    mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
+    mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+    def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
+
+        @jax.vmap #batch
+        @jax.vmap #num_edges
+        def _get_ids_in_blocks(senders, receivers):
+            #block id
+            block_id = (senders - n_global_tokens) // block_len
+            block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+
+            block_id_k = (receivers - n_global_tokens) // block_len
+            block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+
+            #position within the block q
+            block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int32")
+
+            offset_k = block_id_k - block_id
+            # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+            
+            block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
+            block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+            block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
+
+            return block_id, block_pos_q, block_pos_k
+
+        @jax.vmap #batch
+        @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+        def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+            return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+        @jax.vmap #batch
+        @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+        def _update_mask_global(mask, graph_mask, senders, receivers):
+            return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+        block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+        mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
+        mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+
+        mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
+        mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
+
+        return mask_local.swapaxes(1, 2), mask_global
+
+    return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
+
+
+
 
 @dataclass
 class TrainingArguments:
@@ -572,8 +632,21 @@ def main():
             "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
-        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
+        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_mode=None, attention_kwargs=attention_kwargs, layer_wise=False)
 
+        graph = prepare_led_attn_patterns(**attention_kwargs)
+        block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+        n_global_tokens = 2 #TODO: add in config
+        seq_length = data_args.max_source_length
+        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+        senders=einops.repeat(graph["senders"], 'e -> bs h e', bs=1, h=model.config.n_heads)
+        receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.n_heads)
+        graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.n_heads)
+        mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+        graph= {"mask_local": mask_local, "mask_global": mask_global}
+        graph = graph_from_path(model.params, graph, {}, {}, layer_wise=True)
+        graph_ar = graph
+        
     if training_args.gradient_checkpointing:
         print("=============================")
         print("Enabling gradient checkpointing")
