@@ -1056,7 +1056,7 @@ def main():
             f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metric['loss']}, Learning Rate:"
             f" {train_metric['learning_rate']})"
         )
-
+        save_state(state)
         # ======================== Evaluating ==============================
         eval_metrics = []
         eval_preds = []
