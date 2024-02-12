@@ -93,8 +93,8 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     module_class = FlaxT5ForConditionalGeneration_AUG.module_class
 
     #tie the relative positional bias
-    # module_class = tie_relative_pos_bias(module_class, repo_path)
-    # FlaxT5ForConditionalGeneration_AUG.module_class = module_class
+    module_class = tie_relative_pos_bias(module_class, repo_path)
+    FlaxT5ForConditionalGeneration_AUG.module_class = module_class
 
     model = FlaxT5ForConditionalGeneration_AUG.from_pretrained(
         repo_path,
@@ -129,7 +129,7 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
 
     #tieing the graph so it is defined for first layer only
     
-    # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)#attention_kwargs["autoregressive"])
+    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)#attention_kwargs["autoregressive"])
     
     graph_ar = {}
     if attention_mode == "led":

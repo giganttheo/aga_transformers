@@ -30,7 +30,7 @@ class StructuralAttentionPattern(AttentionPattern):
     def __init__(self, transcript_segments, keyframes, tokens, window_size, max_source_length=None, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(transcript_segments, keyframes)
         # tokenized = tokenizer(data_point['transcript'])
-        max_slides = 32 #64 #maximum n of slides accepted, else they will be merge
+        max_slides = 12 #32 #64 #maximum n of slides accepted, else they will be merge
         num_slides = len(edges_slides_to_transcript_segments)
         merge_factor = math.ceil(num_slides / max_slides)
         # print(f"Merge factor is {merge_factor}")

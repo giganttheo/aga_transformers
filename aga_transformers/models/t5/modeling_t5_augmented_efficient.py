@@ -967,7 +967,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
             #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
             n_document_tokens = 2 #TODO: add in config
-            n_global_tokens = 32 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
+            n_global_tokens = 12 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
             
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
@@ -1579,7 +1579,7 @@ class FlaxT5BlockCollection(nn.Module):
         if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
-        if False: #self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
+        if self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
             mask_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_local"].astype("bool")
             mask_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_global"].astype("bool")
             edge_bias_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_local"].astype(jnp.int8)
@@ -1593,30 +1593,45 @@ class FlaxT5BlockCollection(nn.Module):
             edge_bias_global=None
 
         if self.gradient_checkpointing:
-            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
-                            in_axes=(0, 0, 0,), # 0, 0, 0, 0, 0, 0, 0),
-                            variable_axes={"params": 0}, #, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
-                            split_rngs={"params": True, "dropout": True},
-                            # variable_broadcast=["graphs"],
-                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
-                                                           output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache,
-                            )(
-                                        carry_,
-                                        None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
-                                        None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
-                                        None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
-                                        # None if output_attentions is None else einops.repeat(jnp.array(output_attentions), '... -> l ...', l=self.config.num_layers),
-                                        # None if deterministic is None else einops.repeat(jnp.array(deterministic), '... -> l ...', l=self.config.num_layers),
-                                        # None if init_cache is None else einops.repeat(jnp.array(init_cache), '... -> l ...', l=self.config.num_layers),
-                                        # # output_attentions,
-                                        # # deterministic,
-                                        # # init_cache,
-                                        # None if mask_local is None else einops.repeat(mask_local, '... -> l ...', l=self.config.num_layers),
-                                        # None if mask_global is None else einops.repeat(mask_global, '... -> l ...', l=self.config.num_layers),
-                                        # None if edge_bias_local is None else einops.repeat(edge_bias_local, '... -> l ...', l=self.config.num_layers),
-                                        # None if edge_bias_global is None else einops.repeat(edge_bias_global, '... -> l ...', l=self.config.num_layers),
-                                        )
-            hidden_states = layer_outputs[0]
+            for i in range(self.config.num_layers):
+                carry_, _ = remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6))(name=f"{i}", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                                                           output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache,)(                              
+                            carry_,
+                            attention_mask,
+                            encoder_hidden_states,
+                            encoder_attention_mask,
+                            mask_local,
+                            mask_global,
+                            edge_bias_local,
+                            edge_bias_global,
+                            # output_attentions,
+                            # deterministic,
+                            # init_cache,
+                            )
+            # layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            #                 in_axes=(0, 0, 0,), # 0, 0, 0, 0, 0, 0, 0),
+            #                 variable_axes={"params": 0}, #, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
+            #                 split_rngs={"params": True, "dropout": True},
+            #                 # variable_broadcast=["graphs"],
+            #                 length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+            #                                                output_attentions=output_attentions, deterministic=deterministic, init_cache=init_cache,
+            #                 )(
+            #                             carry_,
+            #                             None if attention_mask is None else einops.repeat(attention_mask, '... -> l ...', l=self.config.num_layers),
+            #                             None if encoder_hidden_states is None else einops.repeat(encoder_hidden_states, '... -> l ...', l=self.config.num_layers),
+            #                             None if encoder_attention_mask is None else einops.repeat(encoder_attention_mask, '... -> l ...', l=self.config.num_layers),
+            #                             # None if output_attentions is None else einops.repeat(jnp.array(output_attentions), '... -> l ...', l=self.config.num_layers),
+            #                             # None if deterministic is None else einops.repeat(jnp.array(deterministic), '... -> l ...', l=self.config.num_layers),
+            #                             # None if init_cache is None else einops.repeat(jnp.array(init_cache), '... -> l ...', l=self.config.num_layers),
+            #                             # # output_attentions,
+            #                             # # deterministic,
+            #                             # # init_cache,
+            #                             # None if mask_local is None else einops.repeat(mask_local, '... -> l ...', l=self.config.num_layers),
+            #                             # None if mask_global is None else einops.repeat(mask_global, '... -> l ...', l=self.config.num_layers),
+            #                             # None if edge_bias_local is None else einops.repeat(edge_bias_local, '... -> l ...', l=self.config.num_layers),
+            #                             # None if edge_bias_global is None else einops.repeat(edge_bias_global, '... -> l ...', l=self.config.num_layers),
+            #                             )
+            # hidden_states = layer_outputs[0]
 
             # # We share the position biases between the layers - the first layer store them
             # # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
@@ -1639,10 +1654,10 @@ class FlaxT5BlockCollection(nn.Module):
                             attention_mask,
                             encoder_hidden_states,
                             encoder_attention_mask,
-                            # mask_local,
-                            # mask_global,
-                            # edge_bias_local,
-                            # edge_bias_global,
+                            mask_local,
+                            mask_global,
+                            edge_bias_local,
+                            edge_bias_global,
                             # output_attentions,
                             # deterministic,
                             # init_cache,
