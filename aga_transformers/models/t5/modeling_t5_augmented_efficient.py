@@ -1268,28 +1268,28 @@ class FlaxT5LayerSelfAttention(nn.Module):
         edge_bias_global=None,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
-        if self.config.causal:
-            attention_output = self.SelfAttention(
-                normed_hidden_states,
-                attention_mask=attention_mask,
-                position_bias=position_bias,
-                output_attentions=output_attentions,
-                deterministic=deterministic,
-                init_cache=init_cache,
-            )
-        else:
-            attention_output = self.SelfAttention(
-                normed_hidden_states,
-                attention_mask=attention_mask,
-                position_bias=position_bias,
-                output_attentions=output_attentions,
-                deterministic=deterministic,
-                init_cache=init_cache,
-                mask_local=mask_local,
-                mask_global=mask_global,
-                edge_bias_local=edge_bias_local,
-                edge_bias_global=edge_bias_global,
-            )
+        # if self.config.causal:
+        attention_output = self.SelfAttention(
+            normed_hidden_states,
+            attention_mask=attention_mask,
+            position_bias=position_bias,
+            output_attentions=output_attentions,
+            deterministic=deterministic,
+            init_cache=init_cache,
+        )
+        # else:
+        #     attention_output = self.SelfAttention(
+        #         normed_hidden_states,
+        #         attention_mask=attention_mask,
+        #         position_bias=position_bias,
+        #         output_attentions=output_attentions,
+        #         deterministic=deterministic,
+        #         init_cache=init_cache,
+        #         # mask_local=mask_local,
+        #         # mask_global=mask_global,
+        #         # edge_bias_local=edge_bias_local,
+        #         # edge_bias_global=edge_bias_global,
+        #     )
         hidden_states = hidden_states + self.dropout(attention_output[0], deterministic=deterministic)
         outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
         return outputs

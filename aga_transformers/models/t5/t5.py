@@ -126,7 +126,6 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
             "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
 
-
     #tieing the graph so it is defined for first layer only
     
     model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)#attention_kwargs["autoregressive"])
