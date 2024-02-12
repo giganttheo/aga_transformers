@@ -25,8 +25,8 @@ python ./train_lora_structural.py \
 	--num_train_epochs 5 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 48 \
-	--per_device_eval_batch_size 48 \
+	--per_device_train_batch_size 32 \
+	--per_device_eval_batch_size 32 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
