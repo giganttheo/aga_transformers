@@ -102,11 +102,11 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         dtype=dtype,
     )
     vocab_size = 8
-    model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
+    # model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
     if from_longt5_local:
         print("adapting parameters from longt5_local")
         long_t5=FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs)
-        model.params=repeat_relative_pos_bias(adapt_parameters_from_longt5_local(long_t5.params), n_heads=model.config.num_heads)
+        model.params=init_augmented_vocab(repeat_relative_pos_bias(adapt_parameters_from_longt5_local(long_t5.params), n_heads=model.config.num_heads), model.config.num_heads, vocab_size, dtype="bfloat16")
         del long_t5
     
     if dtype == "bfloat16":
