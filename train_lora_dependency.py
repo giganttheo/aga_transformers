@@ -401,7 +401,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
             # "graph_mask": np.stack([np.stack([graph["graph_mask"] for graph in graph_batch])]*model.config.num_layers).astype("bool"),
             # "edge_labels": np.stack([np.stack([graph["edge_labels"] for graph in graph_batch])]*model.config.num_layers).astype(np.int8),
             # "n_slides": np.stack([np.stack([graph["n_slides"] for graph in graph_batch])]*model.config.num_layers).astype(np.int16),
-            "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
+            # "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
             "mask_local": np.stack([graph["mask_local"] for graph in graph_batch]).astype("bool"),
             "mask_global": np.stack([graph["mask_global"] for graph in graph_batch]).astype("bool"),
             "edge_bias_local": np.stack([graph["edge_bias_local"] for graph in graph_batch]).astype(np.int8),
@@ -855,44 +855,55 @@ def main():
 
         return model_inputs
 
+    loading_ds_from_disk = False
+
     if training_args.do_train:
-        train_dataset = dataset["train"]
-        if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-            train_dataset = train_dataset.select(range(max_train_samples))
-        # train_texts = train_dataset
-        train_dataset = train_dataset.map(
-            preprocess_function,
-            batched=True,
-            batch_size=20,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on train dataset",
-        )
+        try:
+            from datasets import load_from_disk
+            datasets = load_from_disk("./preprocessed_datasets/dependency")
+            train_dataset = datasets["train"]
+            loading_ds_from_disk=True
+        except:
+            train_dataset = dataset["train"]
+            if data_args.max_train_samples is not None:
+                max_train_samples = min(len(train_dataset), data_args.max_train_samples)
+                train_dataset = train_dataset.select(range(max_train_samples))
+            # train_texts = train_dataset
+            train_dataset = train_dataset.map(
+                preprocess_function,
+                batched=True,
+                batch_size=20,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on train dataset",
+            )
 
     if training_args.do_eval:
-        max_target_length = data_args.val_max_target_length
-        eval_dataset = dataset["valid"]
-        if data_args.max_eval_samples is not None:
-            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-            eval_dataset = eval_dataset.select(range(max_eval_samples))
-        # eval_texts = eval_dataset
-        eval_dataset = eval_dataset.map(
-            preprocess_function,
-            batched=True,
-            batch_size=20,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on validation dataset",
-        )
+        if loading_ds_from_disk:
+            eval_dataset = datasets["valid"]
+        else:
+            max_target_length = data_args.val_max_target_length
+            eval_dataset = dataset["valid"]
+            if data_args.max_eval_samples is not None:
+                max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
+                eval_dataset = eval_dataset.select(range(max_eval_samples))
+            # eval_texts = eval_dataset
+            eval_dataset = eval_dataset.map(
+                preprocess_function,
+                batched=True,
+                batch_size=20,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on validation dataset",
+            )
 
-    try:
-        preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
-        preprocessed_datasets.save_to_disk("./preprocessed_datasets/dependency", max_shard_size="100MB")
-    except Exception as e:
-        print(e)
+        try:
+            preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+            preprocessed_datasets.save_to_disk("./preprocessed_datasets/dependency", max_shard_size="100MB")
+        except Exception as e:
+            print(e)
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
