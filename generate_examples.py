@@ -31,16 +31,16 @@ generation_config = {
 #     early_stopping = True,
 #     no_repeat_ngram_size = 3)
 
-repo_path="gigant/graph-t5-global-window-8k-tib" # ==> my checkpoint
+repo_path="gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
             "max_source_length": 8192,
             "max_target_length": 512,
             "window_sizes": [254],
             "autoregressive": False,
-            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
 
-tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
+tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
 predictions = []
 references = []
