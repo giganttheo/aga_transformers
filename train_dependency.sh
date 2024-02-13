@@ -14,8 +14,8 @@ wandb login
 
 # export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
-python ./train_lora_structural.py \
-	--output_dir "./8k-structure-window" \
+python ./train_lora_dependency.py \
+	--output_dir "./8k-global-dependency-bias" \
 	--model_name_or_path "google/long-t5-local-base" \
 	--tokenizer_name "google/long-t5-local-base" \
 	--dataset_name="gigant/tib_dependency" \
@@ -23,7 +23,7 @@ python ./train_lora_structural.py \
 	--do_train \
 	--do_eval \
 	--num_train_epochs 5 \
-	--learning_rate 1e-2 \
+	--learning_rate 1e-3 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 32 \
 	--per_device_eval_batch_size 32 \
