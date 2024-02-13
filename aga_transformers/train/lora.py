@@ -102,7 +102,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
             # print(f'Fully finetuning param {path}')
             # print(param.shape, "fully finetuned")
             return LORA_FULL
-        dim = 64 # 64 > 256 (test 128?)
+        dim = 32 # 64 > 256 (test 128?)
         # print(f'Using LoRA with dim={dim} for param {path}')
         # print(param.shape, "LoRA dim 64")
         return dim
