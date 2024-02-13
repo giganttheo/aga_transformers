@@ -889,7 +889,7 @@ def main():
         )
 
     preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
-    preprocessed_datasets.save_to_disk("./preprocessed_datasets/dependency")
+    preprocessed_datasets.save_to_disk("./preprocessed_datasets/dependency", max_shard_size="1GB")
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
