@@ -47,7 +47,6 @@ from flax.training.common_utils import shard_prng_key, stack_forest
 # from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize, to_state_dict, from_state_dict
 import pickle
 from huggingface_hub import Repository, create_repo
-import einops
 import zlib
 from tqdm import tqdm
 import wandb
@@ -67,12 +66,12 @@ import lorax
 from lorax import LoraWeight
 
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
-from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5
+from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
-from aga_transformers.attention_patterns.sparse_attention.led import prepare_led_attn_patterns
-from aga_transformers.attention_patterns.utils import graph_from_path
-
+from aga_transformers.attention_patterns.utils import graph_from_path, unroll_graph_to_scan
+# from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
+from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch, prepare_window_structural_attn_patterns
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -102,62 +101,6 @@ except (LookupError, OSError):
 
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-
-
-def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
-    mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
-    mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
-
-    mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
-    mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
-
-    def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
-
-        @jax.vmap #batch
-        @jax.vmap #num_edges
-        def _get_ids_in_blocks(senders, receivers):
-            #block id
-            block_id = (senders - n_global_tokens) // block_len
-            block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
-
-            block_id_k = (receivers - n_global_tokens) // block_len
-            block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
-
-            #position within the block q
-            block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int32")
-
-            offset_k = block_id_k - block_id
-            # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
-            
-            block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
-            block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
-            block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
-
-            return block_id, block_pos_q, block_pos_k
-
-        @jax.vmap #batch
-        @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
-        def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
-            return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
-
-        @jax.vmap #batch
-        @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
-        def _update_mask_global(mask, graph_mask, senders, receivers):
-            return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
-
-        block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
-        mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
-        mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
-
-        mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
-        mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
-
-        return mask_local.swapaxes(1, 2), mask_global
-
-    return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
-
-
-
 
 @dataclass
 class TrainingArguments:
@@ -269,7 +212,7 @@ class ModelArguments:
         metadata={
             "help": (
                 "Floating-point format in which the model weights should be initialized and trained. Choose one of"
-                " `[float32, float16, bfloat16]`."
+                " `[float32, float16, float32]`."
             )
         },
     )
@@ -424,7 +367,8 @@ class TrainState(train_state.TrainState):
 #     def replicate(self):
 #         return jax_utils.replicate(self).replace(dropout_rng=shard_prng_key(self.dropout_rng))
 
-def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuffle: bool = False, drop_last=True):
+
+def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: int, shuffle: bool = False, drop_last=True):
     """
     Returns batches of size `batch_size` from `dataset`. If `drop_last` is set to `False`, the final batch may be incomplete,
     and range in size from 1 to `batch_size`. Shuffle batches if `shuffle` is `True`.
@@ -445,15 +389,38 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
 
     for idx in batch_idx:
         batch = dataset[idx]
+        #broadcast to all layers
+        # print([type(graph_batch[0][k]) for k in graph_batch[0].keys()])
         graph_batch = batch.pop("graph")
         graph_batch = {
+            # "receivers": np.stack([np.stack([graph["receivers"] for graph in graph_batch])]*model.config.num_layers).astype(np.int16),
+            # "senders": np.stack([np.stack([graph["senders"] for graph in graph_batch])]*model.config.num_layers).astype(np.int16),
+            # "graph_mask": np.stack([np.stack([graph["graph_mask"] for graph in graph_batch])]*model.config.num_layers).astype("bool"),
+            # "edge_labels": np.stack([np.stack([graph["edge_labels"] for graph in graph_batch])]*model.config.num_layers).astype(np.int8),
+            # "n_slides": np.stack([np.stack([graph["n_slides"] for graph in graph_batch])]*model.config.num_layers).astype(np.int16),
+            "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
             "mask_local": np.stack([graph["mask_local"] for graph in graph_batch]).astype("bool"),
             "mask_global": np.stack([graph["mask_global"] for graph in graph_batch]).astype("bool"),
-            }
+            "edge_bias_local": np.stack([graph["edge_bias_local"] for graph in graph_batch]).astype(np.int8),
+            "edge_bias_global": np.stack([graph["edge_bias_global"] for graph in graph_batch]).astype(np.int8),
+            } #, dtype=graph_batch[0][k].dtype?
+
         batch = {k: np.array(v) for k, v in batch.items()}
-
+        # attention_kwargs= {
+        #     "mode": "window",
+        #     "is_padded": True,
+        #     # "data_point": raw_dataset[idx],
+        #     "keyframes": raw_dataset[idx]["keyframes"],
+        #     "transcript_segments": raw_dataset[idx]["transcript_segments"],
+        #     "tokens": tokens,
+        #     "max_source_length": data_args.max_source_length,
+        #     # "max_target_length": data_args.max_target_length,
+        #     "window_sizes": [254],
+        #     # "autoregressive": False,
+        #     "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        # }
+        # graph_batch = create_window_structural_attn_patterns_batch(model, layer_wise=False, from_longt5_local=True **attention_kwargs)
         yield batch, graph_batch
-
 
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
@@ -469,7 +436,6 @@ def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     for metric_name, value in eval_metrics.items():
         summary_writer.scalar(f"eval_{metric_name}", value, step)
 
-
 def create_learning_rate_fn(
     train_ds_size: int, train_batch_size: int, num_train_epochs: int, num_warmup_steps: int, learning_rate: float
 ) -> Callable[[int], jnp.array]:
@@ -483,6 +449,70 @@ def create_learning_rate_fn(
     )
     schedule_fn = optax.join_schedules(schedules=[warmup_fn, decay_fn], boundaries=[num_warmup_steps])
     return schedule_fn
+
+#TODO: add this to another file
+# @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
+@partial(jax.jit, static_argnums=[3, 4, 5, 6])
+def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
+  mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
+  #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
+  mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
+  if edges is not None:
+      edge_bias_local = jnp.full(mask_local_shape, -1)
+  else:
+      edge_bias_local=None
+  mask_global_shape = (n_global_tokens, seq_len)
+  mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
+  if edges is not None:
+      edge_bias_global = jnp.full(mask_global_shape, -1)
+  else:
+      edge_bias_global=None
+
+  def setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global=None, edge_bias_local=None, edges=None):
+
+    # @jax.vmap #batch
+    # @jax.vmap #heads
+    @jax.vmap #num_edges
+    def _get_ids_in_blocks(senders, receivers):
+      #block id
+      block_id = (senders - n_global_tokens) // block_len
+      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+
+      block_id_k = (receivers - n_global_tokens) // block_len
+      block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+
+      #position within the block q
+      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int32")
+
+      offset_k = block_id_k - block_id
+      # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+      
+      block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
+      block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+      block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
+      return block_id, block_pos_q, block_pos_k
+
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+    def _update_mask_global(mask, graph_mask, senders, receivers):
+        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+    mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
+    mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+
+    mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
+    mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
+
+    if edges is not None:
+        edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
+        edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
+        return mask_local, mask_global, edge_bias_local, edge_bias_global
+
+    return mask_local, mask_global #.swapaxes(1, 2)
+
+  return setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
 
 
 def main():
@@ -629,23 +659,18 @@ def main():
         )
     if model_args.model_name_or_path:
         dtype=model_args.dtype
-        attention_kwargs = {
-            "max_source_length": data_args.max_source_length,
-            "max_target_length": data_args.max_target_length,
-            "window_sizes": [254], #[127], # [254]*12,
-            # "autoregressive": False,
-            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
-        }
-        print(attention_kwargs)
-        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_mode=None, attention_kwargs=attention_kwargs, layer_wise=False)
 
-        
+        tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs={"autoregressive": False}, attention_mode="structure", layer_wise=False, from_longt5_local=True)
+
     if training_args.gradient_checkpointing:
         print("=============================")
         print("Enabling gradient checkpointing")
         print("=============================")
         model.enable_gradient_checkpointing()
-
+        # model.scan_enable()
+        # params = model.convert_unroll_to_scan(model.params) #model.scan_enable()
+        params = model.params
+        
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
 
@@ -697,30 +722,48 @@ def main():
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
     shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
 
-    graph = prepare_led_attn_patterns(**attention_kwargs)
-    block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-    n_global_tokens = 2 #TODO: add in config
-    seq_length = data_args.max_source_length
-    num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
-    senders=einops.repeat(graph["senders"], 'e -> bs h e', bs=1, h=model.config.num_heads)
-    receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.num_heads)
-    graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+
+    vocab_dependency = {'intj': 0, 'punct': 1, 'ccomp': 2, 'advmod': 3, 'det': 4, 'pobj': 5, 'nsubj': 6, 'dobj': 7, 'conj': 8, 'prep': 9, 'aux': 10, 'compound': 11, 'acomp': 12, 'amod': 13, 'nummod': 14, 'attr': 15, 'mark': 16, 'advcl': 17, 'cc': 18, 'relcl': 19, 'npadvmod': 20, 'acl': 21, 'prt': 22, 'auxpass': 23, 'nsubjpass': 24, 'appos': 25, 'neg': 26, 'pcomp': 27, 'preconj': 28, 'poss': 29, 'nmod': 30, 'parataxis': 31, 'dative': 32, 'predet': 33, 'xcomp': 34, 'quantmod': 35, 'oprd': 36, 'meta': 37, 'dep': 38, 'expl': 39, 'csubj': 40, 'agent': 41, 'case': 42, 'csubjpass': 43}
+
 
     # Setting padding="max_length" as we need fixed length inputs for jitted functions
     def preprocess_function(examples):
         inputs = examples[text_column]
         targets = examples[summary_column]
-        inputs = [prefix + inp for inp in inputs]
+        num_slides = [len(example['timestamp']) for example in examples['keyframes']]
+        slide_token="<extra_id_99>"
+        inputs = [slide_token*num_slides_ + prefix + inp for (inp, num_slides_) in zip(inputs, num_slides)]
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        graphs = []
-        for i in range(len(inputs)): 
+        graphs=[]
+        # mask_local_l, mask_global_l, edge_bias_local_l, edge_bias_global_l = [], [], [], []
+        for i in range(len(inputs)):
+            #graph generation
+
+            graph = examples["dependency_graph"]
+            # graphs.append(graph)
+
+            #pre-compute the edge bias buckets
+            block_len = 254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+            n_document_tokens = 2 #TODO: add in config
+            n_global_tokens = 0 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
+            num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
             graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
-            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
-            graph= {"mask_local": mask_local, "mask_global": mask_global}
-            graphs.append(graph)
+            # print(graph_mask.shape)
+            _, _, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, [vocab_dependency[label] for label in graph["edge_labels"]])
+            
+            graph = prepare_led_attn_patterns(**attention_kwargs)
+            seq_length = data_args.max_source_length
+            graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
+            mask_local, mask_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+            
+            graphs.append({**graph, "mask_local": mask_local[None], "mask_global": mask_global[None], "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
+        
         model_inputs["graph"] = graphs
+        # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
+        #     inputs, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
+        # ).tokens()]
 
         # Setup the tokenizer for targets
         labels = tokenizer(
@@ -748,9 +791,11 @@ def main():
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
+        # train_texts = train_dataset
         train_dataset = train_dataset.map(
             preprocess_function,
             batched=True,
+            batch_size=100,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
@@ -763,9 +808,11 @@ def main():
         if data_args.max_eval_samples is not None:
             max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
             eval_dataset = eval_dataset.select(range(max_eval_samples))
+        # eval_texts = eval_dataset
         eval_dataset = eval_dataset.map(
             preprocess_function,
             batched=True,
+            batch_size=100,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
@@ -778,9 +825,11 @@ def main():
         if data_args.max_predict_samples is not None:
             max_predict_samples = min(len(predict_dataset), data_args.max_predict_samples)
             predict_dataset = predict_dataset.select(range(max_predict_samples))
+        # predict_texts = predict_dataset
         predict_dataset = predict_dataset.map(
             preprocess_function,
             batched=True,
+            batch_size=100,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
@@ -875,17 +924,19 @@ def main():
         dtype_momentum=dtype,
     )
 
-    # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
+    # optimizer = optax.MultiSteps(optimizer, every_k_schedule=2) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_lora(model, params, optimizer, dtype="bfloat16")
+
+    from flax.traverse_util import flatten_dict, unflatten_dict
+    print(flatten_dict(lora_params, sep="/").keys(), '\n')
 
     # apply_fn = model.__call__
     # lora_params = model.params
     # optimizer = adamw
 
     loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
-    # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
@@ -942,7 +993,7 @@ def main():
         metrics = {"loss": loss}
         return metrics
 
-    @jax.jit
+    # @jax.jit
     def generate_step(params, batch):
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
@@ -978,13 +1029,13 @@ def main():
         train_metrics = []
 
         # Generate an epoch by shuffling sampling indices from the train dataset
-        train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
+        train_loader = data_loader(input_rng, train_dataset, model, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
-            batch = next(train_loader)
+            batch, graphs = next(train_loader)
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            state, train_metric = train_step(state, batch)
+            state, train_metric = train_step(state, batch, graphs)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
@@ -1003,21 +1054,21 @@ def main():
             f"Epoch... ({epoch + 1}/{num_epochs} | Loss: {train_metric['loss']}, Learning Rate:"
             f" {train_metric['learning_rate']})"
         )
-
+        save_state(state)
         # ======================== Evaluating ==============================
         eval_metrics = []
         eval_preds = []
         eval_labels = []
         print("Evaluating...")
-        eval_loader = data_loader(input_rng, eval_dataset, eval_batch_size, drop_last=False)
+        eval_loader = data_loader(input_rng, eval_dataset, model, eval_batch_size, drop_last=False)
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
             # Model forward
-            batch = next(eval_loader)
+            batch, graphs = next(eval_loader)
             labels = batch["labels"]
-
+            graphs = graph_from_path(state.params, graphs, {}, {}, layer_wise=False)
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, graphs
             )
             eval_metrics.append(metrics)
 
@@ -1085,15 +1136,15 @@ def main():
         pred_generations = []
         pred_labels = []
 
-        pred_loader = data_loader(input_rng, predict_dataset, eval_batch_size, drop_last=False)
+        pred_loader = data_loader(input_rng, predict_dataset, model, eval_batch_size, drop_last=False)
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward
-            batch = next(pred_loader)
+            batch, graphs = next(pred_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, graphs
             )
             pred_metrics.append(metrics)
 

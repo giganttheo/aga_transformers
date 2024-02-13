@@ -968,7 +968,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
             #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
             n_document_tokens = 2 #TODO: add in config
-            n_global_tokens = 12 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
+            n_global_tokens = 0 + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
             
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
