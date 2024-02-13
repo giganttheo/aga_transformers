@@ -716,8 +716,8 @@ def main():
         )
         graphs = []
         for i in range(len(inputs)): 
-            graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
-            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+            graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
+            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
             graph= {"mask_local": mask_local, "mask_global": mask_global}
             graphs.append(graph)
         model_inputs["graph"] = graphs
