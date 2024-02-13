@@ -1,3 +1,4 @@
+from functools import partial
 
 import numpy as np
 
@@ -154,7 +155,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
                 (batch_size, num_beams, input_ids_length),
             )
         )
-        model_outputs = jax.jit(model.decode)(input_token, params=params, return_dict=True, **state.model_kwargs)
+        model_outputs = jax.jit(partial(model.decode,  return_dict=True))(input_token, params=params, **state.model_kwargs)
 
         logits = unflatten_beam_dim(model_outputs.logits[:, -1], batch_size, num_beams)
         cache = jax.tree_util.tree_map(
@@ -256,7 +257,6 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
             model_kwargs=next_model_kwargs,
         )
 
-    from functools import partial
     state = partial(beam_search_body_fn, input_ids_length=input_ids.shape[-1])(state)
     state = lax.while_loop(beam_search_cond_fn, beam_search_body_fn, state)
 
