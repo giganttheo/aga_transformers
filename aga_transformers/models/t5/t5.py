@@ -102,7 +102,7 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         **model_kwargs,
         dtype=dtype,
     )
-    vocab_size = 8
+    vocab_size = 44 #8 for structural, 44 for dependency
     # model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
     if from_longt5_local:
         print("adapting parameters from longt5_local")
