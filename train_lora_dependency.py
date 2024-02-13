@@ -453,22 +453,19 @@ def create_learning_rate_fn(
 #TODO: add this to another file
 # @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
 @partial(jax.jit, static_argnums=[3, 4, 5, 6])
-def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
+def create_local_and_global_edges(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
-  mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
   if edges is not None:
       edge_bias_local = jnp.full(mask_local_shape, -1)
   else:
       edge_bias_local=None
   mask_global_shape = (n_global_tokens, seq_len)
-  mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
   if edges is not None:
       edge_bias_global = jnp.full(mask_global_shape, -1)
   else:
       edge_bias_global=None
 
-  def setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global=None, edge_bias_local=None, edges=None):
+  def setup_mask(senders, receivers, graph_mask, edge_bias_global=None, edge_bias_local=None, edges=None):
 
     # @jax.vmap #batch
     # @jax.vmap #heads
@@ -499,20 +496,67 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
     block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
-    mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
-    mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
-
-    mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
-    mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
 
     if edges is not None:
         edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
         edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
-        return mask_local, mask_global, edge_bias_local, edge_bias_global
+        return edge_bias_local, edge_bias_global
 
-    return mask_local, mask_global #.swapaxes(1, 2)
+    return None #.swapaxes(1, 2)
 
-  return setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
+  return setup_mask(senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
+
+def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
+    mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
+    mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+    mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
+    mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+    def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
+
+        @jax.vmap #batch
+        @jax.vmap #num_edges
+        def _get_ids_in_blocks(senders, receivers):
+            #block id
+            block_id = (senders - n_global_tokens) // block_len
+            block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+
+            block_id_k = (receivers - n_global_tokens) // block_len
+            block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+
+            #position within the block q
+            block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int32")
+
+            offset_k = block_id_k - block_id
+            # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+            
+            block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
+            block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+            block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
+
+            return block_id, block_pos_q, block_pos_k
+
+        @jax.vmap #batch
+        @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+        def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+            return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+        @jax.vmap #batch
+        @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+        def _update_mask_global(mask, graph_mask, senders, receivers):
+            return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+        block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+        mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
+        mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+
+        mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
+        mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
+
+        return mask_local.swapaxes(1, 2), mask_global
+
+    return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
 
 def main():
@@ -724,6 +768,15 @@ def main():
 
 
     vocab_dependency = {'intj': 0, 'punct': 1, 'ccomp': 2, 'advmod': 3, 'det': 4, 'pobj': 5, 'nsubj': 6, 'dobj': 7, 'conj': 8, 'prep': 9, 'aux': 10, 'compound': 11, 'acomp': 12, 'amod': 13, 'nummod': 14, 'attr': 15, 'mark': 16, 'advcl': 17, 'cc': 18, 'relcl': 19, 'npadvmod': 20, 'acl': 21, 'prt': 22, 'auxpass': 23, 'nsubjpass': 24, 'appos': 25, 'neg': 26, 'pcomp': 27, 'preconj': 28, 'poss': 29, 'nmod': 30, 'parataxis': 31, 'dative': 32, 'predet': 33, 'xcomp': 34, 'quantmod': 35, 'oprd': 36, 'meta': 37, 'dep': 38, 'expl': 39, 'csubj': 40, 'agent': 41, 'case': 42, 'csubjpass': 43}
+    
+    graph = prepare_led_attn_patterns(**attention_kwargs)
+    block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+    n_global_tokens = 2 #TODO: add in config
+    seq_length = data_args.max_source_length
+    num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+    senders=einops.repeat(graph["senders"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+    receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+    graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.num_heads)
 
 
     # Setting padding="max_length" as we need fixed length inputs for jitted functions
@@ -741,7 +794,7 @@ def main():
         for i in range(len(inputs)):
             #graph generation
 
-            graph = examples["dependency_graph"]
+            dep_graph = examples["dependency_graph"]
             # graphs.append(graph)
 
             #pre-compute the edge bias buckets
@@ -749,14 +802,13 @@ def main():
             n_document_tokens = 2 #TODO: add in config
             n_global_tokens = 0 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
-            graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
+            graph_mask = jnp.logical_and(dep_graph["graph_mask"], model_inputs["attention_mask"][i].take(dep_graph["receivers"]))
             # print(graph_mask.shape)
-            _, _, edge_bias_local, edge_bias_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, [vocab_dependency[label] for label in graph["edge_labels"]])
+            edge_bias_local, edge_bias_global = create_local_and_global_edges(dep_graph["senders"], dep_graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, [vocab_dependency[label] for label in dep_graph["edge_labels"]])
             
-            graph = prepare_led_attn_patterns(**attention_kwargs)
-            seq_length = data_args.max_source_length
-            graph_mask = jnp.logical_and(graph["graph_mask"], model_inputs["attention_mask"][i].take(graph["receivers"]))
-            mask_local, mask_global = create_local_and_global_masks(graph["senders"], graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+            
+            graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
+            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
             
             graphs.append({**graph, "mask_local": mask_local[None], "mask_global": mask_global[None], "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
         
