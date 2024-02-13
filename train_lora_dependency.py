@@ -813,14 +813,14 @@ def main():
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
             
             receivers_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
-            receivers_dep = jax.lax.dynamic_slice_update(receivers_dep, jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+            receivers_dep = jax.lax.dynamic_update_slice(receivers_dep, jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
             senders_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
-            senders_dep = jax.lax.dynamic_slice_update(senders_dep, jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+            senders_dep = jax.lax.dynamic_update_slice(senders_dep, jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
             graph_mask_dep = jnp.zeros((max_graph_len), dtype="bool")
-            graph_mask_dep = jax.lax.dynamic_slice_update(graph_mask_dep, jnp.array([gm for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype="bool"), (0,))
+            graph_mask_dep = jax.lax.dynamic_update_slice(graph_mask_dep, jnp.array([gm for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype="bool"), (0,))
             graph_mask_dep = jnp.logical_and(graph_mask_dep, model_inputs["attention_mask"][i].take(receivers_dep))
             edge_labels = jnp.full((max_graph_len), -1, dtype=jnp.int16)
-            edge_labels = jax.lax.dynamic_slice_update(edge_labels, jnp.array([vocab_dependency[label] for label,r,s,gm in zip(dep_graph["edge_labels"], dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.int16), (0,))      
+            edge_labels = jax.lax.dynamic_update_slice(edge_labels, jnp.array([vocab_dependency[label] for label,r,s,gm in zip(dep_graph["edge_labels"], dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.int16), (0,))      
             # print(graph_mask.shape)
             edge_bias_local, edge_bias_global = create_local_and_global_edges(senders_dep, receivers_dep, graph_mask_dep, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, edge_labels)
                         
