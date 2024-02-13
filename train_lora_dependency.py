@@ -787,7 +787,7 @@ def main():
     receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.num_heads)
     graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.num_heads)
 
-    max_graph_len = (seq_length - (n_global_tokens)) * attention_kwargs["window_sizes"][0] + (n_global_tokens) * seq_length) # > maximum length
+    max_graph_len = (seq_length - (n_global_tokens)) * attention_kwargs["window_sizes"][0] + (n_global_tokens) * seq_length # > maximum length
 
 
     # Setting padding="max_length" as we need fixed length inputs for jitted functions
