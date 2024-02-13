@@ -860,8 +860,8 @@ def main():
     if training_args.do_train:
         try:
             from datasets import load_from_disk
-            datasets = load_from_disk("./preprocessed_datasets/dependency")
-            train_dataset = datasets["train"]
+            preprocessed_datasets = load_from_disk("./preprocessed_datasets/dependency")
+            train_dataset = preprocessed_datasets["train"]
             loading_ds_from_disk=True
         except:
             train_dataset = dataset["train"]
@@ -881,7 +881,7 @@ def main():
 
     if training_args.do_eval:
         if loading_ds_from_disk:
-            eval_dataset = datasets["valid"]
+            eval_dataset = preprocessed_datasets["valid"]
         else:
             max_target_length = data_args.val_max_target_length
             eval_dataset = dataset["valid"]
@@ -899,11 +899,11 @@ def main():
                 desc="Running tokenizer on validation dataset",
             )
 
-        try:
-            preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
-            preprocessed_datasets.save_to_disk("./preprocessed_datasets/dependency", max_shard_size="100MB")
-        except Exception as e:
-            print(e)
+            try:
+                preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+                preprocessed_datasets.save_to_disk("./preprocessed_datasets/dependency", max_shard_size="100MB")
+            except Exception as e:
+                print(e)
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
