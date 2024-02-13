@@ -800,7 +800,7 @@ def main():
         for i in range(len(inputs)):
             #graph generation
 
-            dep_graph = examples["dependency_graph"]
+            dep_graph = examples["dependency_graph"][i]
             # graphs.append(graph)
 
             #pre-compute the edge bias buckets
