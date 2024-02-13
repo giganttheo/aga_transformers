@@ -808,9 +808,13 @@ def main():
             n_document_tokens = 2 #TODO: add in config
             n_global_tokens = 0 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
-            graph_mask_dep = jnp.logical_and(jnp.array(dep_graph["graph_mask"], dtype="bool"), model_inputs["attention_mask"][i].take(jnp.array(dep_graph["receivers"], dtype=jnp.uint16)))
+            receivers_dep = jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16)
+            senders_dep = jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16)
+            graph_mask_dep = jnp.array([gm for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype="bool")
+            edge_labels = [vocab_dependency[label] for label,r,s,gm in zip(dep_graph["edge_labels"], dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm]
+            graph_mask_dep = jnp.logical_and(graph_mask_dep, model_inputs["attention_mask"][i].take(receivers_dep))
             # print(graph_mask.shape)
-            edge_bias_local, edge_bias_global = create_local_and_global_edges(jnp.array(dep_graph["senders"], dtype=jnp.uint16), jnp.array(dep_graph["receivers"], dtype=jnp.uint16), graph_mask_dep, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, [vocab_dependency[label] for label in dep_graph["edge_labels"]])
+            edge_bias_local, edge_bias_global = create_local_and_global_edges(senders_dep, receivers_dep, graph_mask_dep, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, edge_labels)
                         
             graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
