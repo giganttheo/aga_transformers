@@ -38,7 +38,7 @@ import flax
 import nltk  # Here to have a nice missing dependency error message early on
 import numpy as np
 import optax
-from datasets import Dataset, load_dataset
+from datasets import Dataset, load_dataset, DatasetDict, load_from_disk
 from filelock import FileLock
 from flax import jax_utils, traverse_util
 from flax.training import train_state
@@ -509,6 +509,7 @@ def create_local_and_global_edges(senders, receivers, graph_mask, n_global_token
 
   return setup_mask(senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
 
+@partial(jax.jit, static_argnums=[3, 4, 5, 6])
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
     mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
     mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
@@ -786,6 +787,8 @@ def main():
     receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.num_heads)
     graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.num_heads)
 
+    max_graph_len = (seq_length - (n_global_tokens)) * attention_kwargs["window_sizes"][0] + (n_global_tokens) * seq_length) # > maximum length
+
 
     # Setting padding="max_length" as we need fixed length inputs for jitted functions
     def preprocess_function(examples):
@@ -808,11 +811,16 @@ def main():
             n_document_tokens = 2 #TODO: add in config
             n_global_tokens = 0 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
-            receivers_dep = jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16)
-            senders_dep = jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16)
-            graph_mask_dep = jnp.array([gm for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype="bool")
-            edge_labels = [vocab_dependency[label] for label,r,s,gm in zip(dep_graph["edge_labels"], dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm]
+            
+            receivers_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
+            receivers_dep = jax.lax.dynamic_slice_update(receivers_dep, jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+            senders_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
+            senders_dep = jax.lax.dynamic_slice_update(senders_dep, jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+            graph_mask_dep = jnp.zeros((max_graph_len), dtype="bool")
+            graph_mask_dep = jax.lax.dynamic_slice_update(graph_mask_dep, jnp.array([gm for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype="bool"), (0,))
             graph_mask_dep = jnp.logical_and(graph_mask_dep, model_inputs["attention_mask"][i].take(receivers_dep))
+            edge_labels = jnp.full((max_graph_len), -1, dtype=jnp.int16)
+            edge_labels = jax.lax.dynamic_slice_update(edge_labels, jnp.array([vocab_dependency[label] for label,r,s,gm in zip(dep_graph["edge_labels"], dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.int16), (0,))      
             # print(graph_mask.shape)
             edge_bias_local, edge_bias_global = create_local_and_global_edges(senders_dep, receivers_dep, graph_mask_dep, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, edge_labels)
                         
@@ -879,6 +887,9 @@ def main():
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on validation dataset",
         )
+
+    preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+    preprocessed_datasets.save_to_disk("./preprocessed_datasets/dependency")
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length

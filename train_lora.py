@@ -103,7 +103,7 @@ except (LookupError, OSError):
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
-
+@partial(jax.jit, static_argnums=[3, 4, 5, 6])
 def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
     mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
     mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
