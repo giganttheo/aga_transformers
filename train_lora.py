@@ -985,9 +985,9 @@ def main():
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
-            batch = next(train_loader)
+            batch, batch_graph = next(train_loader)
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            state, train_metric = train_step(state, batch)
+            state, train_metric = train_step(state, batch, batch_graph)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
@@ -1016,11 +1016,11 @@ def main():
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
             # Model forward
-            batch = next(eval_loader)
+            batch, batch_graph = next(eval_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, batch_graph 
             )
             eval_metrics.append(metrics)
 
@@ -1092,11 +1092,11 @@ def main():
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward
-            batch = next(pred_loader)
+            batch, batch_graph  = next(pred_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, batch_graph 
             )
             pred_metrics.append(metrics)
 
