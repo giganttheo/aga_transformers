@@ -10,7 +10,7 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test").select(range(100))
+test_dataset = load_dataset("gigant/tib", split="test").select(range(10))
 
 generation_config = {
     "num_beams": 4, #instead of 2?
