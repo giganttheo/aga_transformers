@@ -17,8 +17,8 @@ generation_config = {
     "max_new_tokens": 20,
     # "min_length": 1,
     "length_penalty": 0,
-    "early_stopping": False,
-    "no_repeat_ngram_size": 2
+    "early_stopping": True,
+    "no_repeat_ngram_size": 3,
 }
 
 # generation_config = transformers.GenerationConfig(**generation_config)
@@ -31,7 +31,7 @@ generation_config = {
 #     early_stopping = True,
 #     no_repeat_ngram_size = 3)
 
-repo_path="gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
+repo_path= "google/long-t5-local-base" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
             "max_source_length": 8192,
             "max_target_length": 512,

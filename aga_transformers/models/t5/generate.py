@@ -154,7 +154,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
                 (batch_size, num_beams, input_ids_length),
             )
         )
-        model_outputs = model.decode(input_token, params=params, return_dict=True, **state.model_kwargs)
+        model_outputs = jax.jit(model.decode)(input_token, params=params, return_dict=True, **state.model_kwargs)
 
         logits = unflatten_beam_dim(model_outputs.logits[:, -1], batch_size, num_beams)
         cache = jax.tree_util.tree_map(
