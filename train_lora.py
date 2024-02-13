@@ -38,7 +38,7 @@ import flax
 import nltk  # Here to have a nice missing dependency error message early on
 import numpy as np
 import optax
-from datasets import Dataset, load_dataset
+from datasets import Dataset, load_dataset, DatasetDict, load_from_disk
 from filelock import FileLock
 from flax import jax_utils, traverse_util
 from flax.training import train_state
@@ -718,7 +718,7 @@ def main():
         for i in range(len(inputs)): 
             graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
-            graph= {"mask_local": mask_local, "mask_global": mask_global}
+            graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
             graphs.append(graph)
         model_inputs["graph"] = graphs
 
@@ -773,6 +773,9 @@ def main():
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on validation dataset",
         )
+
+    preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+    preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local")
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
@@ -1092,7 +1095,7 @@ def main():
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward
-            batch, batch_graph  = next(pred_loader)
+            batch, batch_graph = next(pred_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
