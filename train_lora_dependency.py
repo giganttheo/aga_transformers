@@ -65,13 +65,16 @@ from transformers.utils import get_full_repo_name, is_offline_mode, send_example
 import lorax
 from lorax import LoraWeight
 
+import einops
+
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 from aga_transformers.attention_patterns.utils import graph_from_path, unroll_graph_to_scan
 # from aga_transformers.attention_patterns.sparse_attention.global_dependency import create_global_dependency_attn_patterns_from_prepared
-from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch, prepare_window_structural_attn_patterns
+from aga_transformers.attention_patterns.sparse_attention.led import prepare_led_attn_patterns
+
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -768,7 +771,12 @@ def main():
 
 
     vocab_dependency = {'intj': 0, 'punct': 1, 'ccomp': 2, 'advmod': 3, 'det': 4, 'pobj': 5, 'nsubj': 6, 'dobj': 7, 'conj': 8, 'prep': 9, 'aux': 10, 'compound': 11, 'acomp': 12, 'amod': 13, 'nummod': 14, 'attr': 15, 'mark': 16, 'advcl': 17, 'cc': 18, 'relcl': 19, 'npadvmod': 20, 'acl': 21, 'prt': 22, 'auxpass': 23, 'nsubjpass': 24, 'appos': 25, 'neg': 26, 'pcomp': 27, 'preconj': 28, 'poss': 29, 'nmod': 30, 'parataxis': 31, 'dative': 32, 'predet': 33, 'xcomp': 34, 'quantmod': 35, 'oprd': 36, 'meta': 37, 'dep': 38, 'expl': 39, 'csubj': 40, 'agent': 41, 'case': 42, 'csubjpass': 43}
-    
+    attention_kwargs = {
+            "max_source_length": data_args.max_source_length,
+            "max_target_length": data_args.max_target_length,
+            "window_sizes": [254], #[127], # [254]*12,
+            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+    }
     graph = prepare_led_attn_patterns(**attention_kwargs)
     block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
     n_global_tokens = 2 #TODO: add in config
@@ -783,9 +791,7 @@ def main():
     def preprocess_function(examples):
         inputs = examples[text_column]
         targets = examples[summary_column]
-        num_slides = [len(example['timestamp']) for example in examples['keyframes']]
-        slide_token="<extra_id_99>"
-        inputs = [slide_token*num_slides_ + prefix + inp for (inp, num_slides_) in zip(inputs, num_slides)]
+        inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
@@ -802,15 +808,14 @@ def main():
             n_document_tokens = 2 #TODO: add in config
             n_global_tokens = 0 + n_document_tokens # static value that should be >= n_document_tokens + n_slides.max()
             num_blocks=math.ceil((data_args.max_source_length - n_global_tokens) / block_len)
-            graph_mask = jnp.logical_and(dep_graph["graph_mask"], model_inputs["attention_mask"][i].take(dep_graph["receivers"]))
+            graph_mask_dep = jnp.logical_and(dep_graph["graph_mask"], model_inputs["attention_mask"][i].take(dep_graph["receivers"]))
             # print(graph_mask.shape)
-            edge_bias_local, edge_bias_global = create_local_and_global_edges(dep_graph["senders"], dep_graph["receivers"], graph_mask, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, [vocab_dependency[label] for label in dep_graph["edge_labels"]])
-            
-            
+            edge_bias_local, edge_bias_global = create_local_and_global_edges(dep_graph["senders"], dep_graph["receivers"], graph_mask_dep, n_global_tokens, block_len, num_blocks, data_args.max_source_length, False, [vocab_dependency[label] for label in dep_graph["edge_labels"]])
+                        
             graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
-            
-            graphs.append({**graph, "mask_local": mask_local[None], "mask_global": mask_global[None], "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
+
+            graphs.append({"mask_local": mask_local, "mask_global": mask_global, "edge_bias_local": edge_bias_local, "edge_bias_global": edge_bias_global})
         
         model_inputs["graph"] = graphs
         # model_inputs["tokens"]=[tokenizer.convert_ids_to_tokens(input_ids) for input_ids in tokenizer(
