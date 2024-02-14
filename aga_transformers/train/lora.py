@@ -109,8 +109,10 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
             # print(param.shape, "LoRA dim 64")
             return dim
         elif  'layer_norm' in [p.key for p in path]:
+            print("freeze {path}")
             return LORA_FREEZE
         else:
+            print("freeze {path}")
             return LORA_FREEZE
 
     # Create a pytree with the same shape as params indicating how each parameter should be handled
