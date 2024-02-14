@@ -100,7 +100,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
     def decision_fn(path, param):
         dim = 8 # 64 > 256 (test 128?)
         if 'embedding' in [p.key for p in path] and 'shared' in [p.key for p in path] :
-            return dim
+            return LORA_FREEZE
         elif 'embedding' in [p.key for p in path]:
             return LORA_FULL
         elif 'kernel' in [p.key for p in path]:

@@ -85,7 +85,6 @@ def _split_into_blocks(x: jnp.ndarray, block_len: int, axis: int) -> jnp.ndarray
     output_shape = x.shape[:axis] + (num_blocks, block_len) + x.shape[(axis + 1) :]
     return x.reshape(output_shape, order="C")
 
-
 def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_len: int, axis: int) -> jnp.ndarray:
     """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
     is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
@@ -198,10 +197,13 @@ def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.n
     pad[block_axis] = (1, 1)
     # [..., num_blocks, block_len] -> [..., num_blocks + 2, block_len]
     x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
-    @partial(jax.vmap, out_axes=block_axis)
+    @partial(jax.vmap, out_axes=1)
     def get_global(slide_start):
-        return jnp.concatenate([x_global[:, slide_start:slide_start+n_slides_], x_global[:, doc_tokens_start:]], axis=1)
+        slice_slides = jax.lax.dynamic_slice(x_global, (0, slide_start, 0), (x_global.shape[0], n_slides_, x_global.shape[2]))
+        slice_docs = jax.lax.dynamic_slice(x_global, (0, doc_tokens_start, 0), (x_global.shape[0], x_global.shape[1] - doc_tokens_start, x_global.shape[2]))
+        return jnp.concatenate([slice_slides, slice_docs], axis=1)
         
+    x_global = get_global(slide_start_for_blocks)
     # x_global = jnp.concatenate([x_global[:, slide_start:slide_start+n_slides_], x_global[:, doc_tokens_start:]], axis=1)
     
     # x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
@@ -310,6 +312,84 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
       block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
       block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
       block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
+
+      return block_id, block_pos_q, block_pos_k
+
+    # @jax.vmap #batch
+    # @jax.vmap #heads # @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+    # @jax.vmap #batch
+    # @jax.vmap #heads #was @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+    def _update_mask_global(mask, graph_mask, senders, receivers):
+        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+    mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
+    mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+
+    mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
+    mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
+
+    if edges is not None:
+        edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
+        edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
+        return mask_local, mask_global, edge_bias_local, edge_bias_global
+
+    return mask_local, mask_global #.swapaxes(1, 2)
+
+  return setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
+
+
+@partial(jax.jit, static_argnums=[3, 4, 5, 6])
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #batch
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
+def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
+  #TODO add these args
+  n_slides_total: int = 0
+  slide_start_for_blocks: jnp.ndarray = None
+  n_slides_: jnp.ndarray = None
+  offset_slides = n_slides_total - slide_start_for_blocks
+  n_global_tokens_total: int = n_global_tokens - n_slides_ + n_slides_total
+  
+  mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
+  #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
+  mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
+  if edges is not None:
+      edge_bias_local = jnp.full(mask_local_shape, -1)
+  else:
+      edge_bias_local=None
+  mask_global_shape = (n_global_tokens, seq_len)
+  mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
+  if edges is not None:
+      edge_bias_global = jnp.full(mask_global_shape, -1)
+  else:
+      edge_bias_global=None
+
+  def setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global=None, edge_bias_local=None, edges=None):
+
+    # @jax.vmap #batch
+    # @jax.vmap #heads
+    @jax.vmap #num_edges
+    def _get_ids_in_blocks(senders, receivers):
+      #block id
+      block_id = (senders - n_global_tokens_total) // block_len
+      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+
+      block_id_k = (receivers - n_global_tokens_total) // block_len
+      block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+
+      #position within the block q
+      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens_total) % block_len, 1_000_000).astype("int32")
+
+      offset_k = block_id_k - block_id
+      # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+      
+      block_pos_k = n_global_tokens + ((receivers - n_global_tokens_total) % block_len) + (1 + offset_k) * block_len
+      block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+      block_pos_k = jnp.where((receivers >= n_slides_), block_pos_k, receivers + offset_slides[block_id_k]) #if pos_k is in the slide tokens
+      block_pos_k = jnp.where((receivers >= n_global_tokens_total), block_pos_k, receivers) #if pos_k is in the document tokens
 
       return block_id, block_pos_q, block_pos_k
 
