@@ -1579,18 +1579,18 @@ class FlaxT5BlockCollection(nn.Module):
         if self.config.causal and encoder_hidden_states is not None:
             carry_ += (encoder_decoder_position_bias, )
 
-        if False: #self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
-            mask_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_local"].astype("bool")
-            mask_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_global"].astype("bool")
-            edge_bias_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_local"].astype(jnp.int8)
-            edge_bias_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_global"].astype(jnp.int8)
-            print(mask_local.shape)
-            _ = self.variables.pop("graph")
-        else:
-            mask_local=None
-            mask_global=None
-            edge_bias_local=None
-            edge_bias_global=None
+        # if False: #self.has_variable("graph", "FlaxScanLayers") and "mask_local" in self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"].keys():
+        #     mask_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_local"].astype("bool")
+        #     mask_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["mask_global"].astype("bool")
+        #     edge_bias_local = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_local"].astype(jnp.int8)
+        #     edge_bias_global = self.variables["graph"]["FlaxScanLayers"]["layer"]["0"]["SelfAttention"]["edge_bias_global"].astype(jnp.int8)
+        #     print(mask_local.shape)
+        #     _ = self.variables.pop("graph")
+        # else:
+        #     mask_local=None
+        #     mask_global=None
+        #     edge_bias_local=None
+        #     edge_bias_global=None
 
         if self.gradient_checkpointing:
             for i in range(self.config.num_layers):
@@ -1608,6 +1608,21 @@ class FlaxT5BlockCollection(nn.Module):
                             # edge_bias_local,
                             # edge_bias_global,
                             )
+                hidden_states = carry_[0]
+
+                # We share the position biases between the layers - the first layer store them
+                # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
+                # (cross-attention position bias), (cross-attention weights)
+                position_bias = carry_[1]
+
+                if self.config.causal and encoder_hidden_states is not None:
+                    encoder_decoder_position_bias = carry_[3  if output_attentions else 2]
+
+                if output_attentions:
+                    all_attentions = all_attentions + (carry_[2],)
+                    if self.config.causal:
+                        all_cross_attentions = all_cross_attentions + (carry_[4],)
+
             # layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
             #                 in_axes=(0, 0, 0,), # 0, 0, 0, 0, 0, 0, 0),
             #                 variable_axes={"params": 0}, #, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
