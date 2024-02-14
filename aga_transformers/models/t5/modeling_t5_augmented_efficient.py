@@ -765,7 +765,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 dtype=self.dtype,
             )
         self.has_graph_edge_bias = True
-        self.vocabulary_edge_bias = 8 #doc<->slide, doc/doc, slide/slide, doc<->item and slide<->item
+        self.vocabulary_edge_bias = 44 #8 #doc<->slide, doc/doc, slide/slide, doc<->item and slide<->item
         if self.has_graph_edge_bias:
             #additional vocabulary to encode graph edges labels in the attention
             self.graph_edge_bias = nn.Embed(
