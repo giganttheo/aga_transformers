@@ -350,7 +350,7 @@ def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_
   n_slides_total: int = 0
   slide_start_for_blocks: jnp.ndarray = None
   n_slides_: jnp.ndarray = None
-  offset_slides = n_slides_total - slide_start_for_blocks
+  offset_slides = slide_start_for_blocks - n_slides_total
   n_global_tokens_total: int = n_global_tokens - n_slides_ + n_slides_total
   
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
@@ -389,7 +389,7 @@ def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_
       block_pos_k = n_global_tokens + ((receivers - n_global_tokens_total) % block_len) + (1 + offset_k) * block_len
       block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
       block_pos_k = jnp.where((receivers >= n_slides_), block_pos_k, receivers + offset_slides[block_id_k]) #if pos_k is in the slide tokens
-      block_pos_k = jnp.where((receivers >= n_global_tokens_total), block_pos_k, receivers) #if pos_k is in the document tokens
+      block_pos_k = jnp.where((receivers >= n_global_tokens_total), block_pos_k, receivers - (n_slides_total - n_slides_)) #if pos_k is in the document tokens
 
       return block_id, block_pos_q, block_pos_k
 

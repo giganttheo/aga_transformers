@@ -106,7 +106,6 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
         elif 'kernel' in [p.key for p in path]:
             return dim
         else:
-            print(f"freeze {path}")
             return LORA_FREEZE
 
     # Create a pytree with the same shape as params indicating how each parameter should be handled
