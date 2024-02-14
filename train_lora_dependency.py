@@ -402,8 +402,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, model, batch_size: in
             # "edge_labels": np.stack([np.stack([graph["edge_labels"] for graph in graph_batch])]*model.config.num_layers).astype(np.int8),
             # "n_slides": np.stack([np.stack([graph["n_slides"] for graph in graph_batch])]*model.config.num_layers).astype(np.int16),
             # "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
-            "mask_local": np.stack([graph["mask_local"][0].swapaxes(0, 1) for graph in graph_batch]).astype("bool"),
-            "mask_global": np.stack([graph["mask_global"][0].swapaxes(0, 1) for graph in graph_batch]).astype("bool"),
+            "mask_local": np.stack([graph["mask_local"][0] for graph in graph_batch]).astype("bool").swapaxes(1, 2),
+            "mask_global": np.stack([graph["mask_global"][0]for graph in graph_batch]).astype("bool").swapaxes(1, 2),
             "edge_bias_local": np.stack([graph["edge_bias_local"] for graph in graph_batch]).astype(np.int8),
             "edge_bias_global": np.stack([graph["edge_bias_global"] for graph in graph_batch]).astype(np.int8),
             } #, dtype=graph_batch[0][k].dtype?
