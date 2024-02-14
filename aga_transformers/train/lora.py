@@ -98,16 +98,20 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
 
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
+        target_modules = set(['kernel'])
         if 'embedding' in [p.key for p in path]:
             # print(f'Fully finetuning param {path}')
             # print(param.shape, "fully finetuned")
             return LORA_FULL
-        if  'layer_norm' in [p.key for p in path]:
-            return LORA_FULL
-        dim = 32 # 64 > 256 (test 128?)
-        # print(f'Using LoRA with dim={dim} for param {path}')
-        # print(param.shape, "LoRA dim 64")
-        return dim
+        elif len(target_modules & set([p.key for p in path])) > 0:
+            dim = 8 # 64 > 256 (test 128?)
+            print(f'Using LoRA with dim={dim} for param {path}')
+            # print(param.shape, "LoRA dim 64")
+            return dim
+        elif  'layer_norm' in [p.key for p in path]:
+            return LORA_FREEZE
+        else:
+            return LORA_FREEZE
 
     # Create a pytree with the same shape as params indicating how each parameter should be handled
     # Each leaf will be given one of the following values:
