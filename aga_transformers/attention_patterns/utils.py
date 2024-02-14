@@ -7,7 +7,7 @@ from flax.traverse_util import flatten_dict, unflatten_dict
 
 
 def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], layer_wise=True):
-  if isinstance(graph, FrozenDict):
+  if isinstance(tree, FrozenDict):
     tree = unfreeze(tree)
 
   tree = flatten_dict(tree, sep="/")
