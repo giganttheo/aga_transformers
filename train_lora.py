@@ -447,8 +447,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {
-            "mask_local": np.stack([graph["mask_local"] for graph in graph_batch]).astype("bool"),
-            "mask_global": np.stack([graph["mask_global"] for graph in graph_batch]).astype("bool"),
+            "mask_local": jnp.stack([graph["mask_local"] for graph in graph_batch]).astype("bool"),
+            "mask_global": jnp.stack([graph["mask_global"] for graph in graph_batch]).astype("bool"),
             }
         batch = {k: np.array(v) for k, v in batch.items()}
 

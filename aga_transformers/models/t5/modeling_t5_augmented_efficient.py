@@ -187,6 +187,36 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
         blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
 
+def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.ndarray, slide_start_for_blocks: jnp.ndarray, n_slides_: int, doc_tokens_start:int, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
+    """Concatenate three consecutive blocks for each input block for local attentiont.
+    For more information, see: https://arxiv.org/pdf/2112.07916.pdf.
+    """
+    num_blocks = x.shape[block_axis]
+    # block_len = x.shape[sequence_axis]
+
+    pad = [(0, 0)] * x.ndim
+    pad[block_axis] = (1, 1)
+    # [..., num_blocks, block_len] -> [..., num_blocks + 2, block_len]
+    x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
+    @partial(jax.vmap, out_axes=block_axis)
+    def get_global(slide_start):
+        return jnp.concatenate([x_global[:, slide_start:slide_start+n_slides_], x_global[:, doc_tokens_start:]], axis=1)
+        
+    # x_global = jnp.concatenate([x_global[:, slide_start:slide_start+n_slides_], x_global[:, doc_tokens_start:]], axis=1)
+    
+    # x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
+
+    blocks_list: List[np.array] = [x_global]
+    for i in range(3):
+        # We use indexing approach here:
+        # https://numpy.org/doc/stable/user/basics.indexing.html#dealing-with-variable-numbers-of-indices-within-programs
+        indices = [slice(0, None)] * x.ndim
+        indices[block_axis] = slice(i, i + num_blocks)
+        indices = tuple(indices)
+        blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
+    return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
+
+
 # def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
 
 #   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
