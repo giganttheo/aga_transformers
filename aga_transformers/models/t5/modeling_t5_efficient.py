@@ -177,7 +177,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
     x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
 
     # x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
-    x_global = einops.repeat(x_global, "b global h dim -> b blocks global h dim", blocks=num_blocks)
+    x_global = einops.repeat(x_global, "b gtok h dim -> b blocks gtok h dim", blocks=num_blocks)
     print("x global shape: ", x_global.shape)
     blocks_list: List[np.array] = [x_global]
     for i in range(3):
