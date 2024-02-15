@@ -818,7 +818,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         values = self.relative_attention_bias(relative_position_bucket)
         # values = values.transpose((2, 0, 1))
-        return einops.repeat(values, 'm c h -> b n h m c', b=1, n=num_blocks)
+        return einops.repeat(values, 'm c h -> h n m c', n=num_blocks)
 
     def _split_heads(self, hidden_states):
         return hidden_states.reshape(hidden_states.shape[:2] + (self.n_heads, self.key_value_proj_dim))
