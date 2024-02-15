@@ -89,7 +89,12 @@ def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_l
     """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
     is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
     """
-    x_global = x[:, :n_global_tokens]
+    if n_global_tokens <= x.shape[1]:
+        x_global = x[:, :n_global_tokens]
+    else:
+        pad = [(0,)] * x.ndim
+        pad[1] = (0, n_global_tokens - x.shape[1])
+        x_global = jnp.pad(x, pad_width=pad, mode="constant", constant_values=0)
     print(f"n global tokens:{n_global_tokens}, xglobal shape:{x_global.shape}")
     x_local = _split_into_blocks(x[:, n_global_tokens:], block_len, axis) # [..., num_blocks, block_len, ...]
     return x_local, x_global
