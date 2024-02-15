@@ -91,7 +91,7 @@ def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_l
     """
     x_global = x[:, :n_global_tokens, ...]
     x_local = _split_into_blocks(x[:, n_global_tokens:, ...], block_len, axis) # [..., num_blocks, block_len, ...]
-    return x_local, x_global[:, None, ...]
+    return x_local, x_global
 
 def _concatenate_3_blocks(x: jnp.ndarray, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
     """Concatenate three consecutive blocks for each input block for local attentiont.
@@ -871,6 +871,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
+            assert position_bias.shape == (self.n_heads, block_len, 3 * block_len + n_global_tokens)
         else:
             position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias[None]
@@ -909,8 +910,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
         n_global_tokens = 2 #TODO: add in config
         
-        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
-    
         #Graph attention
         no_graph=False
         if self.has_variable("graph", "mask_local"):
@@ -944,13 +943,15 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             precomputed=False
 
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
-        query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
+        query_states_blocks, global_q = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
         key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
         value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
 
         # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-        key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
-        value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+        key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k[:, None, ...], block_axis=1, sequence_axis=2)
+        value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v[:, None, ...], block_axis=1, sequence_axis=2)
+
+        num_blocks=query_states_blocks.shape[2] #should be == math.ceil((seq_length - n_global_tokens) / block_len)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
@@ -1046,7 +1047,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
         global_attn_weights = dot_product_attention_weights(
-            query_states[:, :n_global_tokens],
+            global_q,
             key_states,
             bias=position_bias_global,
             dropout_rng=dropout_rng,
