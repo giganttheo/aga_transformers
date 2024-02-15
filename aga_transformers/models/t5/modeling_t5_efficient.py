@@ -92,7 +92,7 @@ def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_l
     if n_global_tokens <= x.shape[1]:
         x_global = x[:, :n_global_tokens]
     else:
-        pad = [(0,)] * x.ndim
+        pad = [(0, 0)] * x.ndim
         pad[1] = (0, n_global_tokens - x.shape[1])
         x_global = jnp.pad(x, pad_width=pad, mode="constant", constant_values=0)
     print(f"n global tokens:{n_global_tokens}, xglobal shape:{x_global.shape}")
