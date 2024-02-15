@@ -950,6 +950,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k[:, None, ...], block_axis=1, sequence_axis=2)
         value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v[:, None, ...], block_axis=1, sequence_axis=2)
 
+
+        print("key states blocks shape: ", key_states_blocks.shape)
+
         num_blocks=query_states_blocks.shape[2] #should be == math.ceil((seq_length - n_global_tokens) / block_len)
 
         if not precomputed and not no_graph:
@@ -1020,8 +1023,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias_global = position_bias_global + mask_global
         else:
             position_bias_local = position_bias_local.swapaxes(1, 2)
-
-        assert key_states_blocks.shape[1:] == position_bias_local.shape[1:]
 
         # create dropout rng
         dropout_rng = None
