@@ -1027,53 +1027,53 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
         # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
         # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-        if not no_graph:
+        
+        if no_graph:
+            attn_output = value_states
+        else:
             position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
             position_bias_global = position_bias_global + mask_global
-        else:
-            position_bias_local = position_bias_local.swapaxes(1, 2)
 
-        # create dropout rng
-        dropout_rng = None
-        if not deterministic and self.dropout > 0.0:
-            dropout_rng = self.make_rng("dropout")
+            # create dropout rng
+            dropout_rng = None
+            if not deterministic and self.dropout > 0.0:
+                dropout_rng = self.make_rng("dropout")
 
-        # Softmax(QK^T)
-        attn_weights = dot_product_attention_weights(
-            query_states_blocks,
-            key_states_blocks,
-            bias=position_bias_local,
-            dropout_rng=dropout_rng,
-            dropout_rate=self.dropout,
-            broadcast_dropout=True,
-            deterministic=deterministic,
-            dtype=self.dtype,
-        )
-        jax.debug.print("attn_weights shape: {attn_weights.shape}", attn_weights=attn_weights)
-        # multiply with value states
-        attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
+            # Softmax(QK^T)
+            attn_weights = dot_product_attention_weights(
+                query_states_blocks,
+                key_states_blocks,
+                bias=position_bias_local,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+            jax.debug.print("attn_weights shape: {attn_weights.shape}", attn_weights=attn_weights)
+            # multiply with value states
+            attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
 
-        # merge blocks
-        shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
-        attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
+            # merge blocks
+            shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
+            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
-        global_attn_weights = dot_product_attention_weights(
-            global_q,
-            key_states,
-            bias=position_bias_global,
-            dropout_rng=dropout_rng,
-            dropout_rate=self.dropout,
-            broadcast_dropout=True,
-            deterministic=deterministic,
-            dtype=self.dtype,
-        )
-        jax.debug.print("global_attn_weights shape: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
+            global_attn_weights = dot_product_attention_weights(
+                global_q,
+                key_states,
+                bias=position_bias_global,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
+            jax.debug.print("global_attn_weights shape: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
 
-        attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
-        attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
             
-
         attn_output = self._merge_heads(attn_output)
 
         # apply output matrix
