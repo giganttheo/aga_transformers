@@ -177,7 +177,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 
     # x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
     x_global = einops.repeat(x_global, "b global h dim -> b blocks global h dim", blocks=num_blocks)
-
+    print("x global shape: ", x_global.shape)
     blocks_list: List[np.array] = [x_global]
     for i in range(3):
         # We use indexing approach here:
@@ -186,6 +186,7 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
         indices[block_axis] = slice(i, i + num_blocks)
         indices = tuple(indices)
         blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
+        print("latest block shape: ", blocks_list[-1].shape)
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
 
 # def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
