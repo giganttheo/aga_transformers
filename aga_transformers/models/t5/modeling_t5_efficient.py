@@ -872,10 +872,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             assert global_block.shape[-1] == n_global_tokens
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             assert blocks_block.shape[-1] == 3 * block_len
-            position_bias = jnp.concatenate([global_block, blocks_block], axis=2, dtype=self.dtype) #merge on last axis 
-            assert position_bias.shape == (self.n_heads, block_len, 3 * block_len + n_global_tokens)
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
+            assert position_bias.shape == (self.n_heads, num_blocks, block_len, 3 * block_len + n_global_tokens)
         else:
-            position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
+            position_bias = jnp.zeros((self.n_heads, num_blocks, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias[None]
 
     def __call__(
