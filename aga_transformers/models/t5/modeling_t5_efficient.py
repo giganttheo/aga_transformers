@@ -941,6 +941,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         else:
             #for initialization
             no_graph=True
+            precomputed=False
 
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
         query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
