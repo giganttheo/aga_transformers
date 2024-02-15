@@ -174,7 +174,9 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
     pad[block_axis] = (1, 1)
     # [..., num_blocks, block_len] -> [..., num_blocks + 2, block_len]
     x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
-    x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
+
+    # x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
+    x_global = einops.repeat(x_global, "b global h dim -> b blocks global h dim", blocks=num_blocks)
 
     blocks_list: List[np.array] = [x_global]
     for i in range(3):
@@ -947,8 +949,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
 
         # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-        key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k[:, None, ...], block_axis=1, sequence_axis=2)
-        value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v[:, None, ...], block_axis=1, sequence_axis=2)
+        key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
+        value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
 
         print("key states blocks shape: ", key_states_blocks.shape)
