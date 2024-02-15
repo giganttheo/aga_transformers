@@ -1001,10 +1001,10 @@ def main():
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch, batch_graph = next(train_loader)
-            print("================================================")
-            print("mask_local shape: ", batch_graph["mask_local"].shape)
-            print("mask_global shape: ", batch_graph["mask_global"].shape)
-            print("================================================")
+            # print("================================================")
+            # print("mask_local shape: ", batch_graph["mask_local"].shape)
+            # print("mask_global shape: ", batch_graph["mask_global"].shape)
+            # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
             state, train_metric = train_step(state, batch, batch_graph)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))

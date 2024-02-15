@@ -1027,6 +1027,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
+            jax.debug.print("attn_weights shape: {attn_weights.shape}", attn_weights=attn_weights)
             # multiply with value states
             attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
 
@@ -1044,6 +1045,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
+            jax.debug.print("global_attn_weights shape: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
+
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
@@ -1113,8 +1116,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             # Softmax(QK^T)
             attn_weights = dot_product_attention_weights(
-                query_states,
-                key_states,
+                query_states[:121],
+                key_states[:121],
                 bias=position_bias,
                 dropout_rng=dropout_rng,
                 dropout_rate=self.dropout,
@@ -1122,9 +1125,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
-
+            jax.debug.print("===========default branch===========")
             # multiply with value states
-            attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
+            # attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
+            attn_output = value_states
 
         attn_output = self._merge_heads(attn_output)
 
