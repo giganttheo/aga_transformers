@@ -912,6 +912,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
     
         #Graph attention
+        no_graph=False
         if self.has_variable("graph", "mask_local"):
             mask_local = self.variables["graph"]["mask_local"].astype("bool")
             mask_global = self.variables["graph"]["mask_global"].astype("bool")
@@ -939,10 +940,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
         else:
             #for initialization
-            receivers = jnp.zeros((batch_size, self.n_heads, 1), dtype=jnp.uint16)
-            senders = jnp.zeros((batch_size, self.n_heads, 1), dtype=jnp.uint16)
-            graph_mask = jnp.zeros((batch_size, self.n_heads, 1), dtype="bool")
-            precomputed = False
+            no_graph=True
 
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
         query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
@@ -953,7 +951,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
         value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
-        if not precomputed:
+        if not precomputed and not no_graph:
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
                 graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))
@@ -982,18 +980,23 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
 
-        # replace masked positions with -10_000
-        mask_value = jnp.finfo(self.dtype).min
-        mask_local = jax.lax.select(
-            mask_local > 0,
-            jnp.full(mask_local.shape, 0.0).astype(self.dtype),
-            jnp.full(mask_local.shape, mask_value).astype(self.dtype),
-        )
-        mask_global = jax.lax.select(
-            mask_global > 0,
-            jnp.full(mask_global.shape, 0.0).astype(self.dtype),
-            jnp.full(mask_global.shape, mask_value).astype(self.dtype),
-        )
+
+        if no_graph:
+            mask_local=None
+            mask_global=None
+        else:
+            # replace masked positions with -10_000
+            mask_value = jnp.finfo(self.dtype).min
+            mask_local = jax.lax.select(
+                mask_local > 0,
+                jnp.full(mask_local.shape, 0.0).astype(self.dtype),
+                jnp.full(mask_local.shape, mask_value).astype(self.dtype),
+            )
+            mask_global = jax.lax.select(
+                mask_global > 0,
+                jnp.full(mask_global.shape, 0.0).astype(self.dtype),
+                jnp.full(mask_global.shape, mask_value).astype(self.dtype),
+            )
 
         # # compute position bias
         # position_bias = self._create_position_bias_sparse(
@@ -1011,10 +1014,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
         # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
         # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-        assert position_bias_local.shape[1:] == mask_local.shape[1:]
-        position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
-        assert position_bias_global.shape[1:] == mask_global.shape[1:]
-        position_bias_global = position_bias_global + mask_global
+        if not no_graph:
+            position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
+            position_bias_global = position_bias_global + mask_global
+        else:
+            position_bias_local = position_bias_local.swapaxes(1, 2)
 
         # create dropout rng
         dropout_rng = None
