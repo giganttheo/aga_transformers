@@ -1220,6 +1220,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         if no_graph:
             attn_output = value_states
+            attn_weights = None
         
         else:
 

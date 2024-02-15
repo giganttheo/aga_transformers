@@ -1050,7 +1050,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
-            jax.debug.print("attn_weights shape: {attn_weights.shape}", attn_weights=attn_weights)
             # multiply with value states
             attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
 
@@ -1068,7 +1067,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
-            jax.debug.print("global_attn_weights shape: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
 
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
