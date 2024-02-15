@@ -1169,7 +1169,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if no_graph:
             mask_local=None
             mask_global=None
-        else
+        else:
             # replace masked positions with -10_000
             mask_value = jnp.finfo(self.dtype).min
             mask_local = jax.lax.select(
