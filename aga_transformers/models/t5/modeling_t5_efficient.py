@@ -905,179 +905,72 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1])
 
-        if self.has_variable("graph", "receivers") or self.has_variable("graph", "mask_local"):
-            # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
-            block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-            n_global_tokens = 2 #TODO: add in config
-            
-            num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
-      
-            #Graph attention
-            if self.has_variable("graph", "mask_local"):
-                mask_local = self.variables["graph"]["mask_local"].astype("bool")
-                mask_global = self.variables["graph"]["mask_global"].astype("bool")
-                precomputed=True
-            else:
-                precomputed=False
-                if len(self.variables["graph"]["receivers"].shape) == 3:
-                    receivers =self.variables["graph"]["receivers"]
-                    senders = self.variables["graph"]["senders"]
-                    graph_mask = self.variables["graph"]["graph_mask"]
-                elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == batch_size:
-                    #graph attention pattern is copied head-wise
-                    receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
-                    senders = einops.repeat(self.variables["graph"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
-                    graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
-                elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == self.n_heads:
-                    #graph attention pattern is copied batch-wise
-                    receivers = einops.repeat(self.variables["graph"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
-                    senders = einops.repeat(self.variables["graph"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
-                    graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
-                else:            
-                    #graph attention pattern is copied batch and head-wise
-                    receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                    senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-                    graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
-
-            # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
-            query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
-            key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
-            value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
-
-            # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-            key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
-
-            if not precomputed:
-                if attention_mask is not None:
-                    # merge the input attention mask with the graph mask
-                    graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))
-
-                # for fast decoding causal attention mask should be shifted
-                causal_attention_mask_shift = (
-                    self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
-                )
-
-                if self.causal:
-                    # fast decoding for generate requires special attention_mask
-                    if self.has_variable("cache", "cached_key"):
-                        # during autoregressive decoding, the current query token was remapped
-                        # to sender 0, but should really be causal_attention_mask_shift
-                        causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
-                    else:
-                        causal_mask = jnp.less_equal(receivers, senders)
-                    graph_mask = jnp.logical_and(graph_mask, causal_mask)
-
-                # During fast autoregressive decoding, we feed one position at a time,
-                # and cache the keys and values step by step.
-                if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
-                    key_states, value_states = self._concatenate_to_cache(
-                        key_states, value_states, query_states
-                    )
-                
-                mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
-
-            # replace masked positions with -10_000
-            mask_value = jnp.finfo(self.dtype).min
-            mask_local = jax.lax.select(
-                mask_local > 0,
-                jnp.full(mask_local.shape, 0.0).astype(self.dtype),
-                jnp.full(mask_local.shape, mask_value).astype(self.dtype),
-            )
-            mask_global = jax.lax.select(
-                mask_global > 0,
-                jnp.full(mask_global.shape, 0.0).astype(self.dtype),
-                jnp.full(mask_global.shape, mask_value).astype(self.dtype),
-            )
-
-            # # compute position bias
-            # position_bias = self._create_position_bias_sparse(
-            #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
-            # )
-            position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
-            position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
-
-            # if graph_mask is not None:
-            #     position_bias = position_bias + graph_mask
-
-            #adapt graph attention to block efficient attn
-            position_bias = None #compat
-            # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, :16])
-            # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
-            # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
-            # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-            assert position_bias_local.shape[1:] == mask_local.shape[1:]
-            position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
-            assert position_bias_global.shape[1:] == mask_global.shape[1:]
-            position_bias_global = position_bias_global + mask_global
-
-            # create dropout rng
-            dropout_rng = None
-            if not deterministic and self.dropout > 0.0:
-                dropout_rng = self.make_rng("dropout")
-
-            # Softmax(QK^T)
-            attn_weights = dot_product_attention_weights(
-                query_states_blocks,
-                key_states_blocks,
-                bias=position_bias_local,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
-            )
-            jax.debug.print("attn_weights shape: {attn_weights.shape}", attn_weights=attn_weights)
-            # multiply with value states
-            attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
-
-            # merge blocks
-            shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
-            attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
-
-            global_attn_weights = dot_product_attention_weights(
-                query_states[:, :n_global_tokens],
-                key_states,
-                bias=position_bias_global,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
-            )
-            jax.debug.print("global_attn_weights shape: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
-
-            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
-
-            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
-            
+        # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
+        block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+        n_global_tokens = 2 #TODO: add in config
+        
+        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+    
+        #Graph attention
+        if self.has_variable("graph", "mask_local"):
+            mask_local = self.variables["graph"]["mask_local"].astype("bool")
+            mask_global = self.variables["graph"]["mask_global"].astype("bool")
+            precomputed=True
+        elif self.has_variable("graph", "receivers"):
+            precomputed=False
+            if len(self.variables["graph"]["receivers"].shape) == 3:
+                receivers =self.variables["graph"]["receivers"]
+                senders = self.variables["graph"]["senders"]
+                graph_mask = self.variables["graph"]["graph_mask"]
+            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == batch_size:
+                #graph attention pattern is copied head-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == self.n_heads:
+                #graph attention pattern is copied batch-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+            else:            
+                #graph attention pattern is copied batch and head-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
         else:
-            # regular attention (for decoder during training)
+            #for initialization
+            mask_local = None
+            mask_global = None
+            precomputed = True
+
+        # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
+        query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
+        key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
+        value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
+
+        # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
+        key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
+        value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+
+        if not precomputed:
+            if attention_mask is not None:
+                # merge the input attention mask with the graph mask
+                graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))
+
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
                 self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
             )
-            # create causal attention_mask; attention_mask has to be defined when model is causal
+
             if self.causal:
-                causal_attention_mask = make_causal_mask(attention_mask, dtype="bool")
                 # fast decoding for generate requires special attention_mask
                 if self.has_variable("cache", "cached_key"):
-                    max_decoder_length = self.variables["cache"]["cached_key"].shape[1]
-                    causal_attention_mask = jax.lax.dynamic_slice(
-                        causal_attention_mask,
-                        (0, 0, causal_attention_mask_shift, 0),
-                        (1, 1, seq_length, max_decoder_length),
-                    )
-                # broadcast causal attention mask & attention mask to fit for merge
-                causal_attention_mask = jnp.broadcast_to(
-                    causal_attention_mask, (batch_size,) + causal_attention_mask.shape[1:]
-                )
-                attention_mask = jnp.broadcast_to(
-                    jnp.expand_dims(attention_mask, axis=(-3, -2)), causal_attention_mask.shape
-                )
-                attention_mask = combine_masks(attention_mask, causal_attention_mask)
-            elif attention_mask is not None:
-                attention_mask = jnp.expand_dims(attention_mask, axis=(-3, -2))
+                    # during autoregressive decoding, the current query token was remapped
+                    # to sender 0, but should really be causal_attention_mask_shift
+                    causal_mask = jnp.less_equal(receivers, causal_attention_mask_shift)
+                else:
+                    causal_mask = jnp.less_equal(receivers, senders)
+                graph_mask = jnp.logical_and(graph_mask, causal_mask)
 
             # During fast autoregressive decoding, we feed one position at a time,
             # and cache the keys and values step by step.
@@ -1085,50 +978,83 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 key_states, value_states = self._concatenate_to_cache(
                     key_states, value_states, query_states
                 )
+            
+            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
 
-            # replace masked positions with -10_000
-            if attention_mask is not None:
-                mask_value = jnp.finfo(self.dtype).min
-                attention_mask = jax.lax.select(
-                    attention_mask > 0,
-                    jnp.full(attention_mask.shape, 0.0).astype(self.dtype),
-                    jnp.full(attention_mask.shape, mask_value).astype(self.dtype),
-                )
+        # replace masked positions with -10_000
+        mask_value = jnp.finfo(self.dtype).min
+        mask_local = jax.lax.select(
+            mask_local > 0,
+            jnp.full(mask_local.shape, 0.0).astype(self.dtype),
+            jnp.full(mask_local.shape, mask_value).astype(self.dtype),
+        )
+        mask_global = jax.lax.select(
+            mask_global > 0,
+            jnp.full(mask_global.shape, 0.0).astype(self.dtype),
+            jnp.full(mask_global.shape, mask_value).astype(self.dtype),
+        )
 
-            if position_bias is None:
-                # compute position bias (only for first layer)
-                position_bias = self._create_position_bias(
-                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
-                )
+        # # compute position bias
+        # position_bias = self._create_position_bias_sparse(
+        #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
+        # )
+        position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
+        position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
 
-                if attention_mask is not None:
-                    position_bias = position_bias + attention_mask
-            else:
-                #for initialization
-                _ = self._create_position_bias(
-                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
-                )
+        # if graph_mask is not None:
+        #     position_bias = position_bias + graph_mask
 
-            # create dropout rng
-            dropout_rng = None
-            if not deterministic and self.dropout > 0.0:
-                dropout_rng = self.make_rng("dropout")
+        #adapt graph attention to block efficient attn
+        position_bias = None #compat
+        # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, :16])
+        # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
+        # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
+        # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
+        assert position_bias_local.shape[1:] == mask_local.shape[1:]
+        position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
+        assert position_bias_global.shape[1:] == mask_global.shape[1:]
+        position_bias_global = position_bias_global + mask_global
 
-            # Softmax(QK^T)
-            attn_weights = dot_product_attention_weights(
-                query_states[:121],
-                key_states[:121],
-                bias=position_bias,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
-            )
-            jax.debug.print("===========default branch===========")
-            # multiply with value states
-            # attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
-            attn_output = value_states
+        # create dropout rng
+        dropout_rng = None
+        if not deterministic and self.dropout > 0.0:
+            dropout_rng = self.make_rng("dropout")
+
+        # Softmax(QK^T)
+        attn_weights = dot_product_attention_weights(
+            query_states_blocks,
+            key_states_blocks,
+            bias=position_bias_local,
+            dropout_rng=dropout_rng,
+            dropout_rate=self.dropout,
+            broadcast_dropout=True,
+            deterministic=deterministic,
+            dtype=self.dtype,
+        )
+        jax.debug.print("attn_weights shape: {attn_weights.shape}", attn_weights=attn_weights)
+        # multiply with value states
+        attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
+
+        # merge blocks
+        shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
+        attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
+
+        global_attn_weights = dot_product_attention_weights(
+            query_states[:, :n_global_tokens],
+            key_states,
+            bias=position_bias_global,
+            dropout_rng=dropout_rng,
+            dropout_rate=self.dropout,
+            broadcast_dropout=True,
+            deterministic=deterministic,
+            dtype=self.dtype,
+        )
+        jax.debug.print("global_attn_weights shape: {global_attn_weights.shape}", global_attn_weights=global_attn_weights)
+
+        attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+
+        attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
+            
 
         attn_output = self._merge_heads(attn_output)
 
