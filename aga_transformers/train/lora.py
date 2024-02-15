@@ -101,14 +101,18 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
         dim = 8 # 64 > 256 (test 128?)
         if 'shared' in [p.key for p in path] :
             #word embeddings
+            print(f"freeze {[p.key for p in path]}")
             return LORA_FREEZE
         elif 'embedding' in [p.key for p in path]:
-            #relative positional embedding / 
+            #relative positional embedding /
+            print(f"finetune {[p.key for p in path]}")
             return LORA_FULL
         elif 'kernel' in [p.key for p in path]:
             #linear layers
+            print(f"lora {dim} {[p.key for p in path]}")
             return dim
         else:
+            print(f"freeze {[p.key for p in path]} (default)")
             return LORA_FREEZE
 
     # Create a pytree with the same shape as params indicating how each parameter should be handled

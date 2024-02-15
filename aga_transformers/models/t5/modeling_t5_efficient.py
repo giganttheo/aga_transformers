@@ -797,7 +797,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         )
 
         values = self.relative_attention_bias(relative_position_bucket)
-        values = values.transpose((2, 0, 1))[None, :, :, :]
+        values = values.transpose((2, 0, 1))
         return values
 
     def compute_global_bias(self, block_length: int, num_global_tokens: int, num_blocks:int):
@@ -865,15 +865,15 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias = jnp.zeros((1, self.n_heads, query_length, key_length), dtype=self.dtype)
         return position_bias
 
-    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int) -> np.ndarray:
+    @partial(jax.vmap, in_axes=[None, None, None, None, None, 0]) #batch
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array(0)) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_relative_attention_bias:
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
             blocks_block = self.compute_block_bias(block_len, num_blocks)
-            # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
-            position_bias = jnp.concatenate([global_block, blocks_block], axis=4, dtype=self.dtype)
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
         else:
-            position_bias = jnp.zeros((1, 1, self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
+            position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias
 
     def __call__(
@@ -890,12 +890,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
-        block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 2 #TODO: add in config
-        
-        batch_size, seq_length = hidden_states.shape[:2]
 
-        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+        batch_size, seq_length = hidden_states.shape[:2]
 
         # q, k, v projections
         query_states = self.q(hidden_states)  # (batch_size, n_heads, seq_length, dim_per_head)
@@ -912,6 +908,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         if self.has_variable("graph", "receivers") or self.has_variable("graph", "mask_local"):
             # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
+            block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+            n_global_tokens = 2 #TODO: add in config
+            
+            num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+      
             #Graph attention
             if self.has_variable("graph", "mask_local"):
                 mask_local = self.variables["graph"]["mask_local"].astype("bool")
@@ -995,7 +996,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
             # )
             position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
-            position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)
+            position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
 
             # if graph_mask is not None:
             #     position_bias = position_bias + graph_mask
@@ -1006,7 +1007,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
             # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-            position_bias_local = position_bias_local + mask_local
+            position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
@@ -1372,11 +1373,11 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
-        for i, layer_module in enumerate(self.blocks):
+        for i in range(self.config.num_layers):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            layer_outputs = layer_module(
+            layer_outputs = self.blocks[i](
                 hidden_states,
                 attention_mask,
                 position_bias,
