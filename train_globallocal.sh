@@ -74,7 +74,6 @@ export TOKENIZERS_PARALLELISM=false
 wandb login
 
 # CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
-# export TOKENIZERS_PARALLELISM=false
 
 # export XLA_PYTHON_CLIENT_ALLOCATOR=platform
 # export JAX_NUMPY_RANK_PROMOTION=warn

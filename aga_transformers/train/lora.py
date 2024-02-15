@@ -101,7 +101,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
         dim = 8 # 64 > 256 (test 128?)
         if 'shared' in [p.key for p in path] :
             #word embeddings
-            return 1#LORA_FREEZE
+            return LORA_FREEZE
         elif 'embedding' in [p.key for p in path]:
             #relative positional embedding / 
             return LORA_FULL
