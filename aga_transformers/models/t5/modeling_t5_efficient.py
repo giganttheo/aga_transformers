@@ -89,11 +89,9 @@ def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_l
     """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
     is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
     """
-    if n_global_tokens >= x.shape[1]:
-        x_global = x[:, :n_global_tokens, ...]
-    else:
-        x_global = x
-    x_local = _split_into_blocks(x[:, n_global_tokens:, ...], block_len, axis) # [..., num_blocks, block_len, ...]
+    x_global = x[:, :n_global_tokens]
+    print(f"n global tokens:{n_global_tokens}, xglobal shape:{x_global.shape}")
+    x_local = _split_into_blocks(x[:, n_global_tokens:], block_len, axis) # [..., num_blocks, block_len, ...]
     return x_local, x_global
 
 def _concatenate_3_blocks(x: jnp.ndarray, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
