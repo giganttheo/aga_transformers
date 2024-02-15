@@ -865,8 +865,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias = jnp.zeros((1, self.n_heads, query_length, key_length), dtype=self.dtype)
         return position_bias
 
-    @partial(jax.vmap, in_axes=[None, None, None, None, None, 0]) #batch
-    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array(0)) -> np.ndarray:
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int) -> np.ndarray:
         # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
         if self.has_relative_attention_bias:
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
@@ -874,7 +873,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
         else:
             position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
-        return position_bias
+        return position_bias[None]
 
     def __call__(
         self,
@@ -1007,7 +1006,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
             # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
             # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
+            assert position_bias_local.shape[1:] == mask_local.shape[1:]
             position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
+            assert position_bias_global.shape[1:] == mask_global.shape[1:]
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
@@ -1034,7 +1035,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
             global_attn_weights = dot_product_attention_weights(
-                query_states[:, :n_global_tokens, ...],
+                query_states[:, :n_global_tokens],
                 key_states,
                 bias=position_bias_global,
                 dropout_rng=dropout_rng,
