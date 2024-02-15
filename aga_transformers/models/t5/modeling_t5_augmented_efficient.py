@@ -1130,7 +1130,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
             value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
-
             if not precomputed:
                 if attention_mask is not None:
                     # merge the input attention mask with the graph mask
