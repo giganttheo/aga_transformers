@@ -447,8 +447,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {
-            "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
-            "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
+            "mask_local": np.stack([graph["mask_local"] for graph in graph_batch]).astype(dtype="bool"),
+            "mask_global": np.stack([graph["mask_global"] for graph in graph_batch]).astype(dtype="bool"),
             # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
             # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
@@ -1014,7 +1014,7 @@ def main():
             # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
             # graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
-            print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
+            # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
             state, train_metric = train_step(state, batch, batch_graph)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
