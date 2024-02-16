@@ -1014,6 +1014,7 @@ def main():
             # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
             # graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
+            print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
             state, train_metric = train_step(state, batch, batch_graph)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
