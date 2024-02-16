@@ -443,13 +443,19 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         steps_per_epoch = math.ceil(len(dataset) / batch_size)
         batch_idx = np.array_split(batch_idx, steps_per_epoch)
 
+    init = False
+
     for idx in batch_idx:
         batch = dataset[idx]
-        graph_batch = batch.pop("graph")
-        graph_batch = {
-            "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
-            "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
-            }
+        if not init:
+            graph_batch = batch.pop("graph")
+            graph_batch = {
+                "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
+                "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
+                }
+            init = True
+        else:
+            _ = batch.pop("graph")
         batch = {k: np.array(v) for k, v in batch.items()}
 
         yield batch, graph_batch
