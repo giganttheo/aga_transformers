@@ -459,7 +459,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
         print(graph_batch["mask_local"].shape)
-        assert graph_batch["mask_local"].shape[-3:] == (num_blocks, block_len, 3 * block_len + n_global_tokens)
+        assert graph_batch["mask_local"].shape[-4:] == (num_blocks, 12, block_len, 3 * block_len + n_global_tokens)
         
         batch = {k: np.array(v) for k, v in batch.items()}
 
@@ -731,8 +731,7 @@ def main():
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
             graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
             # graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
-            print(graph["mask_local"].shape)
-            assert graph["mask_local"].shape[-3:] == (num_blocks, block_len, 3 * block_len + n_global_tokens)
+            # print(graph["mask_local"].shape)
             graphs.append(graph)
         # graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
 
@@ -760,7 +759,7 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        loading_ds_from_disk=False
+        loading_ds_from_disk=True
         if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
@@ -799,11 +798,11 @@ def main():
                 desc="Running tokenizer on validation dataset",
             )
 
-            try:
-                preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
-                preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local", max_shard_size="100MB")
-            except Exception as e:
-                print(e)
+            # try:
+            #     preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+            #     preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local", max_shard_size="100MB")
+            # except Exception as e:
+            #     print(e)
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
