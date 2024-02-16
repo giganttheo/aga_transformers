@@ -877,6 +877,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
+            
         else:
             position_bias = jnp.zeros((self.n_heads, num_blocks, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
         return position_bias[None]
@@ -992,7 +993,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 )
             
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
-
 
         if no_graph:
             mask_local=None

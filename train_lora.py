@@ -443,6 +443,11 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         steps_per_epoch = math.ceil(len(dataset) / batch_size)
         batch_idx = np.array_split(batch_idx, steps_per_epoch)
 
+    block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+    n_global_tokens = 2 #TODO: add in config
+    seq_length = 8192
+    num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+
     for idx in batch_idx:
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
@@ -453,6 +458,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
             # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
+        assert graph_batch["mask_local"].shape[-3:] == (num_blocks, block_len, 3 * block_len + n_global_tokens)
         
         batch = {k: np.array(v) for k, v in batch.items()}
 
