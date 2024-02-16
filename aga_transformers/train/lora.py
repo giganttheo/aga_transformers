@@ -106,7 +106,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
         elif 'embedding' in [p.key for p in path]:
             #relative positional embedding /
             # print(f"finetune {[p.key for p in path]}")
-            return 1
+            return LORA_FULL
         elif 'kernel' in [p.key for p in path]:
             #linear layers
             # print(f"lora {dim} {[p.key for p in path]}")
