@@ -942,7 +942,7 @@ def main():
         labels = batch.pop("labels")
 
         def compute_loss(params):
-            loss, _ = loss_fn_(params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(params=params, dropout_rng=dropout_rng, **batch, **graphs) #changed
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
@@ -1013,8 +1013,8 @@ def main():
             # print("mask_global shape: ", batch_graph["mask_global"].shape)
             # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
-            state, train_metric = train_step(state, batch, graphs)
+            # graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
+            state, train_metric = train_step(state, batch, batch_graph)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
