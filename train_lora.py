@@ -443,19 +443,14 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         steps_per_epoch = math.ceil(len(dataset) / batch_size)
         batch_idx = np.array_split(batch_idx, steps_per_epoch)
 
-    init = False
-
     for idx in batch_idx:
         batch = dataset[idx]
-        if not init:
-            graph_batch = batch.pop("graph")
-            graph_batch = {
-                "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
-                "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
-                }
-            init = True
-        else:
-            _ = batch.pop("graph")
+        graph_batch = batch.pop("graph")
+        graph_batch = {
+            "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
+            "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
+            }
+        
         batch = {k: np.array(v) for k, v in batch.items()}
 
         yield batch, graph_batch
@@ -943,7 +938,7 @@ def main():
             loss, _ = loss_fn_(state.apply_fn, params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
-        grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
+        grad_fn = jax.jit(jax.value_and_grad(compute_loss, has_aux=True))
         (loss, _), grad = grad_fn(state.params)
 
         grad = jax.tree_map(lambda x: x.astype(jnp.float32), grad) #? TODO
@@ -1011,8 +1006,7 @@ def main():
             # print("mask_global shape: ", batch_graph["mask_global"].shape)
             # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            if step == 0:
-                graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
+            graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
             state, train_metric = train_step(state, batch, graphs)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
