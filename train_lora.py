@@ -447,8 +447,11 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {
-            "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
-            "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
+            # "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
+            # "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
+            "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+            "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
         
         batch = {k: np.array(v) for k, v in batch.items()}
@@ -717,9 +720,10 @@ def main():
         )
         graphs = []
         for i in range(len(inputs)): 
-            graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
-            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
-            graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
+            # graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
+            # mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
+            # graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
+            graph={"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
             graphs.append(graph)
         model_inputs["graph"] = graphs
 
@@ -745,12 +749,12 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        try:
+        loading_ds_from_disk=False
+        if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
-            train_dataset = preprocessed_datasets["train"]
-            loading_ds_from_disk=True
-        except:
+            train_dataset = preprocessed_datasets["train"]  
+        else:
             train_dataset = dataset["train"]
             if data_args.max_train_samples is not None:
                 max_train_samples = min(len(train_dataset), data_args.max_train_samples)
@@ -758,7 +762,7 @@ def main():
             train_dataset = train_dataset.map(
                 preprocess_function,
                 batched=True,
-                batch_size=20,
+                batch_size=200,
                 num_proc=data_args.preprocessing_num_workers,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
@@ -777,18 +781,18 @@ def main():
             eval_dataset = eval_dataset.map(
                 preprocess_function,
                 batched=True,
-                batch_size=20,
+                batch_size=200,
                 num_proc=data_args.preprocessing_num_workers,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
                 desc="Running tokenizer on validation dataset",
             )
 
-            try:
-                preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
-                preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local", max_shard_size="100MB")
-            except Exception as e:
-                print(e)
+            # try:
+            #     preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+            #     preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local", max_shard_size="100MB")
+            # except Exception as e:
+            #     print(e)
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
@@ -799,7 +803,7 @@ def main():
         predict_dataset = predict_dataset.map(
             preprocess_function,
             batched=True,
-            batch_size=20,
+            batch_size=200,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
