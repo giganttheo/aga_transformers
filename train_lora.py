@@ -458,6 +458,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
             # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
+        print(graph_batch["mask_local"].shape)
         assert graph_batch["mask_local"].shape[-3:] == (num_blocks, block_len, 3 * block_len + n_global_tokens)
         
         batch = {k: np.array(v) for k, v in batch.items()}
@@ -730,6 +731,7 @@ def main():
             mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
             graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
             # graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
+            print(graph["mask_local"].shape)
             assert graph["mask_local"].shape[-3:] == (num_blocks, block_len, 3 * block_len + n_global_tokens)
             graphs.append(graph)
         # graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
