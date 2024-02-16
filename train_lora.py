@@ -447,11 +447,11 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {
-            # "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
-            # "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
-            "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
-            "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
-            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
+            "mask_local": np.array([graph["mask_local"] for graph in graph_batch], dtype="bool"),
+            "mask_global": np.array([graph["mask_global"] for graph in graph_batch], dtype="bool"),
+            # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+            # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
         
         batch = {k: np.array(v) for k, v in batch.items()}
@@ -750,7 +750,7 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        loading_ds_from_disk=False
+        loading_ds_from_disk=True
         if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
