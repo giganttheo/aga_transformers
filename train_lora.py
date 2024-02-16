@@ -718,13 +718,14 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        graphs = []
-        for i in range(len(inputs)): 
-            # graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
-            # mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
-            # graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
-            graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
-            graphs.append(graph)
+        # graphs = []
+        # for i in range(len(inputs)): 
+        #     # graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
+        #     # mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
+        #     # graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
+        #     graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
+        #     graphs.append(graph)
+        graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
         model_inputs["graph"] = graphs
 
         # Setup the tokenizer for targets
