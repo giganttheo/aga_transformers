@@ -99,7 +99,6 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
         dim = 64 # 64 > 256 (test 128?)
-        return dim
         if 'shared' in [p.key for p in path] :
             #word embeddings
             # print(f"freeze {[p.key for p in path]}")
@@ -127,7 +126,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
-    lora_params = init_lora(params, lora_spec, jax.random.PRNGKey(0), dtype=dtype)
+    lora_params = init_lora(params, lora_spec, jax.random.PRNGKey(0), alpha=32, dtype=dtype)
 
     # `wrap_optimizer` uses the spec to freeze the appropriate subset
     # of parameters.
