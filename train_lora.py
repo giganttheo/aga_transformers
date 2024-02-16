@@ -912,7 +912,7 @@ def main():
     loss_fn_ = partial(loss_fn, model=apply_fn)
     # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
-
+    print(f"Apply fn: {help(apply_fn)}")
     # Setup train state
     
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
