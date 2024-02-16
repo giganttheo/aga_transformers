@@ -903,7 +903,8 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
+    # loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
+    loss_fn_ = partial(loss_fn, model=apply_fn)
     # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
@@ -929,16 +930,17 @@ def main():
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
         print("\n\n\n")
 
+    @jax.jit
     def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
         
         labels = batch.pop("labels")
 
         def compute_loss(params):
-            loss, _ = loss_fn_(state.apply_fn, params, graph=graphs, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
-        grad_fn = jax.jit(jax.value_and_grad(compute_loss, has_aux=True))
+        grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
         (loss, _), grad = grad_fn(state.params)
 
         grad = jax.tree_map(lambda x: x.astype(jnp.float32), grad) #? TODO
@@ -948,7 +950,7 @@ def main():
         return new_state, metrics
 
     # Define eval fn
-    # @jax.jit
+    @jax.jit
     def eval_step(params, batch, graphs):
         labels = batch.pop("labels")
         loss, _ = loss_fn(apply_fn, params, graph=graphs, train=False, **batch)
