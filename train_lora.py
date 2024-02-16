@@ -942,7 +942,7 @@ def main():
         labels = batch.pop("labels")
 
         def compute_loss(params):
-            loss, _ = loss_fn_(params=params, dropout_rng=dropout_rng, **batch, **graphs) #changed
+            loss, _ = loss_fn_(params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
