@@ -95,7 +95,6 @@ def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_l
         pad = [(0, 0)] * x.ndim
         pad[1] = (0, n_global_tokens - x.shape[1])
         x_global = jnp.pad(x, pad_width=pad, mode="constant", constant_values=0)
-    print(f"n global tokens:{n_global_tokens}, xglobal shape:{x_global.shape}")
     x_local = _split_into_blocks(x[:, n_global_tokens:], block_len, axis) # [..., num_blocks, block_len, ...]
     return x_local, x_global
 
@@ -183,7 +182,6 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
 
     # x_global = jnp.repeat(x_global, num_blocks, axis=block_axis)
     x_global = einops.repeat(x_global, "b gtok h dim -> b blocks gtok h dim", blocks=num_blocks)
-    print("x global shape: ", x_global.shape)
     blocks_list: List[np.array] = [x_global]
     for i in range(3):
         # We use indexing approach here:
@@ -192,7 +190,6 @@ def _concatenate_3_blocks_and_global(x: jnp.ndarray, x_global: jnp.ndarray, bloc
         indices[block_axis] = slice(i, i + num_blocks)
         indices = tuple(indices)
         blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
-        print("latest block shape: ", blocks_list[-1].shape)
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
 
 # def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
@@ -958,9 +955,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
         key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
         value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
-
-
-        print("key states blocks shape: ", key_states_blocks.shape)
 
         num_blocks=query_states_blocks.shape[2] #should be == math.ceil((seq_length - n_global_tokens) / block_len)
 

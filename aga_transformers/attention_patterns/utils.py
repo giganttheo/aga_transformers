@@ -1,12 +1,13 @@
 import jax.numpy as jnp
+import jax
 from unidecode import unidecode
 import re
 
 from flax.core.frozen_dict import FrozenDict, freeze, unfreeze
 from flax.traverse_util import flatten_dict, unflatten_dict
 
-
-def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], layer_wise=True):
+@jax.jit
+def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=True):
   if isinstance(tree, FrozenDict):
     tree = unfreeze(tree)
 

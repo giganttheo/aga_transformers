@@ -931,7 +931,6 @@ def main():
     def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
         
-        graphs = graph_from_path(state.params, graphs, {}, {}, layer_wise=False)
         labels = batch.pop("labels")
 
         def compute_loss(params):
@@ -1006,7 +1005,9 @@ def main():
             # print("mask_global shape: ", batch_graph["mask_global"].shape)
             # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            state, train_metric = train_step(state, batch, batch_graph)
+            if step == 0:
+                graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
+            state, train_metric = train_step(state, batch, graphs)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
