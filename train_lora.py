@@ -724,14 +724,16 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
-        # graphs = []
-        # for i in range(len(inputs)): 
-        #     # graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
-        #     # mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
-        #     # graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
-        #     graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
-        #     graphs.append(graph)
-        graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
+        graphs = []
+        for i in range(len(inputs)): 
+            graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
+            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
+            graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
+            # graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
+            assert graph["mask_local"].shape[-3:] == (num_blocks, block_len, 3 * block_len + n_global_tokens)
+            graphs.append(graph)
+        # graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
+
         model_inputs["graph"] = graphs
 
         # Setup the tokenizer for targets
@@ -756,7 +758,7 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        loading_ds_from_disk=True
+        loading_ds_from_disk=False
         if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
@@ -795,11 +797,11 @@ def main():
                 desc="Running tokenizer on validation dataset",
             )
 
-            # try:
-            #     preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
-            #     preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local", max_shard_size="100MB")
-            # except Exception as e:
-            #     print(e)
+            try:
+                preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+                preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local", max_shard_size="100MB")
+            except Exception as e:
+                print(e)
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
