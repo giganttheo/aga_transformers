@@ -807,7 +807,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         return values
 
     def compute_global_bias(self, block_length: int, num_global_tokens: int, num_blocks:int):
-        return jax.vmap(lambda offset: self.compute_bias(block_length, num_global_tokens, offset), out_axes=1)(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
+        @partial(jax.vmap, out_axes=1)
+        def fn(offset):
+            return self.compute_bias(block_length, num_global_tokens, offset)
+        return fn(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
 
     def compute_block_bias(self, block_length: int, num_blocks: int):
         """Compute binned relative position bias"""
