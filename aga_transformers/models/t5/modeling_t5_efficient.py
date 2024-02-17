@@ -877,10 +877,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
             blocks_block = self.compute_block_bias(block_len, num_blocks)
             position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
-            
+            assert position_bias.shape == (self.n_heads, num_blocks, block_len, 3 * block_len + n_global_tokens)
         else:
             position_bias = jnp.zeros((self.n_heads, num_blocks, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
-        return position_bias[None]
+        return position_bias[None].swapaxes(1, 2)
 
     def __call__(
         self,
@@ -963,7 +963,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
         value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
-        num_blocks=query_states_blocks.shape[2] #should be == math.ceil((seq_length - n_global_tokens) / block_len)
+        # num_blocks=query_states_blocks.shape[2] #should be == math.ceil((seq_length - n_global_tokens) / block_len)
+        num_blocks = math.ceil((seq_length - n_global_tokens) / block_len)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
@@ -1031,7 +1032,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if no_graph:
             attn_output = value_states
         else:
-            position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
+            position_bias_local = position_bias_local + mask_local
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
