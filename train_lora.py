@@ -1026,7 +1026,7 @@ def main():
             # graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
             # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
             if step==0:
-                train_step_ = jax.jit(partial(train_step), graphs=batch_graph)
+                train_step_ = jax.jit(partial(train_step, graphs=batch_graph))
             
             state, train_metric = train_step_(state, batch)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
