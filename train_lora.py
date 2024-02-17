@@ -944,10 +944,11 @@ def main():
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
         print("\n\n\n")
 
-    @partial(jax.jit, static_argnums=(2,))
-    def train_step(state, batch, graphs):
+    @partial(jax.jit, static_argnums=(2, 3))
+    def train_step(state, batch, mask_local, mask_global):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
-        
+        graphs = {"mask_local": mask_local, "mask_global": mask_global}
+
         labels = batch.pop("labels")
 
         def compute_loss(params):
@@ -1025,7 +1026,7 @@ def main():
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
             # graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
             # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
-            state, train_metric = train_step(state, batch, batch_graph)
+            state, train_metric = train_step(state, batch, batch_graph["mask_local"], batch_graph["mask_global"])
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
