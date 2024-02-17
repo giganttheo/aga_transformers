@@ -944,7 +944,7 @@ def main():
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
         print("\n\n\n")
 
-    @jax.jit
+    @partial(jax.jit, static_argnums=(2,))
     def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
         
