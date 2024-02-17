@@ -924,8 +924,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #Graph attention
         no_graph=False
         if mask_local is not None:
-            # print(f"shapes in attn: local {mask_local.shape}, global: {mask_global.shape}")
-            # jax.debug.print("shapes in attn: local {mask_local.shape}, global: {mask_global.shape}", mask_local=mask_local, mask_global=mask_global)
             precomputed = True
         elif self.has_variable("graph", "mask_local"):
             mask_local = self.variables["graph"]["mask_local"].astype("bool")

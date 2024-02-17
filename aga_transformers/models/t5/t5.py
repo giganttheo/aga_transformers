@@ -64,28 +64,28 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
         model.params = model.to_bf16(model.params)
-    if attention_kwargs is None:
-        attention_kwargs = {
-            "max_source_length": 2048,
-            "max_target_length": 512,
-            "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
-            "autoregressive":False,
-            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
-        }
+    # if attention_kwargs is None:
+    #     attention_kwargs = {
+    #         "max_source_length": 2048,
+    #         "max_target_length": 512,
+    #         "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+    #         "autoregressive":False,
+    #         "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+    #     }
     #tieing the graph so it is defined for first layer only
     # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
     
-    graph_ar = {}
-    if attention_mode == "led":
-        attention_kwargs.pop("autoregressive")
-        graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
-        graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
-    elif attention_mode == "dependency":
-        graph = None
-        graph_ar = None
-    else:
-        graph = None
-        graph_ar = None
+    # graph_ar = {}
+    # if attention_mode == "led":
+    #     attention_kwargs.pop("autoregressive")
+    #     graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
+    #     graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
+    # elif attention_mode == "dependency":
+    #     graph = None
+    #     graph_ar = None
+    # else:
+    graph = None
+    graph_ar = None
     return tokenizer, model, graph, graph_ar
 
 

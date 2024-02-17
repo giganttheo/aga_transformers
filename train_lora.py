@@ -648,7 +648,7 @@ def main():
             "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
-        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_mode=None, attention_kwargs=attention_kwargs, layer_wise=False)
+        tokenizer, model, _, _ = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_mode=None, attention_kwargs=attention_kwargs, layer_wise=False)
 
         
     if training_args.gradient_checkpointing:
@@ -981,9 +981,10 @@ def main():
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
-                                    params=add_graph_to_params(repeat_relative_pos_bias(params), graph_ar),
+                                    params= {"params": params},#add_graph_to_params(repeat_relative_pos_bias(params), graph_ar),
                                     attention_mask=batch["attention_mask"],
-                                    **gen_kwargs)
+                                    **gen_kwargs,
+                                    )
         return output_ids.sequences
 
     # Define generation function
