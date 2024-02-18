@@ -1297,34 +1297,85 @@ class FlaxT5LayerCollection(nn.Module):
         )
 
 
+class ScannableFlaxT5LayerCollection(nn.Module):
+    config: T5Config
+    has_relative_attention_bias: bool
+    dtype: jnp.dtype = jnp.float32  # the dtype of the computation
+
+    def setup(self):
+        self.layer = FlaxT5Block(
+            self.config, has_relative_attention_bias=self.has_relative_attention_bias, dtype=self.dtype
+        )
+
+    @nn.compact
+    def __call__(
+        self,
+        carry_,
+        attention_mask=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        output_attentions=False,
+        deterministic=True,
+        init_cache=False,
+      ):
+        
+        if len(carry_)==2:
+            hidden_states, encoder_decoder_position_bias = carry_
+        elif len(carry_)==1:
+            hidden_states = carry_[0]
+            encoder_decoder_position_bias=None
+        else:
+            raise Exception("carry_ tuple in scanned LayerCollection has the wrong number of elements")
+        
+
+        outputs = self.layer(
+            hidden_states,
+            attention_mask=attention_mask,
+            position_bias=None, #position_bias,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            encoder_decoder_position_bias=encoder_decoder_position_bias,
+            output_attentions=output_attentions,
+            deterministic=deterministic,
+            init_cache=init_cache,
+        )
+        if len(carry_)==2:
+            outputs = (outputs[0], encoder_decoder_position_bias) #outputs[2]) #fix to be able to use scan
+        else:
+            outputs = outputs[0]
+        return outputs, None
+
 class FlaxT5BlockCollection(nn.Module):
     config: T5Config
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
+    scan: bool = False
 
     def setup(self):
         self.causal = self.config.causal
-        if self.gradient_checkpointing:
-            FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(8, 9, 10))#(6, 7, 8))
-            self.blocks = [
-                FlaxT5CheckpointLayer(
-                    self.config,
-                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
-                    dtype=self.dtype,
-                    name=str(i),
-                )
-                for i in range(self.config.num_layers)
-            ]
-        else:
-            self.blocks = [
-                FlaxT5LayerCollection(
-                    self.config,
-                    has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
-                    dtype=self.dtype,
-                    name=str(i),
-                )
-                for i in range(self.config.num_layers)
-            ]
+
+        if not self.scan:
+            if self.gradient_checkpointing:
+                FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(8, 9, 10))#(6, 7, 8))
+                self.blocks = [
+                    FlaxT5CheckpointLayer(
+                        self.config,
+                        has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                        dtype=self.dtype,
+                        name=str(i),
+                    )
+                    for i in range(self.config.num_layers)
+                ]
+            else:
+                self.blocks = [
+                    FlaxT5LayerCollection(
+                        self.config,
+                        has_relative_attention_bias=True, #with arbitrary attention patterns, every block needs to compute position embeddings
+                        dtype=self.dtype,
+                        name=str(i),
+                    )
+                    for i in range(self.config.num_layers)
+                ]
 
     def __call__(
         self,
@@ -1346,24 +1397,26 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
-        for i in range(self.config.num_layers):
-            if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states,)
+        if self.scan:
+            carry_ = (hidden_states, )
+            if self.config.causal and encoder_hidden_states is not None:
+                carry_ += (encoder_decoder_position_bias, )
 
-            layer_outputs = self.blocks[i](
-                hidden_states,
-                attention_mask,
-                position_bias,
-                encoder_hidden_states,
-                encoder_attention_mask,
-                encoder_decoder_position_bias,
-                mask_local,
-                mask_global,
-                output_attentions,
-                deterministic,
-                init_cache,
-            )
-
+            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+                            in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
+                            variable_axes={"params": 0, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
+                            split_rngs={"params": True, "dropout": True},
+                            variable_broadcast=["graphs"],
+                            length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
+                            )(
+                                        carry_,
+                                        attention_mask,
+                                        encoder_hidden_states,
+                                        encoder_attention_mask,
+                                        output_attentions,
+                                        deterministic,
+                                        init_cache,
+                                        )
             hidden_states = layer_outputs[0]
 
             # We share the position biases between the layers - the first layer store them
@@ -1371,13 +1424,46 @@ class FlaxT5BlockCollection(nn.Module):
             # (cross-attention position bias), (cross-attention weights)
             position_bias = layer_outputs[1]
 
-            if self.causal and encoder_hidden_states is not None:
-                encoder_decoder_position_bias = layer_outputs[3 if output_attentions else 2]
+            if self.config.causal and encoder_hidden_states is not None:
+                encoder_decoder_position_bias = layer_outputs[3  if output_attentions else 2]
 
             if output_attentions:
                 all_attentions = all_attentions + (layer_outputs[2],)
-                if self.causal:
+                if self.config.causal:
                     all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
+        else:
+            for i in range(self.config.num_layers):
+                if output_hidden_states:
+                    all_hidden_states = all_hidden_states + (hidden_states,)
+
+                layer_outputs = self.blocks[i](
+                    hidden_states,
+                    attention_mask,
+                    position_bias,
+                    encoder_hidden_states,
+                    encoder_attention_mask,
+                    encoder_decoder_position_bias,
+                    mask_local,
+                    mask_global,
+                    output_attentions,
+                    deterministic,
+                    init_cache,
+                )
+
+                hidden_states = layer_outputs[0]
+
+                # We share the position biases between the layers - the first layer store them
+                # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
+                # (cross-attention position bias), (cross-attention weights)
+                position_bias = layer_outputs[1]
+
+                if self.causal and encoder_hidden_states is not None:
+                    encoder_decoder_position_bias = layer_outputs[3 if output_attentions else 2]
+
+                if output_attentions:
+                    all_attentions = all_attentions + (layer_outputs[2],)
+                    if self.causal:
+                        all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
 
         return FlaxBaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
@@ -1386,18 +1472,18 @@ class FlaxT5BlockCollection(nn.Module):
             cross_attentions=all_cross_attentions,
         )
 
-
 class FlaxT5Stack(nn.Module):
     config: T5Config
     embed_tokens: nn.Embed
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
+    scan: bool = False
 
     def setup(self):
         self.causal = self.config.causal
 
         self.block = FlaxT5BlockCollection(
-            self.config, dtype=self.dtype, gradient_checkpointing=self.gradient_checkpointing
+            self.config, dtype=self.dtype, gradient_checkpointing=self.gradient_checkpointing, scan=self.scan
         )
         self.final_layer_norm = FlaxT5LayerNorm(
             self.config.d_model, eps=self.config.layer_norm_epsilon, dtype=self.dtype
@@ -1607,10 +1693,68 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         dtype: jnp.dtype = jnp.float32,
         _do_init: bool = True,
         gradient_checkpointing: bool = False,
+        scan: bool = False,
         **kwargs,
     ):
-        module = self.module_class(config=config, dtype=dtype, gradient_checkpointing=gradient_checkpointing, **kwargs)
+        module = self.module_class(config=config, dtype=dtype, gradient_checkpointing=gradient_checkpointing, scan=scan, **kwargs)
         super().__init__(config, module, input_shape=input_shape, seed=seed, dtype=dtype, _do_init=_do_init)
+
+    def convert_unroll_to_scan(self, params):
+        r"""
+        Convert a `PyTree` of unrolled model parameters to a scanned block of model parameters. This method can be used
+        to explicitly convert the model parameters to scanned format. This returns a new `params` tree and does not
+        convert the `params` in place.
+        To illustrate the workings of this method, take the Flax BERT model. The unrolled structure for the query
+        projection params is as follows:
+            ('bert', 'encoder', 'layer', '0', 'self_attn', 'q_proj') ('bert', 'encoder', 'layer', '1', 'self_attn',
+            'q_proj') ... ('bert', 'encoder', 'layer', '23', 'self_attn', 'q_proj')
+        This method takes each of the `q_proj` matrices for layers (0, ..., 23) and stacks them into a single 'super'
+        matrix, giving a *single* block of weights for all 24 layers compatible with the scanned model:
+            ('bert', 'encoder', 'layer', 'ScanLayers', 'self_attn', 'q_proj')
+        When enabling scan with _do_init=True (default), this method will be called automatically under the hood. With
+        _do_init=False, it will have to be called explicitly (see example below).
+        Arguments:
+            params (`Union[Dict, FrozenDict]`):
+                A `PyTree` of model parameters.
+        Examples:
+        ```python
+        >>> from transformers import FlaxBertModel
+        >>> # Download model and configuration from huggingface.co
+        >>> model, params = FlaxBertModel.from_pretrained("bert-base-cased", _do_init=False)
+        >>> # By default, the model params will be in unrolled format. To illustrate the use of this method,
+        >>> # we'll first convert to scan format and then back to unrolled
+        >>> model.scan_enable()
+        >>> params = model.convert_unroll_to_scan(params)
+        >>> # now convert back to unrolled
+        >>> model.scan_disable()
+        >>> params = model.convert_scan_to_unroll(params)
+        ```"""
+        if isinstance(params, FrozenDict):
+            params = unfreeze(params)
+
+        params = flatten_dict(params, sep="/")
+        keys = list(params.keys())
+
+        for k in keys:
+            # Identify all "unrolled" layers formed as part of the FlaxBertLayerCollection
+            # These params contain the identifier `block` in their key
+            if "block/0" in k:
+                # Squash the keys for the N unrolled layers into one single key:
+                # (layer/0, ..., layer/N) -> layer/FlaxScanLayers
+                scan_key = k.replace("block/0", "block/FlaxScanLayers")
+                stacked_params = []
+                # Iterate over the unrolled layers (1,...,N)
+                for i in range(self.config.num_layers):
+                    # Stack the params for the N layers into one super block
+                    # and remove the unrolled layer params on the fly
+                    # -> no memory overhead for conversion!
+                    unrolled_layer = params.pop(k.replace("block/0", f"block/{str(i)}"))
+                    stacked_params.append(unrolled_layer)
+                params[scan_key] = jnp.stack(stacked_params)
+        # Finally, unflatten the dict to restore the nested pytree structure
+        print(params.keys())
+        params = unflatten_dict(params, sep="/")
+        return params
 
     def enable_gradient_checkpointing(self):
         self._module = self.module_class(
@@ -1618,6 +1762,19 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
             dtype=self.dtype,
             gradient_checkpointing=True,
         )
+    
+    def enable_scan(self):
+        self._module = self.module_class(
+            config=self.config,
+            dtype=self.dtype,
+            gradient_checkpointing=True,
+            scan=True,
+        )
+        # initialize the parameters
+        params = self.convert_unroll_to_scan(self.params)
+        self._params_shape_tree = jax.tree_util.tree_structure(params)
+        self._required_params = set(flatten_dict(unfreeze(params)).keys())
+        self.params = params
 
     def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
         # init input tensors
@@ -1949,6 +2106,7 @@ class FlaxT5Module(nn.Module):
     config: T5Config
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
+    scan: bool = False
 
     def _get_encoder_module(self):
         return self.encoder
@@ -1971,6 +2129,7 @@ class FlaxT5Module(nn.Module):
             embed_tokens=self.shared,
             dtype=self.dtype,
             gradient_checkpointing=self.gradient_checkpointing,
+            scan=self.scan,
         )
 
         decoder_config = copy.deepcopy(self.config)
@@ -1981,6 +2140,7 @@ class FlaxT5Module(nn.Module):
             embed_tokens=self.shared,
             dtype=self.dtype,
             gradient_checkpointing=self.gradient_checkpointing,
+            scan=self.scan
         )
 
     def __call__(
@@ -2084,6 +2244,7 @@ class FlaxT5EncoderModule(nn.Module):
     config: T5Config
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
+    scan: bool = False
 
     def setup(self):
         self.shared = nn.Embed(
@@ -2102,6 +2263,7 @@ class FlaxT5EncoderModule(nn.Module):
             embed_tokens=self.shared,
             dtype=self.dtype,
             gradient_checkpointing=self.gradient_checkpointing,
+            scan=self.scan
         )
 
     def __call__(
@@ -2175,6 +2337,7 @@ class FlaxT5ForConditionalGenerationModule(nn.Module):
     config: T5Config
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
     gradient_checkpointing: bool = False
+    scan: bool = False
 
     def _get_encoder_module(self):
         return self.encoder
@@ -2197,7 +2360,7 @@ class FlaxT5ForConditionalGenerationModule(nn.Module):
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.encoder = FlaxT5Stack(
-            encoder_config, self.shared, dtype=self.dtype, gradient_checkpointing=self.gradient_checkpointing
+            encoder_config, self.shared, dtype=self.dtype, gradient_checkpointing=self.gradient_checkpointing, scan=self.scan
         )
 
         decoder_config = copy.deepcopy(self.config)
@@ -2205,7 +2368,7 @@ class FlaxT5ForConditionalGenerationModule(nn.Module):
         decoder_config.is_encoder_decoder = False
         decoder_config.num_layers = self.config.num_decoder_layers
         self.decoder = FlaxT5Stack(
-            decoder_config, self.shared, dtype=self.dtype, gradient_checkpointing=self.gradient_checkpointing
+            decoder_config, self.shared, dtype=self.dtype, gradient_checkpointing=self.gradient_checkpointing, scan=self.scan
         )
 
         self.lm_head = nn.Dense(

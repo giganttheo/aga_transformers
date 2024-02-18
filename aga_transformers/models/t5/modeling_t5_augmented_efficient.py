@@ -1496,10 +1496,6 @@ class ScannableFlaxT5LayerCollection(nn.Module):
     config: T5Config
     has_relative_attention_bias: bool
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
-    # output_attentions: bool = False
-    # deterministic: bool = False
-    # init_cache: bool = False
-
 
     def setup(self):
         self.layer = FlaxT5Block(

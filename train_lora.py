@@ -443,10 +443,10 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         steps_per_epoch = math.ceil(len(dataset) / batch_size)
         batch_idx = np.array_split(batch_idx, steps_per_epoch)
 
-    block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-    n_global_tokens = 2 #TODO: add in config
-    seq_length = 8192
-    num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+    # block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+    # n_global_tokens = 2 #TODO: add in config
+    # seq_length = 8192
+    # num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
 
     for idx in batch_idx:
         batch = dataset[idx]
@@ -458,9 +458,6 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
             # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
-        print(graph_batch["mask_local"].shape)
-        assert graph_batch["mask_local"].shape[-4:] == (num_blocks, 12, block_len, 3 * block_len + n_global_tokens)
-        
         batch = {k: np.array(v) for k, v in batch.items()}
 
         yield batch, graph_batch
@@ -653,9 +650,10 @@ def main():
         
     if training_args.gradient_checkpointing:
         print("=============================")
-        print("Enabling gradient checkpointing")
+        print("Enabling gradient checkpointing & Scan")
         print("=============================")
-        model.enable_gradient_checkpointing()
+        # model.enable_gradient_checkpointing()
+        model.enable_scan()
 
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
@@ -944,10 +942,9 @@ def main():
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
         print("\n\n\n")
 
-    # @jax.jit
+    @jax.jit
     def train_step(state, batch, graphs):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
-        # graphs = {"mask_local": mask_local, "mask_global": mask_global}
 
         labels = batch.pop("labels")
 
@@ -1023,12 +1020,10 @@ def main():
             # print("mask_global shape: ", batch_graph["mask_global"].shape)
             # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            # graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
+            graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
             # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
-            if step==0:
-                train_step_ = jax.jit(partial(train_step, graphs=batch_graph))
-            
-            state, train_metric = train_step_(state, batch)
+
+            state, train_metric = train_step(state, batch, graphs)
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
