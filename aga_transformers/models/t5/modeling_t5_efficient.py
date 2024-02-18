@@ -1423,15 +1423,15 @@ class FlaxT5BlockCollection(nn.Module):
             # We share the position biases between the layers - the first layer store them
             # layer_outputs = hidden-states, key-value-states (self-attention position bias), (self-attention weights),
             # (cross-attention position bias), (cross-attention weights)
-            position_bias = layer_outputs[1]
+            position_bias = None
 
             if self.config.causal and encoder_hidden_states is not None:
-                encoder_decoder_position_bias = layer_outputs[3  if output_attentions else 2]
+                encoder_decoder_position_bias = layer_outputs[2  if output_attentions else 1]
 
             if output_attentions:
-                all_attentions = all_attentions + (layer_outputs[2],)
+                all_attentions = all_attentions + (layer_outputs[1],)
                 if self.config.causal:
-                    all_cross_attentions = all_cross_attentions + (layer_outputs[4],)
+                    all_cross_attentions = all_cross_attentions + (layer_outputs[3],)
         else:
             for i in range(self.config.num_layers):
                 if output_hidden_states:
