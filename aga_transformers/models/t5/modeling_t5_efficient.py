@@ -1342,7 +1342,7 @@ class ScannableFlaxT5LayerCollection(nn.Module):
         if len(carry_)==2:
             outputs = (outputs[0], encoder_decoder_position_bias) #outputs[2]) #fix to be able to use scan
         else:
-            outputs = outputs[0]
+            outputs = (outputs[0],)
         return outputs, None
 
 class FlaxT5BlockCollection(nn.Module):
