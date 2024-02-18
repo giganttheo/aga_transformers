@@ -1377,6 +1377,7 @@ class FlaxT5BlockCollection(nn.Module):
                     for i in range(self.config.num_layers)
                 ]
 
+    @nn.compact
     def __call__(
         self,
         hidden_states=None,
