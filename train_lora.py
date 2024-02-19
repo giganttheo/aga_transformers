@@ -754,7 +754,7 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        loading_ds_from_disk=False
+        loading_ds_from_disk=True
         if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")

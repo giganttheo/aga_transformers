@@ -90,9 +90,14 @@ def _split_global_then_into_blocks(x: jnp.ndarray, n_global_tokens: int, block_l
     """Split an input array into blocks of a given `block_len` along the given `axis`. If the dimension length
     is not a multiple of `block_len`, it will be padded first with selected `pad_value`.
     """
-    x_global = x[:, :n_global_tokens, ...]
-    x_local = _split_into_blocks(x[:, n_global_tokens:, ...], block_len, axis) # [..., num_blocks, block_len, ...]
-    return x_local, x_global[:, None, ...]
+    if n_global_tokens <= x.shape[1]:
+        x_global = x[:, :n_global_tokens]
+    else:
+        pad = [(0, 0)] * x.ndim
+        pad[1] = (0, n_global_tokens - x.shape[1])
+        x_global = jnp.pad(x, pad_width=pad, mode="constant", constant_values=0)
+    x_local = _split_into_blocks(x[:, n_global_tokens:], block_len, axis) # [..., num_blocks, block_len, ...]
+    return x_local, x_global
 
 def _concatenate_3_blocks(x: jnp.ndarray, block_axis: int, sequence_axis: int, pad_value: int = 0) -> jnp.ndarray:
     """Concatenate three consecutive blocks for each input block for local attentiont.
@@ -784,30 +789,13 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         return relative_buckets.astype("i4")
 
-    def compute_bias_sparse(self, query_length, key_length, receivers, senders):
+    def compute_bias(self, query_length, key_length, offset=jnp.array(0, dtype="i4")):
         """Compute binned relative position bias"""
-        context_position = jnp.arange(query_length, dtype="i4")
-        memory_position = jnp.arange(key_length, dtype="i4")
-
-        relative_position = memory_position.take(receivers, axis=0) - context_position.take(senders, axis=0)
-        relative_position_bucket = self._relative_position_bucket(
-            relative_position[..., None],
-            bidirectional=(not self.causal),
-            num_buckets=self.relative_attention_num_buckets,
-            max_distance=self.relative_attention_max_distance,
-        )
-
-        values = self.relative_attention_bias(relative_position_bucket)
-        heads = jnp.arange(self.n_heads)
-        return jnp.transpose(values[:, :, 0, heads], (0, 2, 1))
-        # output has shape [bs, heads, seq_len]
-
-    def compute_bias(self, query_length, key_length):
-        """Compute binned relative position bias"""
-        context_position = jnp.arange(query_length, dtype="i4")[:, None]
+        context_position = jnp.arange(query_length, dtype="i4")[:, None] + offset.astype("i4")
         memory_position = jnp.arange(key_length, dtype="i4")[None, :]
 
         relative_position = memory_position - context_position
+        # jax.debug.print("relative pos: {relative_position}", relative_position=relative_position)
         relative_position_bucket = self._relative_position_bucket(
             relative_position,
             bidirectional=(not self.causal),
@@ -816,8 +804,31 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         )
 
         values = self.relative_attention_bias(relative_position_bucket)
-        values = values.transpose((2, 0, 1))[None, :, :, :]
+        values = values.transpose((2, 0, 1))
         return values
+
+    def compute_global_bias(self, block_length: int, num_global_tokens: int, num_blocks:int):
+        @partial(jax.vmap, out_axes=1)
+        def fn(offset):
+            return self.compute_bias(block_length, num_global_tokens, offset)
+        return fn(jnp.arange(num_global_tokens, num_global_tokens + num_blocks * block_length, block_length))
+
+    def compute_block_bias(self, block_length: int, num_blocks: int):
+        """Compute binned relative position bias"""
+        memory_position = jnp.arange(3 * block_length, dtype="i4")
+        context_position = memory_position[block_length:-block_length]
+
+        relative_position = memory_position[None, :] - context_position[:, None]
+        relative_position_bucket = self._relative_position_bucket(
+            relative_position,
+            bidirectional=(not self.causal),
+            num_buckets=self.relative_attention_num_buckets,
+            max_distance=self.relative_attention_max_distance,
+        )
+
+        values = self.relative_attention_bias(relative_position_bucket)
+        # values = values.transpose((2, 0, 1))
+        return einops.repeat(values, 'm c h -> h n m c', n=num_blocks)
 
     def _split_heads(self, hidden_states):
         return hidden_states.reshape(hidden_states.shape[:2] + (self.n_heads, self.key_value_proj_dim))
@@ -850,25 +861,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             cache_index.value = cache_index.value + num_updated_cache_vectors
         return key, value
 
-    def _create_position_bias_sparse(
-        self, key_states, query_states, attention_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift
-    ):
-        cache_is_filled = self.causal and self.has_variable("cache", "cached_key") and (not init_cache)
-        key_length = key_states.shape[1]
-        query_length = key_length if cache_is_filled else query_states.shape[1]
-        # if key and values are already calculated, only the last query position bias should be taken
-        if cache_is_filled and self.has_relative_attention_bias:
-            #this is reproducing the dynamic_slice + broadcast_to combo
-            #works for 1 token at a time decoding only (ie seq_length==1)
-            current_token_sender = jnp.full(senders.shape, causal_attention_mask_shift)
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, current_token_sender)
-        elif self.has_relative_attention_bias:
-            position_bias = self.compute_bias_sparse(query_length, key_length, receivers, senders)
-        else: #attention_mask is never None
-            bs, seq_len = attention_mask.shape
-            position_bias = jnp.zeros((bs, self.n_heads, seq_len), dtype=self.dtype)
-        return position_bias
-
     def _create_position_bias(
         self, key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
     ):
@@ -883,12 +875,25 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             position_bias = jnp.zeros((1, self.n_heads, query_length, key_length), dtype=self.dtype)
         return position_bias
 
+    def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int) -> np.ndarray:
+        # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
+        if self.has_relative_attention_bias:
+            global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
+            blocks_block = self.compute_block_bias(block_len, num_blocks)
+            position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
+            # assert position_bias.shape == (self.n_heads, num_blocks, block_len, 3 * block_len + n_global_tokens)
+        else:
+            position_bias = jnp.zeros((self.n_heads, num_blocks, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
+        return position_bias[None].swapaxes(1, 2)
+
     def __call__(
         self,
         hidden_states,
         attention_mask=None,
         key_value_states=None,
         position_bias=None,
+        mask_local=None,
+        mask_global=None,
         use_cache=False,
         output_attentions=False,
         deterministic=True,
@@ -897,12 +902,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         """
         Self-attention (if key_value_states is None) or attention over source sentence (provided by key_value_states).
         """
-        block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-        n_global_tokens = 3 #TODO: add in config
-        
-        batch_size, seq_length = hidden_states.shape[:2]
 
-        num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+        batch_size, seq_length = hidden_states.shape[:2]
 
         # q, k, v projections
         query_states = self.q(hidden_states)  # (batch_size, n_heads, seq_length, dim_per_head)
@@ -917,24 +918,60 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # counter-act scaling in dot_product_attention_weights function
         query_states *= jnp.sqrt(query_states.shape[-1])
 
-        if self.has_variable("graph", "receivers"):
-            #Graph attention
-            receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs e', bs=batch_size)
-            senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs e', bs=batch_size)
-            graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs e', bs=batch_size)
+        # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
+        block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+        n_global_tokens = 2 #TODO: add in config
+        
+        #Graph attention
+        no_graph=False
+        if mask_local is not None:
+            precomputed = True
+        elif self.has_variable("graph", "mask_local"):
+            mask_local = self.variables["graph"]["mask_local"].astype("bool")
+            mask_global = self.variables["graph"]["mask_global"].astype("bool")
+            precomputed=True
+        elif self.has_variable("graph", "receivers"):
+            precomputed=False
+            if len(self.variables["graph"]["receivers"].shape) == 3:
+                receivers =self.variables["graph"]["receivers"]
+                senders = self.variables["graph"]["senders"]
+                graph_mask = self.variables["graph"]["graph_mask"]
+            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == batch_size:
+                #graph attention pattern is copied head-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+            elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == self.n_heads:
+                #graph attention pattern is copied batch-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+            else:            
+                #graph attention pattern is copied batch and head-wise
+                receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+        else:
+            #for initialization
+            no_graph=True
+            precomputed=False
 
-            # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
-            query_states_blocks, _ = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
-            key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
-            value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
+        # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
+        query_states_blocks, global_q = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
+        key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
+        value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
 
-            # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-            key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
+        # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
+        key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k, block_axis=1, sequence_axis=2)
+        value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v, block_axis=1, sequence_axis=2)
 
+        # num_blocks=query_states_blocks.shape[2] #should be == math.ceil((seq_length - n_global_tokens) / block_len)
+        num_blocks = math.ceil((seq_length - n_global_tokens) / block_len)
+
+        if not precomputed and not no_graph:
             if attention_mask is not None:
                 # merge the input attention mask with the graph mask
-                graph_mask = jnp.logical_and(graph_mask, attn_mask_2_graph_mask(attention_mask, receivers))
+                graph_mask = jnp.logical_and(graph_mask, attention_mask.take(receivers))
 
             # for fast decoding causal attention mask should be shifted
             causal_attention_mask_shift = (
@@ -957,26 +994,37 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 key_states, value_states = self._concatenate_to_cache(
                     key_states, value_states, query_states
                 )
+            
+            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
 
+        if no_graph:
+            mask_local=None
+            mask_global=None
+        else:
             # replace masked positions with -10_000
             mask_value = jnp.finfo(self.dtype).min
-            graph_mask = jax.lax.select(
-                graph_mask > 0,
-                jnp.full(graph_mask.shape, 0.0).astype(self.dtype),
-                jnp.full(graph_mask.shape, mask_value).astype(self.dtype),
+            mask_local = jax.lax.select(
+                mask_local > 0,
+                jnp.full(mask_local.shape, 0.0).astype(self.dtype),
+                jnp.full(mask_local.shape, mask_value).astype(self.dtype),
+            )
+            mask_global = jax.lax.select(
+                mask_global > 0,
+                jnp.full(mask_global.shape, 0.0).astype(self.dtype),
+                jnp.full(mask_global.shape, mask_value).astype(self.dtype),
             )
 
-            # compute position bias
-            position_bias = self._create_position_bias_sparse(
-                key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
-            )
+        # compute position bias
+        position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
+        position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
 
-            if graph_mask is not None:
-                position_bias = position_bias + graph_mask[:, None, :]
-                del graph_mask
+        position_bias = None #compat
 
-            #adapt graph attention to block efficient attn
-            position_bias_local, position_bias_global = create_block_attn_mask_from_graph(senders, receivers, position_bias, n_global_tokens, block_len, num_blocks, seq_length, mask_value)
+        if no_graph:
+            attn_output = value_states
+        else:
+            position_bias_local = position_bias_local + mask_local
+            position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
             dropout_rng = None
@@ -1002,7 +1050,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
             global_attn_weights = dot_product_attention_weights(
-                query_states[:, :n_global_tokens, ...],
+                global_q,
                 key_states,
                 bias=position_bias_global,
                 dropout_rng=dropout_rng,
@@ -1011,88 +1059,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 deterministic=deterministic,
                 dtype=self.dtype,
             )
+
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
-            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)#[:, :seq_length, ...]
             
-        else:
-            # regular attention (for decoder during training)
-            # for fast decoding causal attention mask should be shifted
-            causal_attention_mask_shift = (
-                self.variables["cache"]["cache_index"] if (self.has_variable("cache", "cached_key") and self.causal) else 0
-            )
-            # create causal attention_mask; attention_mask has to be defined when model is causal
-            if self.causal:
-                causal_attention_mask = make_causal_mask(attention_mask, dtype="bool")
-                # fast decoding for generate requires special attention_mask
-                if self.has_variable("cache", "cached_key"):
-                    max_decoder_length = self.variables["cache"]["cached_key"].shape[1]
-                    causal_attention_mask = jax.lax.dynamic_slice(
-                        causal_attention_mask,
-                        (0, 0, causal_attention_mask_shift, 0),
-                        (1, 1, seq_length, max_decoder_length),
-                    )
-                # broadcast causal attention mask & attention mask to fit for merge
-                causal_attention_mask = jnp.broadcast_to(
-                    causal_attention_mask, (batch_size,) + causal_attention_mask.shape[1:]
-                )
-                attention_mask = jnp.broadcast_to(
-                    jnp.expand_dims(attention_mask, axis=(-3, -2)), causal_attention_mask.shape
-                )
-                attention_mask = combine_masks(attention_mask, causal_attention_mask)
-            elif attention_mask is not None:
-                attention_mask = jnp.expand_dims(attention_mask, axis=(-3, -2))
-
-            # During fast autoregressive decoding, we feed one position at a time,
-            # and cache the keys and values step by step.
-            if self.causal and (self.has_variable("cache", "cached_key") or init_cache):
-                key_states, value_states = self._concatenate_to_cache(
-                    key_states, value_states, query_states
-                )
-
-            # replace masked positions with -10_000
-            if attention_mask is not None:
-                mask_value = jnp.finfo(self.dtype).min
-                attention_mask = jax.lax.select(
-                    attention_mask > 0,
-                    jnp.full(attention_mask.shape, 0.0).astype(self.dtype),
-                    jnp.full(attention_mask.shape, mask_value).astype(self.dtype),
-                )
-
-            if position_bias is None:
-                # compute position bias (only for first layer)
-                position_bias = self._create_position_bias(
-                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
-                )
-
-                if attention_mask is not None:
-                    position_bias = position_bias + attention_mask
-            else:
-                #for initialization
-                _ = self._create_position_bias(
-                    key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
-                )
-
-            # create dropout rng
-            dropout_rng = None
-            if not deterministic and self.dropout > 0.0:
-                dropout_rng = self.make_rng("dropout")
-
-            # Softmax(QK^T)
-            attn_weights = dot_product_attention_weights(
-                query_states,
-                key_states,
-                bias=position_bias,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
-            )
-
-            # multiply with value states
-            attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states)
-
         attn_output = self._merge_heads(attn_output)
 
         # apply output matrix
@@ -1141,8 +1112,9 @@ class FlaxT5LayerSelfAttention(nn.Module):
         deterministic=True,
         init_cache=False,
     ):
+        return (hidden_states, None) #bypass attn
         normed_hidden_states = self.layer_norm(hidden_states)
-        if self.config.causal or True:
+        if self.config.causal:
             attention_output = self.SelfAttention(
                 normed_hidden_states,
                 attention_mask=attention_mask,
@@ -1186,6 +1158,7 @@ class FlaxT5LayerCrossAttention(nn.Module):
         output_attentions=False,
         deterministic=True,
     ):
+        return (hidden_states, None) #bypass attn
         normed_hidden_states = self.layer_norm(hidden_states)
         attention_output = self.EncDecAttention(
             normed_hidden_states,
@@ -1294,11 +1267,11 @@ class FlaxT5LayerCollection(nn.Module):
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         encoder_decoder_position_bias=None,
+        mask_local=None,
+        mask_global=None,
         output_attentions=False,
         deterministic=True,
         init_cache=False,
-        mask_local=None,
-        mask_global=None,
     ):
         return self.layer(
             hidden_states,
@@ -1374,7 +1347,7 @@ class FlaxT5BlockCollection(nn.Module):
 
         if not self.scan:
             if self.gradient_checkpointing:
-                FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8))#(6, 7, 8)) , policy=jax.checkpoint_policies.dots_with_no_batch_dims_saveable
+                FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(8, 9, 10), policy=jax.checkpoint_policies.dots_with_no_batch_dims_saveable)#(6, 7, 8))
                 self.blocks = [
                     FlaxT5CheckpointLayer(
                         self.config,
@@ -1462,11 +1435,11 @@ class FlaxT5BlockCollection(nn.Module):
                     encoder_hidden_states,
                     encoder_attention_mask,
                     encoder_decoder_position_bias,
+                    mask_local,
+                    mask_global,
                     output_attentions,
                     deterministic,
                     init_cache,
-                    mask_local,
-                    mask_global,
                 )
 
                 hidden_states = layer_outputs[0]
