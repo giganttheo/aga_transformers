@@ -1142,7 +1142,7 @@ class FlaxT5LayerSelfAttention(nn.Module):
         init_cache=False,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
-        if self.config.causal:
+        if self.config.causal or True:
             attention_output = self.SelfAttention(
                 normed_hidden_states,
                 attention_mask=attention_mask,
