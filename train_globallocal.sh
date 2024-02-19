@@ -54,7 +54,7 @@
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade jaxlib jax==0.4.13
 
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade jaxlib jax==0.4.16
-
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 flash-attention-jax
 
 # CONDA_OVERRIDE_CUDA="11.2" conda install cuda=11.2 jaxlib=*=*cuda* jax cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 
@@ -241,8 +241,8 @@ python ./train_lora.py \
 	--num_train_epochs 10 \
 	--learning_rate 1e-3 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 32 \
-	--per_device_eval_batch_size 32 \
+	--per_device_train_batch_size 4 \
+	--per_device_eval_batch_size 4 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \

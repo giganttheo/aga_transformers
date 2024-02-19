@@ -28,6 +28,7 @@ from flax.linen import combine_masks, make_causal_mask
 from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
+
 from jax.random import PRNGKey
 from functools import partial
 import math
@@ -1059,19 +1060,18 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
-            # global_attn_weights = dot_product_attention_weights(
-            #     global_q,
-            #     key_states,
-            #     bias=position_bias_global,
-            #     dropout_rng=dropout_rng,
-            #     dropout_rate=self.dropout,
-            #     broadcast_dropout=True,
-            #     deterministic=deterministic,
-            #     dtype=self.dtype,
-            # )
+            global_attn_weights = dot_product_attention_weights(
+                global_q,
+                key_states,
+                bias=position_bias_global,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
+            )
 
-            # attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
-            attn_output_global = global_v
+            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
             attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)#[:, :seq_length, ...]
             
@@ -1404,7 +1404,7 @@ class FlaxT5BlockCollection(nn.Module):
             if self.config.causal and encoder_hidden_states is not None:
                 carry_ += (encoder_decoder_position_bias, )
 
-            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
