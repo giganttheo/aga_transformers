@@ -22,13 +22,11 @@ def loss_fn(
 ) -> Tuple[jax.Array, PyTree]:
     
     model_output = model(
-        params={"params": params, "graph": graph},
-        # params={"params": params},
+        {"params": params, "graph": graph},
         input_ids=input_ids,
         attention_mask=attention_mask,
         decoder_input_ids=decoder_input_ids, 
         decoder_attention_mask=decoder_attention_mask,
-        # **graph,
         **model_kwargs,
     )
     
