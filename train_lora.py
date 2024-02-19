@@ -1023,7 +1023,7 @@ def main():
             # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
             
             state, train_metric = train_step(state, batch)
-            print(f"Compilations: {train_step._cache_size()}")
+            # print(f"Compilations: {train_step._cache_size()}")
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
