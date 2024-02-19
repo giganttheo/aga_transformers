@@ -27,6 +27,9 @@
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda102]" jaxlib -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 # CONDA_OVERRIDE_CUDA="10.2" conda install cudnn cudatoolkit cuda-nvcc=10.2 -c nvidia -c conda-forge
 
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda112]"==0.4.15 jaxlib -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+
 # # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade git+https://github.com/giganttheo/qax.git@compat-py38
 
 
@@ -34,7 +37,7 @@
 
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 en_core_web_trf spacy
 
-# # CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* jax=0.4.13 cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
+# # CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* jax=0.4.15 cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 # # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade numpy wheel build
 # # conda install cudnn=8.9 cudatoolkit=11.2.142 -c nvidia
 # # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.13 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
@@ -79,6 +82,9 @@ wandb login
 # export XLA_PYTHON_CLIENT_ALLOCATOR=platform
 # export JAX_NUMPY_RANK_PROMOTION=warn
 # export XLA_PYTHON_CLIENT_PREALLOCATE=false
+
+
+# CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 
 
 #XLA performance flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#xla-performance-flags
