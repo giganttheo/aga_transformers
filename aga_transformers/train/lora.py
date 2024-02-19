@@ -98,7 +98,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
 
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
-        dim = 32 # 64 > 256 (test 128?)
+        dim = 64 # 64 > 256 (test 128?)
         return dim #test
         if 'shared' in [p.key for p in path] :
             #word embeddings
@@ -123,7 +123,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
     # - k > 0: The parameter will be LoRA tuned with a rank k update
 
     # Simple_spec is a helper to do this, but you can also create the label pytree yourself
-    lora_spec = lorax.simple_spec(params, decision_fn=decision_fn, tune_vectors=False)
+    lora_spec = lorax.simple_spec(params, decision_fn=decision_fn, tune_vectors=True)
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE

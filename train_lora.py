@@ -906,8 +906,11 @@ def main():
     # Create LoRA model
     apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
 
-
-    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
+    batch = next(data_loader(input_rng, train_dataset, train_batch_size, shuffle=True))
+    mask_local = batch.pop("mask_local")
+    mask_global = batch.pop("mask_global")
+    graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
+    loss_fn_ =  jax.jit(partial(loss_fn, graph=graphs), static_argnames=["model"])
 
     # loss_fn_ =  partial(jax.jit(loss_fn, static_argnames=["model"]), model=apply_fn)
     # loss_fn_ = partial(loss_fn, model=apply_fn)
@@ -942,10 +945,10 @@ def main():
 
         mask_global = batch.pop("mask_global")
         mask_local = batch.pop("mask_local")
-        graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
+        # graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
 
         def compute_loss(params):
-            loss, _ = loss_fn_(state.apply_fn, params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(state.apply_fn, params=params, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
