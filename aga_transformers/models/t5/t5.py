@@ -76,16 +76,16 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
     
     # graph_ar = {}
-    # if attention_mode == "led":
-    #     attention_kwargs.pop("autoregressive")
-    #     graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
-    #     graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
+    if attention_mode == "led":
+        attention_kwargs.pop("autoregressive")
+        graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
+        graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
     # elif attention_mode == "dependency":
     #     graph = None
     #     graph_ar = None
     # else:
-    graph = None
-    graph_ar = None
+    # graph = None
+    # graph_ar = None
     return tokenizer, model, graph, graph_ar
 
 
