@@ -232,8 +232,8 @@ wandb login
 
 python ./train_lora.py \
 	--output_dir "./8k-global-local" \
-	--model_name_or_path "google/long-t5-local-base" \
-	--tokenizer_name "google/long-t5-local-base" \
+	--model_name_or_path "google/long-t5-local-small" \
+	--tokenizer_name "google/long-t5-local-small" \
 	--dataset_name="gigant/tib" \
 	--source_prefix "summarize: " \
 	--do_train \
