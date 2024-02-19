@@ -231,7 +231,7 @@ wandb login
 	# --run_id "294lkdvh"
 
 python ./train_lora.py \
-	--output_dir "./8k-global-local" \
+	--output_dir "./8k-global-local-small" \
 	--model_name_or_path "google/long-t5-local-small" \
 	--tokenizer_name "google/long-t5-local-small" \
 	--dataset_name="gigant/tib" \
