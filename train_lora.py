@@ -906,7 +906,7 @@ def main():
     # Create LoRA model
     apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
 
-    batch = next(data_loader(input_rng, train_dataset, train_batch_size, shuffle=True))
+    batch = next(data_loader(jax.random.PRNGKey(0), train_dataset, train_batch_size, shuffle=True))
     mask_local = batch.pop("mask_local")
     mask_global = batch.pop("mask_global")
     graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
