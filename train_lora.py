@@ -913,8 +913,8 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    # loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
-    loss_fn_ = partial(loss_fn, model=apply_fn)
+    loss_fn_ =  partial(jax.jit(loss_fn, static_argnames=["model"]), model=apply_fn)
+    # loss_fn_ = partial(loss_fn, model=apply_fn)
     # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
     # print(f"Apply fn: {help(apply_fn)}")
