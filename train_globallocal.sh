@@ -42,7 +42,8 @@
 
 #CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* jax=0.4.16 cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 
-# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.16 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.15 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_pip]"==0.4.15 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda11_local]"==0.4.20 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
@@ -53,7 +54,7 @@
 # CONDA_OVERRIDE_CUDA="11.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade jaxlib jax==0.4.13
 
-# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade jaxlib jax==0.4.16
+# pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade jaxlib jax==0.4.15
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 flash-attention-jax
 
 # CONDA_OVERRIDE_CUDA="11.2" conda install cuda=11.2 jaxlib=*=*cuda* jax cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia

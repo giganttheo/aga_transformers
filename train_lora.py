@@ -452,16 +452,15 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {
-            "mask_local": np.stack([graph["mask_local"] for graph in graph_batch]).astype(dtype="bool"),
-            "mask_global": np.stack([graph["mask_global"] for graph in graph_batch]).astype(dtype="bool"),
+            "mask_local": jnp.stack([graph["mask_local"] for graph in graph_batch]).astype(dtype="bool"),
+            "mask_global": jnp.stack([graph["mask_global"] for graph in graph_batch]).astype(dtype="bool"),
             # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
             # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
-        batch = {k: np.array(v) for k, v in batch.items()}
+        batch = {k: jnp.array(v) for k, v in batch.items()}
 
         yield batch, graph_batch
-
 
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
@@ -1014,9 +1013,6 @@ def main():
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch, batch_graph = next(train_loader)
-            print("Batch device: ", batch.devices())
-            batch = jax.device_put(batch)
-            batch_graph = jax.device_put(batch_graph)
             # print("================================================")
             # print("mask_local shape: ", batch_graph["mask_local"].shape)
             # print("mask_global shape: ", batch_graph["mask_global"].shape)
