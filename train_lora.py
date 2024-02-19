@@ -907,13 +907,14 @@ def main():
     apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
 
 
-    loss_fn_ =  partial(jax.jit(loss_fn, static_argnames=["model"]), model=apply_fn)
+    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
+
+    # loss_fn_ =  partial(jax.jit(loss_fn, static_argnames=["model"]), model=apply_fn)
     # loss_fn_ = partial(loss_fn, model=apply_fn)
     # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
-    # loss_fn_ = partial(loss_fn, graph=graph)
-    # print(f"Apply fn: {help(apply_fn)}")
+
+
     # Setup train state
-    
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
     CKPT_DIR = f"{training_args.output_dir}/ckpts/"
@@ -934,7 +935,6 @@ def main():
         print(f"==================Resuming from checkpoint {training_args.run_id}===============")
         print("\n\n\n")
 
-    @jax.jit
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
@@ -945,7 +945,7 @@ def main():
         graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
 
         def compute_loss(params):
-            loss, _ = loss_fn_(params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(state.apply_fn, params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
