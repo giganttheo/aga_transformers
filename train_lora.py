@@ -452,11 +452,11 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {
-            "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
-            "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
-            # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
-            # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
-            # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
+            # "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
+            # "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
+            "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+            "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
         batch = {**{k: jnp.array(v) for k, v in batch.items()}, **graph_batch}
         yield batch
@@ -721,14 +721,14 @@ def main():
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
         graphs = []
-        for i in range(len(inputs)): 
-            graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
-            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
-            graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
-            # graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
-            # print(graph["mask_local"].shape)
-            graphs.append(graph)
-        # graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
+        # for i in range(len(inputs)): 
+        #     graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
+        #     mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
+        #     graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
+        #     # graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
+        #     # print(graph["mask_local"].shape)
+        #     graphs.append(graph)
+        graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
 
         model_inputs["graph"] = graphs
 
@@ -907,9 +907,13 @@ def main():
     apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
 
     batch = next(data_loader(jax.random.PRNGKey(0), train_dataset, train_batch_size, shuffle=True))
-    mask_local = batch.pop("mask_local")
-    mask_global = batch.pop("mask_global")
-    graphs = graph_from_path(lora_params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
+    # mask_local = batch.pop("mask_local")
+    # mask_global = batch.pop("mask_global")
+    receivers = batch.pop("receivers")
+    senders = batch.pop("senders")
+    graph_mask = batch.pop("graph_mask")
+    graphs = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask} #{"mask_global": mask_global, "mask_local": mask_local}
+    graphs = graph_from_path(lora_params, graphs, {}, {}, layer_wise=False)
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graphs), static_argnames=["model"])
 
     # loss_fn_ =  partial(jax.jit(loss_fn, static_argnames=["model"]), model=apply_fn)
@@ -942,9 +946,12 @@ def main():
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
         labels = batch.pop("labels")
-
-        mask_global = batch.pop("mask_global")
-        mask_local = batch.pop("mask_local")
+        
+        receivers = batch.pop("receivers")
+        senders = batch.pop("senders")
+        graph_mask = batch.pop("graph_mask")
+        # mask_global = batch.pop("mask_global")
+        # mask_local = batch.pop("mask_local")
         # graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
 
         def compute_loss(params):
