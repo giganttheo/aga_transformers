@@ -1462,11 +1462,11 @@ class FlaxT5BlockCollection(nn.Module):
                     encoder_hidden_states,
                     encoder_attention_mask,
                     encoder_decoder_position_bias,
-                    mask_local,
-                    mask_global,
                     output_attentions,
                     deterministic,
                     init_cache,
+                    mask_local,
+                    mask_global,
                 )
 
                 hidden_states = layer_outputs[0]
