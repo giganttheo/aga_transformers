@@ -38,7 +38,7 @@ import flax
 import nltk  # Here to have a nice missing dependency error message early on
 import numpy as np
 import optax
-from datasets import Dataset, load_dataset
+from datasets import Dataset, load_dataset, DatasetDict, load_from_disk
 from filelock import FileLock
 from flax import jax_utils, traverse_util
 from flax.training import train_state
@@ -47,6 +47,7 @@ from flax.training.common_utils import shard_prng_key, stack_forest
 # from flax.serialization import msgpack_restore, to_bytes, msgpack_serialize, to_state_dict, from_state_dict
 import pickle
 from huggingface_hub import Repository, create_repo
+import einops
 import zlib
 from tqdm import tqdm
 import wandb
@@ -69,6 +70,9 @@ from aga_transformers.models.utils import add_graph_to_params, repeat_relative_p
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
+from aga_transformers.attention_patterns.sparse_attention.led import prepare_led_attn_patterns
+from aga_transformers.attention_patterns.utils import graph_from_path
+
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -98,6 +102,62 @@ except (LookupError, OSError):
 
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+
+@partial(jax.jit, static_argnums=[3, 4, 5, 6])
+def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
+    mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
+    mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+    mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
+    mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+    def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
+
+        @jax.vmap #batch
+        @jax.vmap #num_edges
+        def _get_ids_in_blocks(senders, receivers):
+            #block id
+            block_id = (senders - n_global_tokens) // block_len
+            block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+
+            block_id_k = (receivers - n_global_tokens) // block_len
+            block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+
+            #position within the block q
+            block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int32")
+
+            offset_k = block_id_k - block_id
+            # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+            
+            block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
+            block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+            block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
+
+            return block_id, block_pos_q, block_pos_k
+
+        @jax.vmap #batch
+        @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+        def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+            return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+        @jax.vmap #batch
+        @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+        def _update_mask_global(mask, graph_mask, senders, receivers):
+            return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+        block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+        mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
+        mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+
+        mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
+        mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
+
+        return mask_local.swapaxes(1, 2), mask_global
+
+    return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
+
+
+
 
 @dataclass
 class TrainingArguments:
@@ -383,12 +443,23 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         steps_per_epoch = math.ceil(len(dataset) / batch_size)
         batch_idx = np.array_split(batch_idx, steps_per_epoch)
 
+    # block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+    # n_global_tokens = 2 #TODO: add in config
+    # seq_length = 8192
+    # num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+
     for idx in batch_idx:
         batch = dataset[idx]
-        batch = {k: np.array(v) for k, v in batch.items()}
-
+        graph_batch = batch.pop("graph")
+        graph_batch = {
+            "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
+            "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
+            # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+            # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
+            }
+        batch = {**{k: jnp.array(v) for k, v in batch.items()}, **graph_batch}
         yield batch
-
 
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
@@ -500,7 +571,7 @@ def main():
         # Downloading and loading a dataset from the hub.
         dataset = load_dataset(
             data_args.dataset_name,
-            data_args.dataset_config_name,
+            data_args.dataset_config_name, #TODO: add config
             cache_dir=model_args.cache_dir,
             keep_in_memory=False,
             use_auth_token=True if model_args.use_auth_token else None,
@@ -568,17 +639,18 @@ def main():
             "max_source_length": data_args.max_source_length,
             "max_target_length": data_args.max_target_length,
             "window_sizes": [254], #[127], # [254]*12,
-            "autoregressive": False,
-            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            # "autoregressive": False,
+            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
-        tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, layer_wise=False)
-
+        tokenizer, model, _, _ = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", from_longt5_local=True, attention_mode=None, attention_kwargs=attention_kwargs, layer_wise=False)
+        
     if training_args.gradient_checkpointing:
         print("=============================")
-        print("Enabling gradient checkpointing")
+        print("Enabling gradient checkpointing & Scan")
         print("=============================")
         model.enable_gradient_checkpointing()
+        # model.enable_scan()
 
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
@@ -631,6 +703,15 @@ def main():
     model_module = __import__(model.__module__, fromlist=["shift_tokens_tight"])
     shift_tokens_right_fn = getattr(model_module, "shift_tokens_right")
 
+    graph = prepare_led_attn_patterns(**attention_kwargs)
+    block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
+    n_global_tokens = 2 #TODO: add in config
+    seq_length = data_args.max_source_length
+    num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
+    senders=einops.repeat(graph["senders"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+    receivers=einops.repeat(graph["receivers"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+    graph_mask=einops.repeat(graph["graph_mask"], 'e -> bs h e', bs=1, h=model.config.num_heads)
+
     # Setting padding="max_length" as we need fixed length inputs for jitted functions
     def preprocess_function(examples):
         inputs = examples[text_column]
@@ -639,6 +720,17 @@ def main():
         model_inputs = tokenizer(
             inputs, max_length=data_args.max_source_length, padding="max_length", truncation=True, return_tensors="np"
         )
+        graphs = []
+        # for i in range(len(inputs)): 
+        #     graph_mask_ = jnp.logical_and(graph_mask, model_inputs["attention_mask"][i].take(receivers))
+        #     mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask_, n_global_tokens, block_len, num_blocks, seq_length, False)
+        #     graph= {"mask_local": mask_local[0], "mask_global": mask_global[0]}
+        #     # graph={"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]}
+        #     # print(graph["mask_local"].shape)
+        #     graphs.append(graph)
+        graphs = [{"receivers": receivers[0], "senders": senders[0], "graph_mask": graph_mask[0]} for i in range(len(inputs))]
+
+        model_inputs["graph"] = graphs
 
         # Setup the tokenizer for targets
         labels = tokenizer(
@@ -662,33 +754,50 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        train_dataset = dataset["train"]
-        if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-            train_dataset = train_dataset.select(range(max_train_samples))
-        train_dataset = train_dataset.map(
-            preprocess_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on train dataset",
-        )
+        loading_ds_from_disk=True
+        if loading_ds_from_disk:
+            from datasets import load_from_disk
+            preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
+            train_dataset = preprocessed_datasets["train"]  
+        else:
+            train_dataset = dataset["train"]
+            if data_args.max_train_samples is not None:
+                max_train_samples = min(len(train_dataset), data_args.max_train_samples)
+                train_dataset = train_dataset.select(range(max_train_samples))
+            train_dataset = train_dataset.map(
+                preprocess_function,
+                batched=True,
+                batch_size=20,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on train dataset",
+            )
 
     if training_args.do_eval:
-        max_target_length = data_args.val_max_target_length
-        eval_dataset = dataset["valid"]
-        if data_args.max_eval_samples is not None:
-            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-            eval_dataset = eval_dataset.select(range(max_eval_samples))
-        eval_dataset = eval_dataset.map(
-            preprocess_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on validation dataset",
-        )
+        if loading_ds_from_disk:
+            eval_dataset = preprocessed_datasets["valid"]
+        else:
+            max_target_length = data_args.val_max_target_length
+            eval_dataset = dataset["valid"]
+            if data_args.max_eval_samples is not None:
+                max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
+                eval_dataset = eval_dataset.select(range(max_eval_samples))
+            eval_dataset = eval_dataset.map(
+                preprocess_function,
+                batched=True,
+                batch_size=20,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on validation dataset",
+            )
+
+            # try:
+            #     preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+            #     preprocessed_datasets.save_to_disk("./preprocessed_datasets/global_local", max_shard_size="100MB")
+            # except Exception as e:
+            #     print(e)
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
@@ -699,6 +808,7 @@ def main():
         predict_dataset = predict_dataset.map(
             preprocess_function,
             batched=True,
+            batch_size=20,
             num_proc=data_args.preprocessing_num_workers,
             remove_columns=column_names,
             load_from_cache_file=not data_args.overwrite_cache,
@@ -793,20 +903,26 @@ def main():
         dtype_momentum=dtype,
     )
 
-    # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
-    
     # Create LoRA model
     apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
 
-    # apply_fn = model.__call__
-    # lora_params = model.params
-    # optimizer = adamw
+    batch = next(data_loader(jax.random.PRNGKey(0), train_dataset, train_batch_size, shuffle=True))
+    mask_local = batch.pop("mask_local")
+    mask_global = batch.pop("mask_global")
+    # receivers = batch.pop("receivers")
+    # senders = batch.pop("senders")
+    # graph_mask = batch.pop("graph_mask")
+    # graphs = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
+    graphs = {"mask_global": mask_global, "mask_local": mask_local}
+    graphs = graph_from_path(lora_params, graphs, {}, {}, layer_wise=False)
+    loss_fn_ =  jax.jit(partial(loss_fn, graph=graphs), static_argnames=["model"])
 
-    loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
-    # loss_fn_ = partial(loss_fn, graph=graph)
+    # loss_fn_ =  partial(jax.jit(loss_fn, static_argnames=["model"]), model=apply_fn)
+    # loss_fn_ = partial(loss_fn, model=apply_fn)
+    # loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+
 
     # Setup train state
-    
     state = TrainState.create(apply_fn=apply_fn, params=lora_params, tx=optimizer, dropout_rng=dropout_rng)
 
     CKPT_DIR = f"{training_args.output_dir}/ckpts/"
@@ -830,25 +946,33 @@ def main():
     def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
+        labels = batch.pop("labels")
+
+        # receivers = batch.pop("receivers")
+        # senders = batch.pop("senders")
+        # graph_mask = batch.pop("graph_mask")
+        mask_global = batch.pop("mask_global")
+        mask_local = batch.pop("mask_local")
+        # graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
+
         def compute_loss(params):
-            labels = batch.pop("labels")
-            loss, _ = loss_fn_(state.apply_fn, params, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(state.apply_fn, params=params, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
         (loss, _), grad = grad_fn(state.params)
 
-        grad = jax.tree_map(lambda x: x.astype(jnp.bfloat16), grad) #? TODO
+        grad = jax.tree_map(lambda x: x.astype(jnp.float32), grad) #? TODO
         new_state = state.apply_gradients(grads=grad, dropout_rng=new_dropout_rng)
         metrics = {"loss": loss, "learning_rate": linear_decay_lr_schedule_fn(state.step)}
-        loss.block_until_ready()
+        # loss.block_until_ready()
         return new_state, metrics
 
     # Define eval fn
     @jax.jit
-    def eval_step(params, batch):
+    def eval_step(params, batch, graphs):
         labels = batch.pop("labels")
-        loss, _ = loss_fn(apply_fn, params, graph, train=False, **batch)
+        loss, _ = loss_fn_(params, graph=graphs, train=False, **batch)
 
         # # true loss = total loss / total samples
         # loss = jax.lax.psum(loss, "batch")
@@ -862,9 +986,10 @@ def main():
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
-                                    params=add_graph_to_params(repeat_relative_pos_bias(params), graph_ar),
+                                    params= {"params": params},#add_graph_to_params(repeat_relative_pos_bias(params), graph_ar),
                                     attention_mask=batch["attention_mask"],
-                                    **gen_kwargs)
+                                    **gen_kwargs,
+                                    )
         return output_ids.sequences
 
     # Define generation function
@@ -898,8 +1023,15 @@ def main():
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
+            # print("================================================")
+            # print("mask_local shape: ", batch_graph["mask_local"].shape)
+            # print("mask_global shape: ", batch_graph["mask_global"].shape)
+            # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
+            # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
+            
             state, train_metric = train_step(state, batch)
+            # print(f"Compilations: {train_step._cache_size()}")
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
             # print(train_metrics[-1])
@@ -928,11 +1060,11 @@ def main():
         eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
         for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
             # Model forward
-            batch = next(eval_loader)
+            batch, batch_graph = next(eval_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, batch_graph 
             )
             eval_metrics.append(metrics)
 
@@ -1004,11 +1136,11 @@ def main():
         pred_steps = math.ceil(len(predict_dataset) / eval_batch_size)
         for _ in tqdm(range(pred_steps), desc="Predicting...", position=2, leave=False):
             # Model forward
-            batch = next(pred_loader)
+            batch, batch_graph = next(pred_loader)
             labels = batch["labels"]
 
             metrics = eval_step(
-                state.params, batch
+                state.params, batch, batch_graph 
             )
             pred_metrics.append(metrics)
 
@@ -1046,6 +1178,7 @@ def main():
             with open(path, "w") as f:
                 json.dump(rouge_metrics, f, indent=4, sort_keys=True)
     wandb.finish()
+
 
 
 if __name__ == "__main__":
