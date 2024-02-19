@@ -458,9 +458,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
             # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
-        batch = {k: jnp.array(v) for k, v in batch.items()}
-
-        yield batch, graph_batch
+        batch = {**{k: jnp.array(v) for k, v in batch.items()}, **graph_batch}
+        yield batch
 
 def write_metric(summary_writer, train_metrics, eval_metrics, train_time, step):
     summary_writer.scalar("train_time", train_time, step)
@@ -936,10 +935,14 @@ def main():
         print("\n\n\n")
 
     @jax.jit
-    def train_step(state, batch, graphs):
+    def train_step(state, batch):
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
         labels = batch.pop("labels")
+
+        mask_global = batch.pop("mask_global")
+        mask_local = batch.pop("mask_local")
+        graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
 
         def compute_loss(params):
             loss, _ = loss_fn_(params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
@@ -955,9 +958,10 @@ def main():
         return new_state, metrics
 
     # Define eval fn
+    @jax.jit
     def eval_step(params, batch, graphs):
         labels = batch.pop("labels")
-        loss, _ = loss_fn(apply_fn, params, graph=graphs, train=False, **batch)
+        loss, _ = loss_fn_(params, graph=graphs, train=False, **batch)
 
         # # true loss = total loss / total samples
         # loss = jax.lax.psum(loss, "batch")
@@ -1007,16 +1011,15 @@ def main():
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
-            batch, batch_graph = next(train_loader)
+            batch = next(train_loader)
             # print("================================================")
             # print("mask_local shape: ", batch_graph["mask_local"].shape)
             # print("mask_global shape: ", batch_graph["mask_global"].shape)
             # print("================================================")
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
-            graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
             # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
             
-            state, train_metric = train_step(state, batch, graphs)
+            state, train_metric = train_step(state, batch)
             print(f"Compilations: {train_step._cache_size()}")
             # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
             train_metrics.append(train_metric)
