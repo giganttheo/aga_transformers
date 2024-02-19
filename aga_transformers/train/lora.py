@@ -98,7 +98,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
 
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
-        dim = 64 # 64 > 256 (test 128?)
+        dim = 32 # 64 > 256 (test 128?)
         if 'shared' in [p.key for p in path] :
             #word embeddings
             # print(f"freeze {[p.key for p in path]}")

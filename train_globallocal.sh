@@ -231,9 +231,9 @@ wandb login
 	# --run_id "294lkdvh"
 
 python ./train_lora.py \
-	--output_dir "./8k-global-local-small" \
-	--model_name_or_path "google/long-t5-local-small" \
-	--tokenizer_name "google/long-t5-local-small" \
+	--output_dir "./8k-global-local" \
+	--model_name_or_path "google/long-t5-local-base" \
+	--tokenizer_name "google/long-t5-local-base" \
 	--dataset_name="gigant/tib" \
 	--source_prefix "summarize: " \
 	--do_train \
@@ -241,8 +241,8 @@ python ./train_lora.py \
 	--num_train_epochs 10 \
 	--learning_rate 1e-3 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 32 \
-	--per_device_eval_batch_size 32 \
+	--per_device_train_batch_size 40 \
+	--per_device_eval_batch_size 40 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
