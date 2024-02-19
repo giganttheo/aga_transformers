@@ -645,7 +645,7 @@ def main():
             "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
-        tokenizer, model, _, _ = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", from_longt5_local=False, attention_mode=None, attention_kwargs=attention_kwargs, layer_wise=False)
+        tokenizer, model, _, _ = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", from_longt5_local=True, attention_mode=None, attention_kwargs=attention_kwargs, layer_wise=False)
         
     if training_args.gradient_checkpointing:
         print("=============================")

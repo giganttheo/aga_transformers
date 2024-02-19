@@ -1018,8 +1018,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # position_bias = self._create_position_bias_sparse(
         #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
         # )
-        position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
-        position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
+        # position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
+        # position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
 
         # if graph_mask is not None:
         #     position_bias = position_bias + graph_mask
@@ -1034,8 +1034,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if no_graph:
             attn_output = value_states
         else:
-            position_bias_local = position_bias_local + mask_local
-            position_bias_global = position_bias_global + mask_global
+            # position_bias_local = position_bias_local + mask_local
+            # position_bias_global = position_bias_global + 
+            position_bias_local=None
+            position_bias_global=None
 
             # create dropout rng
             dropout_rng = None
