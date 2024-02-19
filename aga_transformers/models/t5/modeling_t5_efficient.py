@@ -1014,30 +1014,17 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 jnp.full(mask_global.shape, mask_value).astype(self.dtype),
             )
 
-        # # compute position bias
-        # position_bias = self._create_position_bias_sparse(
-        #     key_states, query_states, graph_mask, receivers, senders, init_cache, seq_length, causal_attention_mask_shift,
-        # )
-        # position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
-        # position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
+        # compute position bias
+        position_bias_local = self._create_block_position_bias(block_len, n_global_tokens, num_blocks)
+        position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
 
-        # if graph_mask is not None:
-        #     position_bias = position_bias + graph_mask
-
-        #adapt graph attention to block efficient attn
         position_bias = None #compat
-        # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, :16])
-        # jax.debug.print("position_bias_local to global: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, -16:])
-        # jax.debug.print("position_bias_local: {position_bias_local}", position_bias_local=position_bias_local[0, 0, 0, :5, 16+128:16+128+5])
-        # jax.debug.print("position_global: {position_bias_global}", position_bias_global=position_bias_global[0, 0, :5, :5])
-        
+
         if no_graph:
             attn_output = value_states
         else:
-            # position_bias_local = position_bias_local + mask_local
-            # position_bias_global = position_bias_global + 
-            position_bias_local=None
-            position_bias_global=None
+            position_bias_local = position_bias_local + mask_local
+            position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
             dropout_rng = None
@@ -1125,6 +1112,7 @@ class FlaxT5LayerSelfAttention(nn.Module):
         deterministic=True,
         init_cache=False,
     ):
+        return (hidden_states, None) #bypass attn
         normed_hidden_states = self.layer_norm(hidden_states)
         if self.config.causal:
             attention_output = self.SelfAttention(
