@@ -452,13 +452,13 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         batch = dataset[idx]
         graph_batch = batch.pop("graph")
         graph_batch = {
-            "mask_local": np.stack([graph["mask_local"] for graph in graph_batch]).astype(dtype="bool"),
-            "mask_global": np.stack([graph["mask_global"] for graph in graph_batch]).astype(dtype="bool"),
+            "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
+            "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
             # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
             # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             }
-        batch = {k: np.array(v) for k, v in batch.items()}
+        batch = {k: jnp.array(v) for k, v in batch.items()}
 
         yield batch, graph_batch
 
@@ -904,14 +904,9 @@ def main():
         dtype_momentum=dtype,
     )
 
-    # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
-    
     # Create LoRA model
     apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
 
-    # apply_fn = model.__call__
-    # lora_params = model.params
-    # optimizer = adamw
 
     loss_fn_ =  partial(jax.jit(loss_fn, static_argnames=["model"]), model=apply_fn)
     # loss_fn_ = partial(loss_fn, model=apply_fn)
