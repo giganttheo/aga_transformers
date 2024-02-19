@@ -754,7 +754,7 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        loading_ds_from_disk=True
+        loading_ds_from_disk=False
         if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
@@ -946,7 +946,7 @@ def main():
         dropout_rng, new_dropout_rng = jax.random.split(state.dropout_rng)
 
         labels = batch.pop("labels")
-        
+
         receivers = batch.pop("receivers")
         senders = batch.pop("senders")
         graph_mask = batch.pop("graph_mask")
