@@ -1094,7 +1094,7 @@ class FlaxT5LayerSelfAttention(nn.Module):
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
-        if self.config.causal or True:
+        if self.config.causal:
             self.SelfAttention = FlaxT5Attention(
                 self.config,
                 has_relative_attention_bias=self.has_relative_attention_bias,
@@ -1124,7 +1124,7 @@ class FlaxT5LayerSelfAttention(nn.Module):
         init_cache=False,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
-        if self.config.causal or True:
+        if self.config.causal:
             attention_output = self.SelfAttention(
                 normed_hidden_states,
                 attention_mask=attention_mask,
