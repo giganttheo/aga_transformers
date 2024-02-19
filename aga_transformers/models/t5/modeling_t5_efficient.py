@@ -1138,7 +1138,6 @@ class FlaxT5LayerSelfAttention(nn.Module):
         outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
         return outputs
 
-
 class FlaxT5LayerCrossAttention(nn.Module):
     config: T5Config
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
@@ -1159,6 +1158,7 @@ class FlaxT5LayerCrossAttention(nn.Module):
         output_attentions=False,
         deterministic=True,
     ):
+        return (hidden_states, None) #bypass attn
         normed_hidden_states = self.layer_norm(hidden_states)
         attention_output = self.EncDecAttention(
             normed_hidden_states,
