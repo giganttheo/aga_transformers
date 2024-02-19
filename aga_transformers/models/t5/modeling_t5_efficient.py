@@ -1112,7 +1112,6 @@ class FlaxT5LayerSelfAttention(nn.Module):
         deterministic=True,
         init_cache=False,
     ):
-        return (hidden_states, None) #bypass attn
         normed_hidden_states = self.layer_norm(hidden_states)
         if self.config.causal:
             attention_output = self.SelfAttention(
@@ -1158,7 +1157,6 @@ class FlaxT5LayerCrossAttention(nn.Module):
         output_attentions=False,
         deterministic=True,
     ):
-        return (hidden_states, None) #bypass attn
         normed_hidden_states = self.layer_norm(hidden_states)
         attention_output = self.EncDecAttention(
             normed_hidden_states,
