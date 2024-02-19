@@ -1059,20 +1059,21 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
-            global_attn_weights = dot_product_attention_weights(
-                global_q,
-                key_states,
-                bias=position_bias_global,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
-            )
+            # global_attn_weights = dot_product_attention_weights(
+            #     global_q,
+            #     key_states,
+            #     bias=position_bias_global,
+            #     dropout_rng=dropout_rng,
+            #     dropout_rate=self.dropout,
+            #     broadcast_dropout=True,
+            #     deterministic=deterministic,
+            #     dtype=self.dtype,
+            # )
 
-            attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+            # attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
+            attn_output_global = global_v
 
-            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)#[:, :seq_length, ...]
             
         attn_output = self._merge_heads(attn_output)
 
