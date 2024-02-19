@@ -1012,13 +1012,14 @@ def main():
             # print("mask_local shape: ", batch_graph["mask_local"].shape)
             # print("mask_global shape: ", batch_graph["mask_global"].shape)
             # print("================================================")
-            with jax.profiler.trace(str(Path(training_args.output_dir))):
-                graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
-                # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
-                
-                state, train_metric = train_step(state, batch, graphs)
-                # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
-                train_metrics.append(train_metric)
+            # with jax.profiler.trace(str(Path(training_args.output_dir))):
+            graphs = graph_from_path(state.params, batch_graph, {}, {}, layer_wise=False)
+            # print(f'shapes: local: {batch_graph["mask_local"].shape},  global: {batch_graph["mask_global"].shape}')
+            
+            state, train_metric = train_step(state, batch, graphs)
+            print(f"Compilations: {train_step._cache_size()}")
+            # wandb.save(str(Path(training_args.output_dir) / 'plugins' / 'profile'))
+            train_metrics.append(train_metric)
             # print(train_metrics[-1])
             # if step % int(training_args.logging_steps) == 0:
             #     summary_writer.scalar("train loss", train_metrics[-1]["loss"], previous_steps + step + (epoch * steps_per_epoch))
