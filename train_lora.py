@@ -584,7 +584,7 @@ def main():
         }
         print(attention_kwargs)
         tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
-        # graph = graph["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]
+        graph = graph["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]
 
     if training_args.gradient_checkpointing:
         print("=============================")
@@ -833,7 +833,7 @@ def main():
     # graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
 
     # /!\ the graph scope should follow the original params scope, not the scanned one
-    # graphs = graph_from_path(lora_params, graph, {}, {}, layer_wise=False)
+    graph = graph_from_path(lora_params, graph, {}, {}, layer_wise=False)
 
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
