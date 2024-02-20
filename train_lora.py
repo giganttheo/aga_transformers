@@ -578,8 +578,8 @@ def main():
         print("=============================")
         print("Enabling gradient checkpointing")
         print("=============================")
-        # model.enable_gradient_checkpointing()
-        model.enable_scan()
+        model.enable_gradient_checkpointing()
+        # model.enable_scan()
 
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
@@ -897,7 +897,7 @@ def main():
         train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
-        
+
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
