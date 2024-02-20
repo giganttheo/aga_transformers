@@ -569,7 +569,7 @@ def main():
             "max_target_length": data_args.max_target_length,
             "window_sizes": [254], #[127], # [254]*12,
             "autoregressive": False,
-            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
         print(attention_kwargs)
         tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
@@ -849,7 +849,7 @@ def main():
     @jax.jit
     def eval_step(params, batch):
         labels = batch.pop("labels")
-        loss, _ = loss_fn(apply_fn, params, graph, train=False, **batch)
+        loss, _ = loss_fn_(model=state.apply_fn, params=params, train=False, **batch)
 
         # # true loss = total loss / total samples
         # loss = jax.lax.psum(loss, "batch")
@@ -897,6 +897,7 @@ def main():
         train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
         steps_per_epoch = len(train_dataset) // train_batch_size
         # train
+        print(f"Training with model {apply_fn}, and graph: {graph.keys()}")
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
             # with jax.profiler.trace(str(Path(training_args.output_dir))):
