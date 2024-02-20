@@ -29,6 +29,8 @@ from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
 
+dot_product_attention_weights = jax.checkpoint(dot_product_attention_weights)
+
 from jax.random import PRNGKey
 from functools import partial
 import math
@@ -1397,7 +1399,7 @@ class FlaxT5BlockCollection(nn.Module):
             # else:
             #     jax.debug.print("graph not in variable keys")
 
-            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6), policy=jax.checkpoint_policies.checkpoint_dots_with_no_batch_dims), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
