@@ -830,7 +830,10 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
+    # graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
+    graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
+
+    loss_fn_ =  jax.jit(partial(loss_fn, graph=graphs), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
@@ -866,9 +869,9 @@ def main():
             senders = batch.pop("senders")
             graph_mask = batch.pop("graph_mask")
             graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
-            graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
+            # graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
 
-            loss, _ = loss_fn_(model=state.apply_fn, params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(model=state.apply_fn, params=params, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
@@ -889,9 +892,9 @@ def main():
         receivers = batch.pop("receivers")
         senders = batch.pop("senders")
         graph_mask = batch.pop("graph_mask")
-        graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
-        graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
-        loss, _ = loss_fn(model=state.apply_fn, params=params, graph=graphs, train=False, **batch)
+        # graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
+        # graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
+        loss, _ = loss_fn(model=state.apply_fn, params=params, graph=graph, train=False, **batch)
 
         # # true loss = total loss / total samples
         # loss = jax.lax.psum(loss, "batch")
