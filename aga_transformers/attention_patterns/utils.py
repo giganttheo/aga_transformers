@@ -7,63 +7,63 @@ from functools import partial
 from flax.core.frozen_dict import FrozenDict, freeze, unfreeze
 from flax.traverse_util import flatten_dict, unflatten_dict
 
-@partial(jax.jit, static_argnums=(4,))
-def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=True):
-  if isinstance(tree, FrozenDict):
-    tree = unfreeze(tree)
+# @partial(jax.jit, static_argnums=(4,))
+# def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=True):
+#   if isinstance(tree, FrozenDict):
+#     tree = unfreeze(tree)
 
-  tree = flatten_dict(tree, sep="/")
-  keys = list(tree.keys())
+#   tree = flatten_dict(tree, sep="/")
+#   keys = list(tree.keys())
 
-  graph = {}
-  is_first_layer_ = lambda k: ("FlaxScanLayers" in k) or ("block/0" in k)
+#   graph = {}
+#   is_first_layer_ = lambda k: ("FlaxScanLayers" in k) or ("block/0" in k)
 
-  for k in keys:
-    if layer_wise or is_first_layer_(k):
-      if "encoder" in k and "SelfAttention" in k:
-        graph[k] = enc_self_attn
-      elif "decoder" in k and "SelfAttention" in k:
-        graph[k] = dec_self_attn
-      elif "decoder" in k and "EncDecAttention" in k:
-        graph[k] = encdec_attn
+#   for k in keys:
+#     if layer_wise or is_first_layer_(k):
+#       if "encoder" in k and "SelfAttention" in k:
+#         graph[k] = enc_self_attn
+#       elif "decoder" in k and "SelfAttention" in k:
+#         graph[k] = dec_self_attn
+#       elif "decoder" in k and "EncDecAttention" in k:
+#         graph[k] = encdec_attn
+#     else:
+#       graph[k] = {}
+#   # Finally, unflatten the dict to restore the nested pytree structure
+#   graph = unflatten_dict(graph, sep="/")
+#   return graph
+
+
+def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], layer_wise=True):
+  # creates a tree of graph attention patterns, given a tree with path
+  if not isinstance(tree, dict):
+    return None
+  if 'SelfAttention' in path:
+    is_first_layer_ = ("FlaxScanLayers" in path[2]) or (int(path[2]) == 0)
+    if layer_wise or is_first_layer_:
+      #self attention
+      if 'encoder' in path:
+        if isinstance(enc_self_attn, list):
+          return enc_self_attn[int(path[2])]
+        else:
+          return enc_self_attn
+      else: #decoder attn
+        if isinstance(dec_self_attn, list):
+          return dec_self_attn[int(path[2])]
+        else:
+          return dec_self_attn
     else:
-      graph[k] = {}
-  # Finally, unflatten the dict to restore the nested pytree structure
-  graph = unflatten_dict(graph, sep="/")
-  return graph
-
-
-# def graph_from_path(tree, enc_self_attn, dec_self_attn, encdec_attn, path=[], layer_wise=True):
-#   # creates a tree of graph attention patterns, given a tree with path
-#   if not isinstance(tree, dict):
-#     return None
-#   if 'SelfAttention' in path:
-#     is_first_layer_ = ("FlaxScanLayers" in path[2]) or (int(path[2]) == 0)
-#     if layer_wise or is_first_layer_:
-#       #self attention
-#       if 'encoder' in path:
-#         if isinstance(enc_self_attn, list):
-#           return enc_self_attn[int(path[2])]
-#         else:
-#           return enc_self_attn
-#       else: #decoder attn
-#         if isinstance(dec_self_attn, list):
-#           return dec_self_attn[int(path[2])]
-#         else:
-#           return dec_self_attn
-#     else:
-#       return None
-#   elif 'EncDecAttention' in path:
-#     is_first_layer_ = ("FlaxScanLayers" in path[2]) or (int(path[2]) == 0)
-#     if layer_wise or is_first_layer_:
-#       #encoder / decoder cross attention
-#       if isinstance(encdec_attn, list):
-#         return encdec_attn[int(path[2])]
-#       else:
-#         return encdec_attn
-#     else:
-#       return None
-#   return {k: graph_from_path(t, enc_self_attn=enc_self_attn, dec_self_attn=dec_self_attn, encdec_attn=encdec_attn, path=path+[k]) for (k, t) in tree.items()}
+      return None
+  elif 'EncDecAttention' in path:
+    is_first_layer_ = ("FlaxScanLayers" in path[2]) or (int(path[2]) == 0)
+    if layer_wise or is_first_layer_:
+      #encoder / decoder cross attention
+      if isinstance(encdec_attn, list):
+        return encdec_attn[int(path[2])]
+      else:
+        return encdec_attn
+    else:
+      return None
+  return {k: graph_from_path(t, enc_self_attn=enc_self_attn, dec_self_attn=dec_self_attn, encdec_attn=encdec_attn, path=path+[k]) for (k, t) in tree.items()}
 
 def normalize(string):
   return unidecode(string.lower().replace("▁", "").replace(" ", "")).casefold()
