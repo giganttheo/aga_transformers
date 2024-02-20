@@ -675,7 +675,7 @@ class FlaxT5Attention(nn.Module):
         if not deterministic and self.dropout > 0.0:
             dropout_rng = self.make_rng("dropout")
 
-        dot_product_attention_weights = jax.checkpoint(
+        dot_product_attention_weights_ckpt = jax.checkpoint(
                             partial(dot_product_attention_weights,
                                     dropout_rng=dropout_rng,
                                     dropout_rate=self.dropout,
@@ -685,7 +685,7 @@ class FlaxT5Attention(nn.Module):
                             )
 
         # Softmax(QK^T)
-        attn_weights = dot_product_attention_weights(
+        attn_weights = dot_product_attention_weights_ckpt(
             query_states,
             key_states,
             bias=position_bias,
@@ -1050,7 +1050,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 dropout_rng = self.make_rng("dropout")
 
             
-            dot_product_attention_weights = jax.checkpoint(
+            dot_product_attention_weights_ckpt = jax.checkpoint(
                                 partial(dot_product_attention_weights,
                                         dropout_rng=dropout_rng,
                                         dropout_rate=self.dropout,
@@ -1060,7 +1060,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                                 )
 
             # Softmax(QK^T)
-            attn_weights = dot_product_attention_weights(
+            attn_weights = dot_product_attention_weights_ckpt(
                 query_states_blocks,
                 key_states_blocks,
                 bias=position_bias_local,
@@ -1072,7 +1072,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
-            global_attn_weights = dot_product_attention_weights(
+            global_attn_weights = dot_product_attention_weights_ckpt(
                 global_q,
                 key_states,
                 bias=position_bias_global,
