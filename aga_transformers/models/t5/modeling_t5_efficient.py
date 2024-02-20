@@ -1393,13 +1393,19 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
-
-        print("go....................")
-        jax.debug.print("go................")
         if self.scan:
             carry_ = (hidden_states, )
             if self.config.causal and encoder_hidden_states is not None:
                 carry_ += (encoder_decoder_position_bias, )
+
+
+            print("in scan....................")
+            jax.debug.print("in scan===========")
+            if "graph" in self.variables.keys():
+                g = flatten_dict(self.variables["graph"], sep="/")
+                jax.debug.print("keys: {k}", k=flatten_dict(g, sep="/"))
+            else:
+                jax.debug.print("graph not in variable keys")
 
             layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(1, 2, 3, 4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
