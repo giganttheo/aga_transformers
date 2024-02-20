@@ -893,8 +893,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         attention_mask=None,
         key_value_states=None,
         position_bias=None,
-        mask_local=None,
-        mask_global=None,
         use_cache=False,
         output_attentions=False,
         deterministic=True,
@@ -929,16 +927,13 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #     jax.debug.print("keys in the attn: {k}", k=flatten_dict(self.variables["graph"], sep="/"))
         # else:
         #     jax.debug.print("graph not in the attn")
-        if mask_local is not None:
-            precomputed = True
-            # jax.debug.print("Running with inputed mask local")
-        elif self.has_variable("graph", "mask_local"):
-            # jax.debug.print("Running with mask local")
+        if self.has_variable("graph", "mask_local"):
+            jax.debug.print("Running with mask local")
             mask_local = self.variables["graph"]["mask_local"].astype("bool")
             mask_global = self.variables["graph"]["mask_global"].astype("bool")
             precomputed=True
         elif self.has_variable("graph", "receivers"):
-            # jax.debug.print("Running with receivers shape: {receivers.shape}", receivers=self.variables["graph"]["receivers"])
+            jax.debug.print("Running with receivers shape: {receivers.shape}", receivers=self.variables["graph"]["receivers"])
             precomputed=False
             if len(self.variables["graph"]["receivers"].shape) == 3:
                 receivers =self.variables["graph"]["receivers"]
@@ -1114,8 +1109,6 @@ class FlaxT5LayerSelfAttention(nn.Module):
         hidden_states,
         attention_mask=None,
         position_bias=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions=False,
         deterministic=True,
         init_cache=False,
@@ -1197,8 +1190,6 @@ class FlaxT5Block(nn.Module):
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         encoder_decoder_position_bias=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions=False,
         return_dict=True,
         deterministic=True,
@@ -1209,8 +1200,6 @@ class FlaxT5Block(nn.Module):
             attention_mask=attention_mask,
             position_bias=position_bias,
             output_attentions=output_attentions,
-            mask_local=mask_local,
-            mask_global=mask_global,
             deterministic=deterministic,
             init_cache=init_cache,
         )
@@ -1262,8 +1251,6 @@ class FlaxT5LayerCollection(nn.Module):
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         encoder_decoder_position_bias=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions=False,
         deterministic=True,
         init_cache=False,
@@ -1275,13 +1262,10 @@ class FlaxT5LayerCollection(nn.Module):
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             encoder_decoder_position_bias=encoder_decoder_position_bias,
-            mask_local=mask_local,
-            mask_global=mask_global,
             output_attentions=output_attentions,
             deterministic=deterministic,
             init_cache=init_cache,
         )
-
 
 class ScannableFlaxT5LayerCollection(nn.Module):
     config: T5Config
@@ -1370,8 +1354,6 @@ class FlaxT5BlockCollection(nn.Module):
         attention_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions: bool = False,
         output_hidden_states: bool = False,
         deterministic: bool = True,
@@ -1388,14 +1370,6 @@ class FlaxT5BlockCollection(nn.Module):
             carry_ = (hidden_states, )
             if self.config.causal and encoder_hidden_states is not None:
                 carry_ += (encoder_decoder_position_bias, )
-
-            # print("in scan....................")
-            # jax.debug.print("in scan===========")
-            # if "graph" in self.variables.keys():
-            #     g = flatten_dict(self.variables["graph"], sep="/")
-            #     jax.debug.print("keys: {k}", k=flatten_dict(g, sep="/"))
-            # else:
-            #     jax.debug.print("graph not in variable keys")
 
             layer_outputs, _ = nn.scan( remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
@@ -1438,8 +1412,6 @@ class FlaxT5BlockCollection(nn.Module):
                     encoder_hidden_states,
                     encoder_attention_mask,
                     encoder_decoder_position_bias,
-                    mask_local,
-                    mask_global,
                     output_attentions,
                     deterministic,
                     init_cache,
@@ -1491,8 +1463,6 @@ class FlaxT5Stack(nn.Module):
         attention_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions: bool = False,
         output_hidden_states: bool = False,
         return_dict: bool = True,
@@ -1507,8 +1477,6 @@ class FlaxT5Stack(nn.Module):
             attention_mask=attention_mask,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
-            mask_local=mask_local,
-            mask_global=mask_global,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             deterministic=deterministic,
@@ -1809,8 +1777,6 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         attention_mask: Optional[jnp.ndarray] = None,
         decoder_input_ids: jnp.ndarray = None,
         decoder_attention_mask: Optional[jnp.ndarray] = None,
-        mask_local=None,
-        mask_global=None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -1847,8 +1813,6 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
             attention_mask=jnp.array(attention_mask, dtype="i4"),
             decoder_input_ids=jnp.array(decoder_input_ids, dtype="i4"),
             decoder_attention_mask=jnp.array(decoder_attention_mask, dtype="i4"),
-            mask_local=mask_local,
-            mask_global=mask_global,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -2147,8 +2111,6 @@ class FlaxT5Module(nn.Module):
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_outputs=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
@@ -2163,8 +2125,6 @@ class FlaxT5Module(nn.Module):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            mask_local=mask_local,
-            mask_global=mask_global,
             return_dict=return_dict,
             deterministic=deterministic,
         )
@@ -2267,8 +2227,6 @@ class FlaxT5EncoderModule(nn.Module):
         self,
         input_ids=None,
         attention_mask=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions=False,
         output_hidden_states=False,
         return_dict: bool = True,
@@ -2278,8 +2236,6 @@ class FlaxT5EncoderModule(nn.Module):
         encoder_outputs = self.encoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            mask_local=mask_local,
-            mask_global=mask_global,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -2382,8 +2338,6 @@ class FlaxT5ForConditionalGenerationModule(nn.Module):
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_outputs=None,
-        mask_local=None,
-        mask_global=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
@@ -2396,8 +2350,6 @@ class FlaxT5ForConditionalGenerationModule(nn.Module):
         encoder_outputs = self.encoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            mask_local=mask_local,
-            mask_global=mask_global,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,

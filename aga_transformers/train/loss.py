@@ -18,11 +18,17 @@ def loss_fn(
     attention_mask: jax.Array, 
     decoder_input_ids: jax.Array, 
     decoder_attention_mask: jax.Array,
+    graph_dependency: PyTree=None,
     **model_kwargs
 ) -> Tuple[jax.Array, PyTree]:
     
+    param_dict = {"params": params, "graph": graph}
+    
+    if graph_dependency is not None:
+        param_dict["graph_dependency"] = graph_dependency
+
     model_output = model(
-        params={"params": params, "graph": graph},
+        params=param_dict,
         input_ids=input_ids,
         attention_mask=attention_mask,
         decoder_input_ids=decoder_input_ids, 
