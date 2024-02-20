@@ -29,7 +29,6 @@ from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
 
-
 from jax.random import PRNGKey
 from functools import partial
 import math
@@ -675,25 +674,16 @@ class FlaxT5Attention(nn.Module):
         if not deterministic and self.dropout > 0.0:
             dropout_rng = self.make_rng("dropout")
 
-        dot_product_attention_weights_ckpt = jax.checkpoint(
-                            partial(dot_product_attention_weights,
-                                    dropout_rng=dropout_rng,
-                                    dropout_rate=self.dropout,
-                                    broadcast_dropout=True,
-                                    deterministic=deterministic,
-                                    dtype=self.dtype, )
-                            )
-
         # Softmax(QK^T)
-        attn_weights = dot_product_attention_weights_ckpt(
+        attn_weights = dot_product_attention_weights(
             query_states,
             key_states,
             bias=position_bias,
-            # dropout_rng=dropout_rng,
-            # dropout_rate=self.dropout,
-            # broadcast_dropout=True,
-            # deterministic=deterministic,
-            # dtype=self.dtype,
+            dropout_rng=dropout_rng,
+            dropout_rate=self.dropout,
+            broadcast_dropout=True,
+            deterministic=deterministic,
+            dtype=self.dtype,
         )
 
         # multiply with value states
@@ -1049,21 +1039,16 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
-            
-            dot_product_attention_weights_ckpt = jax.checkpoint(
-                                partial(dot_product_attention_weights,
-                                        dropout_rng=dropout_rng,
-                                        dropout_rate=self.dropout,
-                                        broadcast_dropout=True,
-                                        deterministic=deterministic,
-                                        dtype=self.dtype, )
-                                )
-
             # Softmax(QK^T)
-            attn_weights = dot_product_attention_weights_ckpt(
+            attn_weights = dot_product_attention_weights(
                 query_states_blocks,
                 key_states_blocks,
                 bias=position_bias_local,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
             )
             # multiply with value states
             attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
@@ -1072,15 +1057,15 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             shape_output = tuple((attn_output_blocks.shape[0], (attn_output_blocks.shape[1] * attn_output_blocks.shape[2]))) + attn_output_blocks.shape[3:]
             attn_output_blocks = attn_output_blocks.reshape(shape_output, order="C")
 
-            global_attn_weights = dot_product_attention_weights_ckpt(
+            global_attn_weights = dot_product_attention_weights(
                 global_q,
                 key_states,
                 bias=position_bias_global,
-                # dropout_rng=dropout_rng,
-                # dropout_rate=self.dropout,
-                # broadcast_dropout=True,
-                # deterministic=deterministic,
-                # dtype=self.dtype,
+                dropout_rng=dropout_rng,
+                dropout_rate=self.dropout,
+                broadcast_dropout=True,
+                deterministic=deterministic,
+                dtype=self.dtype,
             )
 
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
@@ -1412,7 +1397,7 @@ class FlaxT5BlockCollection(nn.Module):
             # else:
             #     jax.debug.print("graph not in variable keys")
 
-            layer_outputs, _ = nn.scan(ScannableFlaxT5LayerCollection, #remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, _ = nn.scan( remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
