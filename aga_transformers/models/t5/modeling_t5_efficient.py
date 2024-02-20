@@ -33,6 +33,8 @@ from jax.random import PRNGKey
 from functools import partial
 import math
 
+from jax.ad_checkpoint import checkpoint_name
+
 import einops
 
 ArrayTree = Union[jnp.ndarray, Iterable['ArrayTree'], Mapping[Any, 'ArrayTree']]
@@ -1120,26 +1122,14 @@ class FlaxT5LayerSelfAttention(nn.Module):
         init_cache=False,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
-        if self.config.causal:
-            attention_output = self.SelfAttention(
-                normed_hidden_states,
-                attention_mask=attention_mask,
-                position_bias=position_bias,
-                output_attentions=output_attentions,
-                deterministic=deterministic,
-                init_cache=init_cache,
-            )
-        else:
-            attention_output = self.SelfAttention(
-                normed_hidden_states,
-                attention_mask=attention_mask,
-                position_bias=position_bias,
-                output_attentions=output_attentions,
-                mask_local=mask_local,
-                mask_global=mask_global,
-                deterministic=deterministic,
-                init_cache=init_cache,
-            )
+        attention_output = checkpoint_name(self.SelfAttention(
+            normed_hidden_states,
+            attention_mask=attention_mask,
+            position_bias=position_bias,
+            output_attentions=output_attentions,
+            deterministic=deterministic,
+            init_cache=init_cache,
+        ), name="self_attn_output")
         hidden_states = hidden_states + self.dropout(attention_output[0], deterministic=deterministic)
         outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
         return outputs
@@ -1407,7 +1397,7 @@ class FlaxT5BlockCollection(nn.Module):
             # else:
             #     jax.debug.print("graph not in variable keys")
 
-            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(1, 2, 3, 4, 5, 6), policy=jax.checkpoint_policies.dots_with_no_batch_dims_saveable), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(1, 2, 3, 4, 5, 6), policy=jax.checkpoint_policies.save_only_these_names('self_attn_output')), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
