@@ -856,7 +856,7 @@ def main():
             mask_local = batch.pop("mask_local")
             graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
 
-            loss, _ = loss_fn_(model=state.apply_fn, params=params, graphs=graphs, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(model=state.apply_fn, params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
