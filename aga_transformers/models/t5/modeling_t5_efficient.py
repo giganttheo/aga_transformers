@@ -931,6 +931,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             mask_global = self.variables["graph"]["mask_global"].astype("bool")
             precomputed=True
         elif self.has_variable("graph", "receivers"):
+            jax.debug.print("Running with receivers shape: {receivers.shape}", receivers=self.variables["graph"]["receivers"])
             precomputed=False
             if len(self.variables["graph"]["receivers"].shape) == 3:
                 receivers =self.variables["graph"]["receivers"]
