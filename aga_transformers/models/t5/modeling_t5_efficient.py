@@ -1407,7 +1407,7 @@ class FlaxT5BlockCollection(nn.Module):
             # else:
             #     jax.debug.print("graph not in variable keys")
 
-            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(1, 2, 3, 4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
+            layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(1, 2, 3, 4, 5, 6), policy=jax.checkpoint_policies.dots_with_no_batch_dims_saveable), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
