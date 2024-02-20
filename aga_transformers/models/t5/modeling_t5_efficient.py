@@ -29,7 +29,6 @@ from flax.linen import partitioning as nn_partitioning
 from flax.linen.attention import dot_product_attention_weights
 from flax.traverse_util import flatten_dict, unflatten_dict
 
-dot_product_attention_weights = jax.checkpoint(dot_product_attention_weights)
 
 from jax.random import PRNGKey
 from functools import partial
@@ -1041,16 +1040,21 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             if not deterministic and self.dropout > 0.0:
                 dropout_rng = self.make_rng("dropout")
 
+            
+            dot_product_attention_weights = jax.checkpoint(
+                                partial(dot_product_attention_weights,
+                                        dropout_rng=dropout_rng,
+                                        dropout_rate=self.dropout,
+                                        broadcast_dropout=True,
+                                        deterministic=deterministic,
+                                        dtype=self.dtype, )
+                                )
+
             # Softmax(QK^T)
             attn_weights = dot_product_attention_weights(
                 query_states_blocks,
                 key_states_blocks,
                 bias=position_bias_local,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
             )
             # multiply with value states
             attn_output_blocks = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value_states_blocks)
@@ -1063,11 +1067,11 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 global_q,
                 key_states,
                 bias=position_bias_global,
-                dropout_rng=dropout_rng,
-                dropout_rate=self.dropout,
-                broadcast_dropout=True,
-                deterministic=deterministic,
-                dtype=self.dtype,
+                # dropout_rng=dropout_rng,
+                # dropout_rate=self.dropout,
+                # broadcast_dropout=True,
+                # deterministic=deterministic,
+                # dtype=self.dtype,
             )
 
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
