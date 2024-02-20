@@ -675,16 +675,25 @@ class FlaxT5Attention(nn.Module):
         if not deterministic and self.dropout > 0.0:
             dropout_rng = self.make_rng("dropout")
 
+        dot_product_attention_weights = jax.checkpoint(
+                            partial(dot_product_attention_weights,
+                                    dropout_rng=dropout_rng,
+                                    dropout_rate=self.dropout,
+                                    broadcast_dropout=True,
+                                    deterministic=deterministic,
+                                    dtype=self.dtype, )
+                            )
+
         # Softmax(QK^T)
         attn_weights = dot_product_attention_weights(
             query_states,
             key_states,
             bias=position_bias,
-            dropout_rng=dropout_rng,
-            dropout_rate=self.dropout,
-            broadcast_dropout=True,
-            deterministic=deterministic,
-            dtype=self.dtype,
+            # dropout_rng=dropout_rng,
+            # dropout_rate=self.dropout,
+            # broadcast_dropout=True,
+            # deterministic=deterministic,
+            # dtype=self.dtype,
         )
 
         # multiply with value states
