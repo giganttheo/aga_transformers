@@ -387,15 +387,16 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
 
     for idx in batch_idx:
         batch = dataset[idx]
-        graph_batch = batch.pop("graph")
-        graph_batch = {
-            "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
-            "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
-            # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
-            # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
-            # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
-            }
-        batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
+        batch = {k: np.array(v) for k, v in batch.items()}
+        # graph_batch = batch.pop("graph")
+        # graph_batch = {
+        #     "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
+        #     "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
+        #     # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+        #     # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+        #     # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
+        #     }
+        # batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
 
         yield batch
 
@@ -583,6 +584,7 @@ def main():
         }
         print(attention_kwargs)
         tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=model_args.model_name_or_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
+        graph = graph["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]
 
     if training_args.gradient_checkpointing:
         print("=============================")
@@ -673,7 +675,7 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        loading_ds_from_disk=True
+        loading_ds_from_disk=False
         if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
@@ -852,9 +854,9 @@ def main():
 
         def compute_loss(params):
             labels = batch.pop("labels")
-            mask_global = batch.pop("mask_global")
-            mask_local = batch.pop("mask_local")
-            graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
+            # mask_global = batch.pop("mask_global")
+            # mask_local = batch.pop("mask_local")
+            graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
 
             loss, _ = loss_fn_(model=state.apply_fn, params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
