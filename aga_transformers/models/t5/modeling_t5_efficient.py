@@ -1393,6 +1393,9 @@ class FlaxT5BlockCollection(nn.Module):
         position_bias = None
         encoder_decoder_position_bias = None
 
+
+        print("go....................")
+        jax.debug.print("go................")
         if self.scan:
             carry_ = (hidden_states, )
             if self.config.causal and encoder_hidden_states is not None:
