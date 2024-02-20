@@ -578,7 +578,8 @@ def main():
         print("=============================")
         print("Enabling gradient checkpointing")
         print("=============================")
-        model.enable_gradient_checkpointing()
+        # model.enable_gradient_checkpointing()
+        model.enable_scan()
 
     if model.config.decoder_start_token_id is None:
         raise ValueError("Make sure that `config.decoder_start_token_id` is correctly defined")
