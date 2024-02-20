@@ -925,7 +925,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #Graph attention
         no_graph=False
         if "graph" in self.variables.keys():
-            jax.debug.print("keys in the attn: {k}", k=self.variables["graph"].keys())
+            jax.debug.print("keys in the attn: {k}", k=flatten_dict(self.variables["graph"], sep="/"))
         else:
             jax.debug.print("graph not in the attn")
         if mask_local is not None:
