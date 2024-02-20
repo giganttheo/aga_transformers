@@ -69,6 +69,8 @@ from aga_transformers.models.utils import add_graph_to_params, repeat_relative_p
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5
 from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
+from aga_transformers.attention_patterns.utils import graph_from_path
+
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
 
@@ -385,7 +387,15 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
 
     for idx in batch_idx:
         batch = dataset[idx]
-        batch = {k: np.array(v) for k, v in batch.items()}
+        graph_batch = batch.pop("graph")
+        graph_batch = {
+            "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
+            "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
+            # "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+            # "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            # "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
+            }
+        batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
 
         yield batch
 
@@ -663,33 +673,42 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        train_dataset = dataset["train"]
-        if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-            train_dataset = train_dataset.select(range(max_train_samples))
-        train_dataset = train_dataset.map(
-            preprocess_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on train dataset",
-        )
+        loading_ds_from_disk=True
+        if loading_ds_from_disk:
+            from datasets import load_from_disk
+            preprocessed_datasets = load_from_disk("./preprocessed_datasets/global_local")
+            train_dataset = preprocessed_datasets["train"]  
+        else:
+            train_dataset = dataset["train"]
+            if data_args.max_train_samples is not None:
+                max_train_samples = min(len(train_dataset), data_args.max_train_samples)
+                train_dataset = train_dataset.select(range(max_train_samples))
+            train_dataset = train_dataset.map(
+                preprocess_function,
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on train dataset",
+            )
 
     if training_args.do_eval:
-        max_target_length = data_args.val_max_target_length
-        eval_dataset = dataset["valid"]
-        if data_args.max_eval_samples is not None:
-            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-            eval_dataset = eval_dataset.select(range(max_eval_samples))
-        eval_dataset = eval_dataset.map(
-            preprocess_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on validation dataset",
-        )
+        if loading_ds_from_disk:
+            eval_dataset = preprocessed_datasets["valid"]
+        else:
+            max_target_length = data_args.val_max_target_length
+            eval_dataset = dataset["valid"]
+            if data_args.max_eval_samples is not None:
+                max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
+                eval_dataset = eval_dataset.select(range(max_eval_samples))
+            eval_dataset = eval_dataset.map(
+                preprocess_function,
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on validation dataset",
+            )
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
@@ -803,7 +822,7 @@ def main():
     # lora_params = model.params
     # optimizer = adamw
 
-    loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
@@ -833,7 +852,11 @@ def main():
 
         def compute_loss(params):
             labels = batch.pop("labels")
-            loss, _ = loss_fn_(model=state.apply_fn, params=params, dropout_rng=dropout_rng, **batch)
+            mask_global = batch.pop("mask_global")
+            mask_local = batch.pop("mask_local")
+            graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
+
+            loss, _ = loss_fn_(model=state.apply_fn, params=params, graphs=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
@@ -849,7 +872,11 @@ def main():
     @jax.jit
     def eval_step(params, batch):
         labels = batch.pop("labels")
-        loss, _ = loss_fn_(model=state.apply_fn, params=params, train=False, **batch)
+        mask_global = batch.pop("mask_global")
+        mask_local = batch.pop("mask_local")
+        graphs = graph_from_path(state.params, {"mask_global": mask_global, "mask_local": mask_local}, {}, {}, layer_wise=False)
+
+        loss, _ = loss_fn(model=state.apply_fn, params=params, graph=graphs, train=False, **batch)
 
         # # true loss = total loss / total samples
         # loss = jax.lax.psum(loss, "batch")
