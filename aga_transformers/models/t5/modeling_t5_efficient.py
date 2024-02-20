@@ -924,20 +924,20 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         
         #Graph attention
         no_graph=False
-        if "graph" in self.variables.keys():
-            jax.debug.print("keys in the attn: {k}", k=flatten_dict(self.variables["graph"], sep="/"))
-        else:
-            jax.debug.print("graph not in the attn")
+        # if "graph" in self.variables.keys():
+        #     jax.debug.print("keys in the attn: {k}", k=flatten_dict(self.variables["graph"], sep="/"))
+        # else:
+        #     jax.debug.print("graph not in the attn")
         if mask_local is not None:
             precomputed = True
-            jax.debug.print("Running with inputed mask local")
+            # jax.debug.print("Running with inputed mask local")
         elif self.has_variable("graph", "mask_local"):
-            jax.debug.print("Running with mask local")
+            # jax.debug.print("Running with mask local")
             mask_local = self.variables["graph"]["mask_local"].astype("bool")
             mask_global = self.variables["graph"]["mask_global"].astype("bool")
             precomputed=True
         elif self.has_variable("graph", "receivers"):
-            jax.debug.print("Running with receivers shape: {receivers.shape}", receivers=self.variables["graph"]["receivers"])
+            # jax.debug.print("Running with receivers shape: {receivers.shape}", receivers=self.variables["graph"]["receivers"])
             precomputed=False
             if len(self.variables["graph"]["receivers"].shape) == 3:
                 receivers =self.variables["graph"]["receivers"]
