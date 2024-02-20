@@ -924,7 +924,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         
         #Graph attention
         no_graph=False
-        jax.debug.print("keys in the attn: {k}", k=self.variables["graph"].keys())
+        if "graph" in self.variables.keys():
+            jax.debug.print("keys in the attn: {k}", k=self.variables["graph"].keys())
+        else:
+            jax.debug.print("graph not in the attn")
         if mask_local is not None:
             precomputed = True
             jax.debug.print("Running with inputed mask local")
