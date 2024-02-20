@@ -1069,7 +1069,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             attn_output_global = jnp.einsum("...hqk,...khd->...qhd", global_attn_weights, value_states)
 
-            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)#[:, :seq_length, ...]
+            attn_output = jnp.concatenate([attn_output_global, attn_output_blocks], axis=1, dtype=self.dtype)[:, :seq_length, ...]
             
         attn_output = self._merge_heads(attn_output)
 
