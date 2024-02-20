@@ -387,16 +387,16 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
 
     for idx in batch_idx:
         batch = dataset[idx]
-        # batch = {k: np.array(v) for k, v in batch.items()}
-        graph_batch = batch.pop("graph")
-        graph_batch = {
-            # "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
-            # "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
-            "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
-            "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
-            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
-            }
-        batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
+        batch = {k: np.array(v) for k, v in batch.items()}
+        # graph_batch = batch.pop("graph")
+        # graph_batch = {
+        #     # "mask_local": jnp.asarray(np.stack([graph["mask_local"] for graph in graph_batch]), dtype="bool"),
+        #     # "mask_global": jnp.asarray(np.stack([graph["mask_global"] for graph in graph_batch]), dtype="bool"),
+        #     "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+        #     "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+        #     "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
+        #     }
+        # batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
 
         yield batch
 
@@ -831,6 +831,8 @@ def main():
     # optimizer = adamw
 
     # graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
+
+    # /!\ the graph scope should follow the original params scope, not the scanned one
     # graphs = graph_from_path(lora_params, graph, {}, {}, layer_wise=False)
 
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
