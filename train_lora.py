@@ -831,7 +831,7 @@ def main():
     # optimizer = adamw
 
     # graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
-    graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
+    graphs = graph_from_path(lora_params, graph, {}, {}, layer_wise=False)
 
     loss_fn_ =  jax.jit(partial(loss_fn, graph=graphs), static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
