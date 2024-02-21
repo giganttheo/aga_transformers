@@ -271,28 +271,18 @@ def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.n
 
 #   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
-@partial(jax.jit, static_argnums=[3, 4, 5, 6])
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #batch
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
-def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
+@partial(jax.jit, static_argnums=[2, 3, 5])
+@partial(jax.vmap, in_axes=[0, 0, None, None, None, None, 0]) #batch
+@partial(jax.vmap, in_axes=[0, 0, None, None, None, None, 0]) #heads
+def create_local_and_global_edges(senders, receivers, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, edges=None):
   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
-  mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
-  if edges is not None:
-      edge_bias_local = jnp.full(mask_local_shape, -1)
-  else:
-      edge_bias_local=None
+  edge_bias_local = jnp.full(mask_local_shape, -1)
+
   mask_global_shape = (n_global_tokens, seq_len)
-  mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
-  if edges is not None:
-      edge_bias_global = jnp.full(mask_global_shape, -1)
-  else:
-      edge_bias_global=None
+  edge_bias_global = jnp.full(mask_global_shape, -1)
 
-  def setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global=None, edge_bias_local=None, edges=None):
+  def setup_mask(senders, receivers, edge_bias_global, edge_bias_local=None, edges=None):
 
-    # @jax.vmap #batch
-    # @jax.vmap #heads
     @jax.vmap #num_edges
     def _get_ids_in_blocks(senders, receivers):
       #block id
@@ -314,13 +304,58 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
 
       return block_id, block_pos_q, block_pos_k
 
-    # @jax.vmap #batch
-    # @jax.vmap #heads # @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
     def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
         return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
 
-    # @jax.vmap #batch
-    # @jax.vmap #heads #was @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+    def _update_mask_global(mask, graph_mask, senders, receivers):
+        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+
+    edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
+    edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
+    return edge_bias_local, edge_bias_global
+
+  return setup_mask(senders, receivers, edge_bias_global, edge_bias_local, edges)
+
+def create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
+  mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
+  mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+  mask_global_shape = tuple(graph_mask.shape[:-1]) + (n_global_tokens, seq_len)
+  mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
+
+  def setup_mask(mask_local, mask_global, senders, receivers, graph_mask):
+
+    @jax.vmap #batch
+    @jax.vmap #num_edges
+    def _get_ids_in_blocks(senders, receivers):
+      #block id
+      block_id = (senders - n_global_tokens) // block_len
+      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+
+      block_id_k = (receivers - n_global_tokens) // block_len
+      block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+
+      #position within the block q
+      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens) % block_len, 1_000_000).astype("int32")
+
+      offset_k = block_id_k - block_id
+      # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+      
+      block_pos_k = n_global_tokens + ((receivers - n_global_tokens) % block_len) + (1 + offset_k) * block_len
+      block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+      block_pos_k = jnp.where((receivers >= n_global_tokens), block_pos_k, receivers)
+
+      return block_id, block_pos_q, block_pos_k
+
+    @jax.vmap #batch
+    @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+    @jax.vmap #batch
+    @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
     def _update_mask_global(mask, graph_mask, senders, receivers):
         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
@@ -331,14 +366,10 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
     mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
     mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
 
-    if edges is not None:
-        edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
-        edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
-        return mask_local, mask_global, edge_bias_local, edge_bias_global
+    return mask_local.swapaxes(1, 2), mask_global
 
-    return mask_local, mask_global #.swapaxes(1, 2)
+  return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
-  return setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
 
 
 @partial(jax.jit, static_argnums=[3, 4, 5, 6])
@@ -1081,6 +1112,15 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #Graph attention
         no_graph=False
 
+        if "graph" in self.variables.keys():
+            jax.debug.print("graph is in the attn")
+        else:
+            jax.debug.print("graph is NOT in the attn")
+        if "graph_dependency" in self.variables.keys():
+            jax.debug.print("graph_dependency is in the attn")
+        else:
+            jax.debug.print("graph_dependency is NOT in the attn")
+
         if self.has_variable("graph", "edge_bias_local"):
             mask_local = self.variables["graph"]["mask_local"].astype("bool")
             mask_global = self.variables["graph"]["mask_global"].astype("bool")
@@ -1095,7 +1135,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
                 senders = einops.repeat(self.variables["graph"]["senders"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
-                edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
             elif len(self.variables["graph"]["receivers"].shape) == 3:
                 receivers =self.variables["graph"]["receivers"]
                 senders = self.variables["graph"]["senders"]
@@ -1120,6 +1159,33 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             no_graph=True
             precomputed=False
 
+        if self.has_variable("graph_dependency", "receivers"):
+            #Graph attention
+            if len(self.variables["graph_dependency"]["receivers"].shape) == 3 and self.variables["graph_dependency"]["receivers"].shape[1] != self.n_heads:
+                #graph_dependency attention pattern is copied head-wise
+                receivers_dependency = einops.repeat(self.variables["graph_dependency"]["receivers"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                senders_dependency = einops.repeat(self.variables["graph_dependency"]["senders"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                edge_labels_dependency = einops.repeat(self.variables["graph_dependency"]["edge_labels"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+            elif len(self.variables["graph_dependency"]["receivers"].shape) == 3:
+                receivers_dependency =self.variables["graph_dependency"]["receivers"]
+                senders_dependency = self.variables["graph_dependency"]["senders"]
+                # graph_mask_dependency = self.variables["graph_dependency"]["graph_mask"]
+            elif len(self.variables["graph_dependency"]["receivers"].shape) == 2 and self.variables["graph_dependency"]["receivers"].shape[0] == batch_size:
+                #graph_dependency attention pattern is copied head-wise
+                receivers_dependency = einops.repeat(self.variables["graph_dependency"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders_dependency = einops.repeat(self.variables["graph_dependency"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+            elif len(self.variables["graph_dependency"]["receivers"].shape) == 2 and self.variables["graph_dependency"]["receivers"].shape[0] == self.n_heads:
+                #graph_dependency attention pattern is copied batch-wise
+                receivers_dependency = einops.repeat(self.variables["graph_dependency"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders_dependency = einops.repeat(self.variables["graph_dependency"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+            else:
+                #graph_dependency attention pattern is copied batch and head-wise
+                receivers_dependency = einops.repeat(self.variables["graph_dependency"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                senders_dependency = einops.repeat(self.variables["graph_dependency"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
 
         # print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
@@ -1158,8 +1224,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                     key_states, value_states, query_states
                 )
             # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
-            mask_local, mask_global, edge_bias_local, edge_bias_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False, edge_labels)
-
+            mask_local, mask_global = mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+            edge_bias_local, edge_bias_global = create_local_and_global_edges(senders_dependency, receivers_dependency, n_global_tokens, block_len, num_blocks, seq_length, edge_labels_dependency)
 
         if no_graph:
             mask_local=None
@@ -1566,9 +1632,9 @@ class FlaxT5BlockCollection(nn.Module):
 
             layer_outputs, _ = nn.scan( remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
-                            variable_axes={"params": 0, "graphs": 0}, #==> instead of using the variables, we passe the input in the model
+                            variable_axes={"params": 0, "graph": 0, "graph_dependency": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
-                            variable_broadcast=["graphs"],
+                            variable_broadcast=["graph", "graph_dependency"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
                             )(
                                         carry_,

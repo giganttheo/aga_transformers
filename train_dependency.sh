@@ -25,14 +25,16 @@ python ./train_lora_dependency.py \
 	--num_train_epochs 5 \
 	--learning_rate 1e-3 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 24 \
-	--per_device_eval_batch_size 24 \
+	--per_device_train_batch_size 14 \
+	--per_device_eval_batch_size 14 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
+	--max_train_samples 64 \
+	--max_eval_samples 64 \
 	# --resume_from_checkpoint \#8192 \
 	# --run_id "fv3mirpt"
 	# --max_train_samples 64 \
