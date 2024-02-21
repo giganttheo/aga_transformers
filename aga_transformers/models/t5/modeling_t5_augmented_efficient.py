@@ -1290,7 +1290,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         
         else:
 
-            position_bias_local = (position_bias_local + mask_local).swapaxes(1, 2)
+            position_bias_local = position_bias_local.swapaxes(1, 2) + mask_local
             position_bias_global = position_bias_global + mask_global
 
             # create dropout rng
