@@ -1112,14 +1112,14 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #Graph attention
         no_graph=False
 
-        if "graph" in self.variables.keys():
-            jax.debug.print("graph is in the attn")
-        else:
-            jax.debug.print("graph is NOT in the attn")
-        if "graph_dependency" in self.variables.keys():
-            jax.debug.print("graph_dependency is in the attn")
-        else:
-            jax.debug.print("graph_dependency is NOT in the attn")
+        # if "graph" in self.variables.keys():
+        #     jax.debug.print("graph is in the attn")
+        # else:
+        #     jax.debug.print("graph is NOT in the attn")
+        # if "graph_dependency" in self.variables.keys():
+        #     jax.debug.print("graph_dependency is in the attn")
+        # else:
+        #     jax.debug.print("graph_dependency is NOT in the attn")
 
         if self.has_variable("graph", "edge_bias_local"):
             mask_local = self.variables["graph"]["mask_local"].astype("bool")
