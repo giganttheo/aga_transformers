@@ -1171,21 +1171,26 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 receivers_dependency =self.variables["graph_dependency"]["receivers"]
                 senders_dependency = self.variables["graph_dependency"]["senders"]
                 # graph_mask_dependency = self.variables["graph_dependency"]["graph_mask"]
+                edge_labels_dependency = self.variables["graph_dependency"]["edge_labels"]
             elif len(self.variables["graph_dependency"]["receivers"].shape) == 2 and self.variables["graph_dependency"]["receivers"].shape[0] == batch_size:
                 #graph_dependency attention pattern is copied head-wise
                 receivers_dependency = einops.repeat(self.variables["graph_dependency"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
                 senders_dependency = einops.repeat(self.variables["graph_dependency"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
                 # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                edge_labels_dependency = einops.repeat(self.variables["graph_dependency"]["edge_labels"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
             elif len(self.variables["graph_dependency"]["receivers"].shape) == 2 and self.variables["graph_dependency"]["receivers"].shape[0] == self.n_heads:
                 #graph_dependency attention pattern is copied batch-wise
                 receivers_dependency = einops.repeat(self.variables["graph_dependency"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
                 senders_dependency = einops.repeat(self.variables["graph_dependency"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
                 # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                edge_labels_dependency = einops.repeat(self.variables["graph_dependency"]["edge_labels"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
             else:
                 #graph_dependency attention pattern is copied batch and head-wise
                 receivers_dependency = einops.repeat(self.variables["graph_dependency"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
                 senders_dependency = einops.repeat(self.variables["graph_dependency"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
                 # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                edge_labels_dependency = einops.repeat(self.variables["graph_dependency"]["edge_labels"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+
 
         # print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
