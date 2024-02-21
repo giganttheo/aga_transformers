@@ -895,8 +895,8 @@ def main():
             # mask_local = batch.pop("mask_local")
             receivers = batch.pop("receivers")
             senders = batch.pop("senders")
-            graph_mask = batch.pop("graph_mask")
-            graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
+            edge_labels = batch.pop("edge_labels")
+            graph = {"receivers": receivers, "senders": senders, "edge_labels": edge_labels}
             graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
 
             loss, _ = loss_fn_(model=state.apply_fn, params=params, graph_dependency=graphs, dropout_rng=dropout_rng, **batch)
@@ -919,8 +919,8 @@ def main():
         # mask_local = batch.pop("mask_local")
         receivers = batch.pop("receivers")
         senders = batch.pop("senders")
-        graph_mask = batch.pop("graph_mask")
-        graph_dep = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
+        edge_labels = batch.pop("edge_labels")
+        graph_dep = {"receivers": receivers, "senders": senders, "edge_labels": edge_labels}
         graphs = graph_from_path(state.params, graph_dep, {}, {}, layer_wise=False)
         loss, _ = loss_fn(model=state.apply_fn, params=params, graph=graph, graph_dependency=graphs, train=False, **batch)
 
