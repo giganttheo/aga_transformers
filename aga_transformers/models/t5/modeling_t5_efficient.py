@@ -1773,7 +1773,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
 
             # Unroll the key for the stacked scan matrix into N separate keys, indexed by layer number
             # layer/FlaxScanLayers -> (layer/0, ..., layer/N)
-            for i in range(self.config.encoder_layers):
+            for i in range(self.config.num_layers):
                 # Unstack the params for the i-th scan layer to unrolled
                 # and remove corresponding scan params on the fly
                 # -> no memory overhead for conversion!
