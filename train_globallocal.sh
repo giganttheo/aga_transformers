@@ -256,11 +256,12 @@ python ./train_lora.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
+	--resume_from_checkpoint \
+	--run_id "yuvc6oi7"
 	# --max_train_samples 50 \
 	# --max_eval_samples 50 \
 	# --seed 43 \
-	# --resume_from_checkpoint \
-	# --run_id "fv3mirpt"
+
 
 # python ./train_lora.py \
 # 	--output_dir "./lora-t5-graph-small-8k" \
