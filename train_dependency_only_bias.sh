@@ -15,15 +15,15 @@ wandb login
 # export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 python ./train_dependency_only_bias.py \
-	--output_dir "./8k-global-dependency-bias" \
-	--model_name_or_path "google/long-t5-local-base" \
-	--tokenizer_name "google/long-t5-local-base" \
+	--output_dir "./8k-global-dependency-bias-only" \
+	--model_name_or_path "gigant/longt5-global-3epoch" \
+	--tokenizer_name "gigant/longt5-global-3epoch" \
 	--dataset_name="gigant/tib_dependency" \
 	--source_prefix "summarize: " \
 	--do_train \
 	--do_eval \
 	--num_train_epochs 10 \
-	--learning_rate 1e-2 \
+	--learning_rate 1e-3 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 14 \
 	--per_device_eval_batch_size 14 \
