@@ -10,7 +10,7 @@ import lorax
 class TrainState(train_state.TrainState):
     dropout_rng: jnp.ndarray
 
-state = TrainState()
+state = TrainState.create(apply_fn=lambda : None, params=None, tx=None, dropout_rng=None)
 
 tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs={}, from_longt5_local=True, layer_wise=False)
         
