@@ -43,7 +43,7 @@ def load_state():
 
 state = state.replace(**load_state())
 model.enable_scan()
-model.params = lorax.merge_params(state.params, destructive=True)
+model.params = lorax.merge_params(state.params, destructive=False)
 model.disable_scan()
 model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
