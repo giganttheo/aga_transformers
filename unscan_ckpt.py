@@ -4,16 +4,24 @@ from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augme
 
 from flax.training import train_state
 import jax.numpy as jnp
+import jax
+
+import optax
 
 import lorax
 
 class TrainState(train_state.TrainState):
     dropout_rng: jnp.ndarray
 
-state = TrainState.create(apply_fn=lambda : None, params=None, tx=None, dropout_rng=None)
-
 tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs={}, from_longt5_local=True, layer_wise=False)
-        
+
+tx = optax.adafactor(
+    learning_rate=0,
+)
+
+state = TrainState.create(apply_fn=model.apply, params=model.params, tx=tx, dropout_rng=jax.random.PRGNKey(0))
+
+
 load_dir="8k-global-local"
 CKPT_DIR_LOAD = f"{load_dir}/ckpts/"
 
