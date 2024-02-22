@@ -13,7 +13,15 @@ import lorax
 class TrainState(train_state.TrainState):
     dropout_rng: jnp.ndarray
 
-tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs={}, from_longt5_local=True, layer_wise=False)
+attention_kwargs = {
+    "max_source_length": 0,
+    "max_target_length": 0,
+    "window_sizes": [254], #[127], # [254]*12,
+    "autoregressive": False,
+    "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+}
+
+tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
 tx = optax.adafactor(
     learning_rate=0,
