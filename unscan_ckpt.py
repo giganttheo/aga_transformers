@@ -27,7 +27,7 @@ tx = optax.adafactor(
     learning_rate=0,
 )
 
-state = TrainState.create(apply_fn=model.__call__, params=model.params, tx=tx, dropout_rng=jax.random.PRGNKey(0))
+state = TrainState.create(apply_fn=model.__call__, params=model.params, tx=tx, dropout_rng=jax.random.PRNGKey(0))
 
 
 load_dir="8k-global-local"
