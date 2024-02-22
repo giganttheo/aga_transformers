@@ -67,7 +67,7 @@ from lorax import LoraWeight
 
 from aga_transformers.models.utils import add_graph_to_params, repeat_relative_pos_bias
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
-from aga_transformers.train.lora import create_lora
+from aga_transformers.train.lora import create_lora, create_bias_ft
 from aga_transformers.train.loss import loss_fn
 from aga_transformers.attention_patterns.utils import graph_from_path
 
@@ -854,7 +854,7 @@ def main():
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_lora(model, model.params, optimizer, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_bias_ft(model, model.params, optimizer, dtype="bfloat16")
 
     # apply_fn = model.__call__
     # lora_params = model.params
@@ -1062,15 +1062,10 @@ def main():
             # orbax_mngr.save(state.step, FrozenDict(ckpt))
             save_state(state)
             # state.replace(**load_state())
-            if training_args.gradient_checkpointing:
-                model.disable_scan()
-            model.save_pretrained(training_args.output_dir, params=lorax.merge_params(model.params, destructive=False))
+            model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
                 repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)
-            if training_args.gradient_checkpointing:
-                model.enable_scan()
-
 
     # ======================== Prediction loop ==============================
     if training_args.do_predict:

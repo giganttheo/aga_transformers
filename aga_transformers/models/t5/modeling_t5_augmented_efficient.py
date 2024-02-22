@@ -217,7 +217,6 @@ def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.n
         blocks_list.append(x[indices]) #x[indices] is [..., 1, 3*block_len, ...]
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
 
-
 # def create_block_attn_mask_from_graph(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value):
 
 #   mask_local_shape = tuple(graph_mask.shape[:-1]) + (num_blocks, block_len, 3 * block_len + n_global_tokens)
@@ -371,83 +370,82 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
 
-
-@partial(jax.jit, static_argnums=[3, 4, 5, 6])
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #batch
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
-def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
-  #TODO add these args
-  n_slides_total: int = 0
-  slide_start_for_blocks: jnp.ndarray = None
-  n_slides_: jnp.ndarray = None
-  offset_slides = slide_start_for_blocks - n_slides_total
-  n_global_tokens_total: int = n_global_tokens - n_slides_ + n_slides_total
+# @partial(jax.jit, static_argnums=[3, 4, 5, 6])
+# @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #batch
+# @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0]) #heads
+# def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges=None):
+#   #TODO add these args
+#   n_slides_total: int = 0
+#   slide_start_for_blocks: jnp.ndarray = None
+#   n_slides_: jnp.ndarray = None
+#   offset_slides = slide_start_for_blocks - n_slides_total
+#   n_global_tokens_total: int = n_global_tokens - n_slides_ + n_slides_total
   
-  mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
-  #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
-  mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
-  if edges is not None:
-      edge_bias_local = jnp.full(mask_local_shape, -1)
-  else:
-      edge_bias_local=None
-  mask_global_shape = (n_global_tokens, seq_len)
-  mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
-  if edges is not None:
-      edge_bias_global = jnp.full(mask_global_shape, -1)
-  else:
-      edge_bias_global=None
+#   mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens)
+#   #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
+#   mask_local = jnp.full(mask_local_shape, mask_value).astype(dtype=graph_mask.dtype)
+#   if edges is not None:
+#       edge_bias_local = jnp.full(mask_local_shape, -1)
+#   else:
+#       edge_bias_local=None
+#   mask_global_shape = (n_global_tokens, seq_len)
+#   mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
+#   if edges is not None:
+#       edge_bias_global = jnp.full(mask_global_shape, -1)
+#   else:
+#       edge_bias_global=None
 
-  def setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global=None, edge_bias_local=None, edges=None):
+#   def setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global=None, edge_bias_local=None, edges=None):
 
-    # @jax.vmap #batch
-    # @jax.vmap #heads
-    @jax.vmap #num_edges
-    def _get_ids_in_blocks(senders, receivers):
-      #block id
-      block_id = (senders - n_global_tokens_total) // block_len
-      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+#     # @jax.vmap #batch
+#     # @jax.vmap #heads
+#     @jax.vmap #num_edges
+#     def _get_ids_in_blocks(senders, receivers):
+#       #block id
+#       block_id = (senders - n_global_tokens_total) // block_len
+#       block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
 
-      block_id_k = (receivers - n_global_tokens_total) // block_len
-      block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+#       block_id_k = (receivers - n_global_tokens_total) // block_len
+#       block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
 
-      #position within the block q
-      block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens_total) % block_len, 1_000_000).astype("int32")
+#       #position within the block q
+#       block_pos_q = jnp.where(senders >= n_global_tokens, (senders - n_global_tokens_total) % block_len, 1_000_000).astype("int32")
 
-      offset_k = block_id_k - block_id
-      # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+#       offset_k = block_id_k - block_id
+#       # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
       
-      block_pos_k = n_global_tokens + ((receivers - n_global_tokens_total) % block_len) + (1 + offset_k) * block_len
-      block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
-      block_pos_k = jnp.where((receivers >= n_slides_), block_pos_k, receivers + offset_slides[block_id_k]) #if pos_k is in the slide tokens
-      block_pos_k = jnp.where((receivers >= n_global_tokens_total), block_pos_k, receivers - (n_slides_total - n_slides_)) #if pos_k is in the document tokens
+#       block_pos_k = n_global_tokens + ((receivers - n_global_tokens_total) % block_len) + (1 + offset_k) * block_len
+#       block_pos_k = jnp.where( jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+#       block_pos_k = jnp.where((receivers >= n_slides_), block_pos_k, receivers + offset_slides[block_id_k]) #if pos_k is in the slide tokens
+#       block_pos_k = jnp.where((receivers >= n_global_tokens_total), block_pos_k, receivers - (n_slides_total - n_slides_)) #if pos_k is in the document tokens
 
-      return block_id, block_pos_q, block_pos_k
+#       return block_id, block_pos_q, block_pos_k
 
-    # @jax.vmap #batch
-    # @jax.vmap #heads # @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
-    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
-        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+#     # @jax.vmap #batch
+#     # @jax.vmap #heads # @partial(jax.vmap, in_axes=[0, 0, None, None, None]) #heads
+#     def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+#         return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
 
-    # @jax.vmap #batch
-    # @jax.vmap #heads #was @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
-    def _update_mask_global(mask, graph_mask, senders, receivers):
-        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+#     # @jax.vmap #batch
+#     # @jax.vmap #heads #was @partial(jax.vmap, in_axes=[0, 0, None, None]) #heads
+#     def _update_mask_global(mask, graph_mask, senders, receivers):
+#         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
-    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
-    mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
-    mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
+#     block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+#     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
+#     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
 
-    mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
-    mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
+#     mask_local = mask_local.at[..., 0, :, n_global_tokens:n_global_tokens+block_len].set(jnp.array(mask_value).astype(graph_mask.dtype))
+#     mask_local = mask_local.at[..., -1, :, n_global_tokens+2*block_len:].set(jnp.array(mask_value).astype(graph_mask.dtype))
 
-    if edges is not None:
-        edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
-        edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
-        return mask_local, mask_global, edge_bias_local, edge_bias_global
+#     if edges is not None:
+#         edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
+#         edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
+#         return mask_local, mask_global, edge_bias_local, edge_bias_global
 
-    return mask_local, mask_global #.swapaxes(1, 2)
+#     return mask_local, mask_global #.swapaxes(1, 2)
 
-  return setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
+#   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask, edge_bias_global, edge_bias_local, edges)
 
 
 

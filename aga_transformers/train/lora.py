@@ -142,3 +142,54 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
     
     # return model.__call__, model.params, optimizer #bypass
     return apply_fn, lora_params, lora_optimizer
+
+
+
+def create_bias_ft(model, params, optimizer, dtype="bfloat16", scanned=False):
+
+    # # This function defines a spec which tells lorax how each parameter should be handled
+    # def decision_fn(path, param):
+    #     if 'embedding' in [p.key for p in path] or 'layer_norm' in [p.key for p in path]:
+    #         # print(f'Fully finetuning param {path}')
+    #         return LORA_FULL
+    #     dim = 64 # 64 > 256 (test 128?)
+    #     # print(f'Using LoRA with dim={dim} for param {path}')
+    #     return dim
+
+    # This function defines a spec which tells lorax how each parameter should be handled
+    def decision_fn(path, param):
+        if 'embedding' in [p.key for p in path] and 'graph_edge_bias' in [p.key for p in path]:
+            #relative positional embedding /
+            # print(f"finetune {[p.key for p in path]}")
+            return LORA_FULL
+        else:
+            # print(f"freeze {[p.key for p in path]} (default)")
+            return LORA_FREEZE
+
+    # Create a pytree with the same shape as params indicating how each parameter should be handled
+    # Each leaf will be given one of the following values:
+    # - LORA_FULL: The parameter will be fully finetuned
+    # - LORA_FREEZE: The parameter will be frozen
+    # - k > 0: The parameter will be LoRA tuned with a rank k update
+
+    # Simple_spec is a helper to do this, but you can also create the label pytree yourself
+    lora_spec = lorax.simple_spec(params, decision_fn=decision_fn, tune_vectors=False)
+
+    # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
+    # which had a spec value other than LORA_FULL or LORA_FREEZE
+    lora_params = init_lora(params, lora_spec, jax.random.PRNGKey(0), alpha=32, dtype=dtype)
+
+    # `wrap_optimizer` uses the spec to freeze the appropriate subset
+    # of parameters.
+    # The frozen parameters won't have optimizer states etc
+    # created for them
+    lora_optimizer = lorax.wrap_optimizer(optimizer, lora_spec, scalar_frozen_grads=True)
+
+    # lorax.lora wraps a callable so that the arguments can be lorax.LoraWeight
+    # instances. (It's actually just an alias for qax.use_implicit_args, so
+    # the wrapped function can handle other qax types as well)
+    # lora_model = lorax.lora(model)
+    apply_fn = lorax.lora(model).__call__
+    
+    # return model.__call__, model.params, optimizer #bypass
+    return apply_fn, lora_params, lora_optimizer
