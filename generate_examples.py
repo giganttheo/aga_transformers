@@ -31,7 +31,7 @@ generation_config = {
 #     early_stopping = True,
 #     no_repeat_ngram_size = 3)
 
-repo_path= "google/long-t5-local-base" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
+repo_path= "gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
             "max_source_length": 8192,
             "max_target_length": 512,
