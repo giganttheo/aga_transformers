@@ -1766,21 +1766,20 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         keys = list(params.keys())
 
         for k in keys:
-            # Identify all "scan" layers formed as part of the FlaxBertLayerCollection
-            # These params contain the identifier `FlaxScanLayers` in their key
-            # Remove the scan layer from the PyTree of params
-            scan_layer = params.pop(k)
+            if "FlaxScanLayers" in k:
+                # Identify all "scan" layers formed as part of the FlaxBertLayerCollection
+                # These params contain the identifier `FlaxScanLayers` in their key
+                # Remove the scan layer from the PyTree of params
+                scan_layer = params.pop(k)
 
-            # Unroll the key for the stacked scan matrix into N separate keys, indexed by layer number
-            # layer/FlaxScanLayers -> (layer/0, ..., layer/N)
-            for i in range(self.config.num_layers):
-                # Unstack the params for the i-th scan layer to unrolled
-                # and remove corresponding scan params on the fly
-                # -> no memory overhead for conversion!
-                unrolled_key = k.replace("FlaxScanLayers", str(i))
-                params[unrolled_key], scan_layer = scan_layer[0], scan_layer[1:]
-
-
+                # Unroll the key for the stacked scan matrix into N separate keys, indexed by layer number
+                # layer/FlaxScanLayers -> (layer/0, ..., layer/N)
+                for i in range(self.config.num_layers):
+                    # Unstack the params for the i-th scan layer to unrolled
+                    # and remove corresponding scan params on the fly
+                    # -> no memory overhead for conversion!
+                    unrolled_key = k.replace("FlaxScanLayers", str(i))
+                    params[unrolled_key], scan_layer = scan_layer[0], scan_layer[1:]
         print(f"unrolled keys: {list(params.keys())}")
         params = unflatten_dict(params, sep="/")
         return params
