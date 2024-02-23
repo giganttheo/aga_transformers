@@ -47,13 +47,20 @@ def load_state():
 print("============================================\n\n")
 
 state = state.replace(**load_state())
+print("============================================\n\n")
+
 model.enable_scan()
 model.params = lorax.merge_params(state.params, destructive=False)
+
+print("============================================\n\n")
+
 model.disable_scan()
 model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
-model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE)
+model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE,
+                                                    dtype="bfloat16"
+                                                    )
 
 params_model = flatten_dict(model.params, sep="/")
 params_loaded = flatten_dict(model_bis.params, sep="/")
