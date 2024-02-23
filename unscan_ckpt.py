@@ -57,6 +57,6 @@ model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE)
 params_model = flatten_dict(model.params, sep="/")
 params_loaded = flatten_dict(model_bis.params, sep="/")
 for k in params_model.keys():
-    assert params_model[k] == params_loaded[k]
+    assert jnp.allclose(params_model[k], params_loaded[k])
     print(f"OK: {k}")
 
