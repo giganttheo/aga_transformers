@@ -158,7 +158,7 @@ def create_bias_ft(model, params, optimizer, dtype="bfloat16", scanned=False):
 
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
-        if 'embedding' in [p.key for p in path] and 'graph_edge_bias' in [p.key for p in path]:
+        if 'graph_edge_bias' in [p.key for p in path]:
             #relative positional embedding /
             # print(f"finetune {[p.key for p in path]}")
             return LORA_FULL
