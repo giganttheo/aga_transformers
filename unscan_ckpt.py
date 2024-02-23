@@ -2,6 +2,8 @@ import pickle
 
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
 
+from aga_transformers.models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
+
 from flax.training import train_state
 import jax.numpy as jnp
 import jax
@@ -47,4 +49,8 @@ model.params = lorax.merge_params(state.params, destructive=False)
 model.disable_scan()
 model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
+
+model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE)
+
+assert jax.tree_util.tree_leaves(model_bis.params) == jax.tree_util.tree_leaves(model.params)
 
