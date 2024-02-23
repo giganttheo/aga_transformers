@@ -5,6 +5,7 @@ from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augme
 from aga_transformers.models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
 
 from flax.training import train_state
+from flax.traverse_util import flatten_dict, unflatten_dict
 import jax.numpy as jnp
 import jax
 
@@ -52,5 +53,10 @@ tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
 model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE)
 
-assert jax.tree_util.tree_leaves(model_bis.params) == jax.tree_util.tree_leaves(model.params)
+
+params_model = flatten_dict(model.params, sep="/")
+params_loaded = flatten_dict(model_bis.params, sep="/")
+for k in params_model.keys():
+    assert params_model[k] == params_loaded[k]
+    print(f"OK: {k}")
 
