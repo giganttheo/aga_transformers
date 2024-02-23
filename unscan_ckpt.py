@@ -44,6 +44,8 @@ def load_state():
         state_ = pickle.load(file)
     return state_
 
+print("============================================\n\n")
+
 state = state.replace(**load_state())
 model.enable_scan()
 model.params = lorax.merge_params(state.params, destructive=False)
@@ -53,10 +55,11 @@ tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
 model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE)
 
-
 params_model = flatten_dict(model.params, sep="/")
 params_loaded = flatten_dict(model_bis.params, sep="/")
 for k in params_model.keys():
+    if not k in params_loaded.keys():
+        print(f"{k} not in params loaded keys")
     assert params_model[k].shape == params_loaded[k].shape
     assert jnp.allclose(params_model[k], params_loaded[k])
     print(f"OK: {k}")
