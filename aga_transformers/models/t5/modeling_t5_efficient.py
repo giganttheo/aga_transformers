@@ -1780,6 +1780,8 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
                 unrolled_key = k.replace("FlaxScanLayers", str(i))
                 params[unrolled_key], scan_layer = scan_layer[0], scan_layer[1:]
 
+
+        print(f"unrolled keys: {list(params.keys())}")
         params = unflatten_dict(params, sep="/")
         return params
 
