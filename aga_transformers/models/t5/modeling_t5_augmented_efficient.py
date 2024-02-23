@@ -808,7 +808,7 @@ class FlaxT5Attention(nn.Module):
                 jnp.full(attention_mask.shape, -1e4).astype(self.dtype),
             )
 
-        if position_bias is None:
+        if True: #position_bias is None:
             # compute position bias (only for first layer)
             position_bias = self._create_position_bias(
                 key_states, query_states, attention_mask, init_cache, seq_length, causal_attention_mask_shift
@@ -1983,6 +1983,69 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         params = unflatten_dict(params, sep="/")
         return params
 
+    def convert_scan_to_unroll(self, params):
+        r"""
+        Convert a `PyTree` of scanned model parameters to an unrolled stack of model parameters. This method can be
+        used to explicitly convert the model parameters to unrolled format. This returns a new `params` tree and does
+        not convert the `params` in place.
+
+        To illustrate the workings of this method, take the Flax BERT model. The scanned structure for the query
+        projection (`q_proj`) params is a single, stacked matrix of parameters over all N layers:
+            ('bert', 'encoder', 'layer', 'FlaxScanLayers', 'self_attn', 'q_proj')
+
+        This method slices each layer of the `q_proj` scanned matrix into single, standalone layers, and replaces the
+        scanned matrix of parameteres on the fly:
+            ('bert', 'encoder', 'layer', '0', 'self_attn', 'q_proj') ('bert', 'encoder', 'layer', '1', 'self_attn',
+            'q_proj') ... ('bert', 'encoder', 'layer', 'N', 'self_attn', 'q_proj')
+
+        When enabling scan with _do_init=True (default), this method will be called automatically under the hood. With
+        _do_init=False, it will have to be called explicitly (see example below).
+
+        Arguments:
+            params (`Union[Dict, FrozenDict]`):
+                A `PyTree` of model parameters.
+
+        Examples:
+
+        ```python
+        >>> from distil_whisper import FlaxWhisperForConditionalGeneration
+
+        >>> # Download model and configuration from huggingface.co
+        >>> model, params = FlaxWhisperModel.from_pretrained("openai/whisper-tiny.en", _do_init=False)
+        >>> # By default, the model params will be in unrolled format. To illustrate the use of this method,
+        >>> # we'll first convert to scan format and then back to unrolled
+        >>> model.enable_scan()
+        >>> params = model.convert_unroll_to_scan(params)
+        >>> # now convert back to unrolled
+        >>> model.disable_scan()
+        >>> params = model.convert_scan_to_unroll(params)
+        ```"""
+
+        if isinstance(params, FrozenDict):
+            params = unfreeze(params)
+
+        params = flatten_dict(params, sep="/")
+        keys = list(params.keys())
+
+        for k in keys:
+            if "FlaxScanLayers" in k:
+                # Identify all "scan" layers formed as part of the FlaxBertLayerCollection
+                # These params contain the identifier `FlaxScanLayers` in their key
+                # Remove the scan layer from the PyTree of params
+                scan_layer = params.pop(k)
+
+                # Unroll the key for the stacked scan matrix into N separate keys, indexed by layer number
+                # layer/FlaxScanLayers -> (layer/0, ..., layer/N)
+                for i in range(self.config.num_layers):
+                    # Unstack the params for the i-th scan layer to unrolled
+                    # and remove corresponding scan params on the fly
+                    # -> no memory overhead for conversion!
+                    unrolled_key = k.replace("FlaxScanLayers", str(i))
+                    params[unrolled_key], scan_layer = scan_layer[0], scan_layer[1:]
+        print(f"unrolled keys: {list(params.keys())}")
+        params = unflatten_dict(params, sep="/")
+        return params
+
     def enable_gradient_checkpointing(self):
         self._module = self.module_class(
             config=self.config,
@@ -1999,6 +2062,19 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
         )
         # initialize the parameters
         params = self.convert_unroll_to_scan(self.params)
+        self._params_shape_tree = jax.tree_util.tree_structure(params)
+        self._required_params = set(flatten_dict(unfreeze(params)).keys())
+        self.params = params
+
+    def disable_scan(self):
+        self._module = self.module_class(
+            config=self.config,
+            dtype=self.dtype,
+            gradient_checkpointing=False,
+            scan=False,
+        )
+        # initialize the parameters
+        params = self.convert_scan_to_unroll(self.params)
         self._params_shape_tree = jax.tree_util.tree_structure(params)
         self._required_params = set(flatten_dict(unfreeze(params)).keys())
         self.params = params
