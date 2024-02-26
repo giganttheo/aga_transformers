@@ -1188,10 +1188,14 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 # graph_mask_dependency = einops.repeat(self.variables["graph_dependency"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
                 edge_labels_dependency = einops.repeat(self.variables["graph_dependency"]["edge_labels"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
         else:
-            receivers_dependency = jnp.zeros((batch_size, self.n_heads, 0,), dtype=jnp.uint16)
-            senders_dependency = jnp.zeros((batch_size, self.n_heads, 0,), dtype=jnp.uint16)
-            edge_labels_dependency = jnp.zeros((batch_size, self.n_heads, 0,), dtype=jnp.uint16)
-
+            # receivers_dependency = jnp.zeros((batch_size, self.n_heads, 0,), dtype=jnp.uint16)
+            # senders_dependency = jnp.zeros((batch_size, self.n_heads, 0,), dtype=jnp.uint16)
+            # edge_labels_dependency = jnp.zeros((batch_size, self.n_heads, 0,), dtype=jnp.uint16)
+            #for test purposes
+            receivers_dependency = einops.repeat(jnp.arange(20), 'e -> bs h e', bs=batch_size, h=self.n_heads)
+            senders_dependency = einops.repeat(jnp.arange(20, 0, -1), 'e -> bs h e', bs=batch_size, h=self.n_heads)
+            edge_labels_dependency = einops.repeat(jnp.arange(20), 'e -> bs h e', bs=batch_size, h=self.n_heads)
+        
         # print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
         query_states_blocks, global_q = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
