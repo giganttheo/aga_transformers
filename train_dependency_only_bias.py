@@ -854,7 +854,7 @@ def main():
     # optimizer = optax.MultiSteps(optimizer, every_k_schedule=8) #gradient accumulation
     
     # Create LoRA model
-    apply_fn, lora_params, optimizer = create_bias_ft(model, model.params, optimizer, dtype="bfloat16")
+    apply_fn, lora_params, optimizer = create_bias_ft(model, model.params, optimizer, dtype="bfloat16", bypass=True)
 
     # apply_fn = model.__call__
     # lora_params = model.params

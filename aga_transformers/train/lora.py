@@ -85,7 +85,7 @@ def init_lora(param_tree, spec, rng, stddev=0.01, dtype=jnp.float32, alpha=1., i
 
     return jax.tree_util.tree_map_with_path(get_param, param_tree, spec, is_leaf=is_leaf)
 
-def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
+def create_lora(model, params, optimizer, dtype="bfloat16", bypass=False):
 
     # # This function defines a spec which tells lorax how each parameter should be handled
     # def decision_fn(path, param):
@@ -140,12 +140,13 @@ def create_lora(model, params, optimizer, dtype="bfloat16", scanned=False):
     # lora_model = lorax.lora(model)
     apply_fn = lorax.lora(model).__call__
     
-    # return model.__call__, model.params, optimizer #bypass
+    if bypass:
+        return model.__call__, model.params, optimizer #bypass
     return apply_fn, lora_params, lora_optimizer
 
 
 
-def create_bias_ft(model, params, optimizer, dtype="bfloat16", scanned=False):
+def create_bias_ft(model, params, optimizer, dtype="bfloat16", bypass=False):
 
     # # This function defines a spec which tells lorax how each parameter should be handled
     # def decision_fn(path, param):
@@ -191,5 +192,6 @@ def create_bias_ft(model, params, optimizer, dtype="bfloat16", scanned=False):
     # lora_model = lorax.lora(model)
     apply_fn = lorax.lora(model).__call__
     
-    # return model.__call__, model.params, optimizer #bypass
+    if bypass:
+        return model.__call__, model.params, optimizer #bypass
     return apply_fn, lora_params, lora_optimizer
