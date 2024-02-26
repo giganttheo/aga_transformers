@@ -106,8 +106,7 @@ def load_t5_from_pretrained(repo_path, attention_kwargs=None, layer_wise=False, 
         repo_path,
         dtype=dtype,
     )
-    model.params = repeat_relative_pos_bias(model.params, n_heads=model.config.num_heads)
-
+    
     model.params = model.to_bf16(model.params)
 
     vocab_size=44
