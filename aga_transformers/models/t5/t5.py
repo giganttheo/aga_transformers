@@ -107,6 +107,9 @@ def load_t5_from_pretrained(repo_path, attention_kwargs=None, layer_wise=False, 
         **model_kwargs,
         dtype=dtype,
     )
+    
+    vocab_size=44
+    model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
 
     if dtype == "bfloat16":
         print("adapting parameters to bfloat16...")
