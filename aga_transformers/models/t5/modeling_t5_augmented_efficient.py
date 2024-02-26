@@ -1582,7 +1582,7 @@ class FlaxT5BlockCollection(nn.Module):
 
         if not self.scan:
             if self.gradient_checkpointing:
-                FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(8, 9, 10))#(6, 7, 8))
+                FlaxT5CheckpointLayer = remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8))#(6, 7, 8))
                 self.blocks = [
                     FlaxT5CheckpointLayer(
                         self.config,
