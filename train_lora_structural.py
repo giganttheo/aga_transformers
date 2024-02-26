@@ -359,6 +359,7 @@ class DataTrainingArguments:
 
 summarization_name_mapping = {
     "gigant/tib": ("transcript", "abstract"),
+    "gigant/tib_dependency": ("transcript", "abstract"),
 }
 
 class TrainState(train_state.TrainState):
@@ -693,10 +694,13 @@ def main():
     else:
         logger.info("There is nothing to do. Please pass `do_train`, `do_eval` and/or `do_predict`.")
         return
-
+    
     # Get the column names for input/target.
     dataset_columns = summarization_name_mapping.get(data_args.dataset_name, None)
     if data_args.text_column is None:
+        if dataset_columns is None:
+            print("\n\n\n==================/!\==================\n")
+            print(f"Text column is not set, defaulting to {column_names[0]}")
         text_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
     else:
         text_column = data_args.text_column
@@ -705,6 +709,9 @@ def main():
                 f"--text_column' value '{data_args.text_column}' needs to be one of: {', '.join(column_names)}"
             )
     if data_args.summary_column is None:
+        if dataset_columns is None:
+            print("\n\n\n==================/!\==================\n")
+            print(f"Summary column is not set, defaulting to {column_names[1]}")
         summary_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
     else:
         summary_column = data_args.summary_column
