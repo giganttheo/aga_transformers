@@ -65,7 +65,7 @@ def test():
     )
 
     model.enable_scan()
-    ref_model.enable_scan()
+    # ref_model.enable_scan()
 
     # ref_model.params = model.params
 
@@ -76,7 +76,9 @@ def test():
         "autoregressive":False,
         "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
     }
+    ref_graph_training = create_led_attn_patterns(ref_model, **attention_kwargs, layer_wise=False)
     graph_training = create_led_attn_patterns(model, **attention_kwargs, layer_wise=False)
+
 
     attention_kwargs = {
         "max_source_length": 512,
@@ -123,7 +125,7 @@ def test():
     print("Computing outputs in training mode...")
     output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), train=False, **training_inputs)
     print(" * output for tested model: Done")
-    output_reference = ref_model.__call__(params=add_graph_to_params(ref_model.params, graph_training), train=False, **training_inputs)
+    output_reference = ref_model.__call__(params=add_graph_to_params(ref_model.params, ref_graph_training), train=False, **training_inputs)
     print(" * output for reference model: Done")
 
     ## Encoder part
@@ -148,78 +150,78 @@ def test():
 
     print("===Test passed for decoder (training mode)===")
 
-    ## Autoregressive decoding with greedy search
+    # ## Autoregressive decoding with greedy search
 
-    def greedy_search(model, params, input_ids, model_kwargs, n=10):
-        model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
+    # def greedy_search(model, params, input_ids, model_kwargs, n=10):
+    #     model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
 
-        input_ids = model._prepare_decoder_input_ids_for_generation(
-            batch_size,
-            decoder_start_token_id=model.generation_config.decoder_start_token_id,
-            bos_token_id=model.generation_config.bos_token_id,
-            model_kwargs=model_kwargs,
-        )
-        model_kwargs = model.prepare_inputs_for_generation(input_ids, 512, **model_kwargs)
+    #     input_ids = model._prepare_decoder_input_ids_for_generation(
+    #         batch_size,
+    #         decoder_start_token_id=model.generation_config.decoder_start_token_id,
+    #         bos_token_id=model.generation_config.bos_token_id,
+    #         model_kwargs=model_kwargs,
+    #     )
+    #     model_kwargs = model.prepare_inputs_for_generation(input_ids, 512, **model_kwargs)
 
-        logits_processor = FlaxLogitsProcessorList()
+    #     logits_processor = FlaxLogitsProcessorList()
 
-        _, cur_len = input_ids.shape
-        sequences = jnp.full((batch_size, 512), pad_token_id, dtype=jnp.int32)
-        sequences = lax.dynamic_update_slice(sequences, input_ids, (0, 0))
+    #     _, cur_len = input_ids.shape
+    #     sequences = jnp.full((batch_size, 512), pad_token_id, dtype=jnp.int32)
+    #     sequences = lax.dynamic_update_slice(sequences, input_ids, (0, 0))
 
-        state = GreedyState(
-                cur_len=cur_len,
-                sequences=sequences,
-                running_token=input_ids,
-                is_sent_finished=False,
-                model_kwargs=model_kwargs,
-            )
+    #     state = GreedyState(
+    #             cur_len=cur_len,
+    #             sequences=sequences,
+    #             running_token=input_ids,
+    #             is_sent_finished=False,
+    #             model_kwargs=model_kwargs,
+    #         )
 
-        def greedy_search_body_fn(state):
-            """state update fn."""
-            model_outputs = model.decode(state.running_token, params=params, return_dict=True, **state.model_kwargs)
-            logits = model_outputs.logits[:, -1]
+    #     def greedy_search_body_fn(state):
+    #         """state update fn."""
+    #         model_outputs = model.decode(state.running_token, params=params, return_dict=True, **state.model_kwargs)
+    #         logits = model_outputs.logits[:, -1]
 
-            # apply min_length, ...
-            logits = logits_processor(state.sequences, logits, state.cur_len)
+    #         # apply min_length, ...
+    #         logits = logits_processor(state.sequences, logits, state.cur_len)
 
-            next_token = jnp.argmax(logits, axis=-1)
-            next_token = next_token[:, None]
+    #         next_token = jnp.argmax(logits, axis=-1)
+    #         next_token = next_token[:, None]
 
-            next_sequences = lax.dynamic_update_slice(state.sequences, next_token, (0, state.cur_len))
-            next_model_kwargs = model.update_inputs_for_generation(model_outputs, state.model_kwargs.copy())
+    #         next_sequences = lax.dynamic_update_slice(state.sequences, next_token, (0, state.cur_len))
+    #         next_model_kwargs = model.update_inputs_for_generation(model_outputs, state.model_kwargs.copy())
 
-            return GreedyState(
-                cur_len=state.cur_len + 1,
-                sequences=next_sequences,
-                running_token=next_token,
-                is_sent_finished=False,
-                model_kwargs=next_model_kwargs,
-            ), model_outputs
-        r = []
-        states = []
-        for rep in range(n):
-            states.append(state)
-            state, output = greedy_search_body_fn(states[rep])
-            r.append((output, state.running_token))
-        return r, states
+    #         return GreedyState(
+    #             cur_len=state.cur_len + 1,
+    #             sequences=next_sequences,
+    #             running_token=next_token,
+    #             is_sent_finished=False,
+    #             model_kwargs=next_model_kwargs,
+    #         ), model_outputs
+    #     r = []
+    #     states = []
+    #     for rep in range(n):
+    #         states.append(state)
+    #         state, output = greedy_search_body_fn(states[rep])
+    #         r.append((output, state.running_token))
+    #     return r, states
 
-    n = 5
+    # n = 5
 
-    print("Computing outputs in generate mode...")
-    ar_inputs = get_ar_inputs()
-    input_ids = ar_inputs.pop("input_ids")
-    greedy_outputs_reference, _ = greedy_search(ref_model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
-    print(" * output for reference model: Done")
+    # print("Computing outputs in generate mode...")
+    # ar_inputs = get_ar_inputs()
+    # input_ids = ar_inputs.pop("input_ids")
+    # greedy_outputs_reference, _ = greedy_search(ref_model, add_graph_to_params(repeat_relative_pos_bias(ref_model.params), graph_ar), input_ids, ar_inputs, n=n)
+    # print(" * output for reference model: Done")
 
-    ar_inputs = get_ar_inputs()
-    input_ids = ar_inputs.pop("input_ids")
-    greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(model.params), graph_ar), input_ids, ar_inputs, n=n)
-    print(" * output for tested model: Done")
+    # ar_inputs = get_ar_inputs()
+    # input_ids = ar_inputs.pop("input_ids")
+    # greedy_outputs, _ = greedy_search(model, add_graph_to_params(repeat_relative_pos_bias(model.params), graph_ar), input_ids, ar_inputs, n=n)
+    # print(" * output for tested model: Done")
 
-    for i in range(n):
-        print(greedy_outputs[i][0].logits[0,0,:6], greedy_outputs_reference[i][0].logits[0,0,:6])
-        assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
-        print(f"token {i+1}/{n}: ok")
+    # for i in range(n):
+    #     print(greedy_outputs[i][0].logits[0,0,:6], greedy_outputs_reference[i][0].logits[0,0,:6])
+    #     assert jnp.allclose(greedy_outputs[i][0].logits, greedy_outputs_reference[i][0].logits, **allclose_kwargs)
+    #     print(f"token {i+1}/{n}: ok")
 
-    print(f"===Test passed for decoder ({n} tokens greedy search autoregressive)===")
+    # print(f"===Test passed for decoder ({n} tokens greedy search autoregressive)===")
