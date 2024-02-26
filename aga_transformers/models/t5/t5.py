@@ -108,7 +108,7 @@ def load_t5_from_pretrained(repo_path, attention_kwargs=None, layer_wise=False, 
     attention_kwargs.pop("autoregressive")
     graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
 
-    return model, tokenizer, graph, None
+    return tokenizer, model, graph, None
 
 
 def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, from_longt5_local=False, **model_kwargs):
