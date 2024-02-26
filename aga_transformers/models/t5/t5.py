@@ -106,13 +106,12 @@ def load_t5_from_pretrained(repo_path, attention_kwargs=None, layer_wise=False, 
         repo_path,
         dtype=dtype,
     )
+    model.params = repeat_relative_pos_bias(model.params, n_heads=model.config.num_heads)
+
     model.params = model.to_bf16(model.params)
 
     vocab_size=44
     model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
-
-    #tieing the graph so it is defined for first layer only
-    # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
     attention_kwargs.pop("autoregressive")
     graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
