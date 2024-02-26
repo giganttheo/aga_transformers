@@ -1282,8 +1282,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
             # create dropout rng
             dropout_rng = None
-            # if not deterministic and self.dropout > 0.0:
-            #     dropout_rng = self.make_rng("dropout")
+            if not deterministic and self.dropout > 0.0:
+                dropout_rng = self.make_rng("dropout")
 
             # Softmax(QK^T)
             attn_weights = dot_product_attention_weights(
@@ -1503,7 +1503,6 @@ class FlaxT5LayerCollection(nn.Module):
         encoder_attention_mask=None,
         encoder_decoder_position_bias=None,
         output_attentions=False,
-        return_dict=True,
         deterministic=True,
         init_cache=False,
     ):
