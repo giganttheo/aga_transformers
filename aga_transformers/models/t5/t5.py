@@ -97,7 +97,6 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
     # graph_ar = None
     return tokenizer, model, graph, graph_ar
 
-
 def load_t5_from_pretrained(repo_path, attention_kwargs=None, layer_wise=False, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     # module_class = FlaxT5ForConditionalGeneration_AUG.module_class
