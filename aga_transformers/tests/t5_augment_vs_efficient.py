@@ -118,9 +118,9 @@ def test():
 
     # print(graph_training["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"])
     print("Computing outputs in training mode...")
-    output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), **training_inputs)
+    output_training = model.__call__(params=add_graph_to_params(model.params, graph_training), deterministic=True, **training_inputs)
     print(" * output for tested model: Done")
-    output_reference = ref_model.__call__(params=add_graph_to_params(ref_model.params, graph_training), **training_inputs)
+    output_reference = ref_model.__call__(params=add_graph_to_params(ref_model.params, graph_training), deterministic=True, **training_inputs)
     print(" * output for reference model: Done")
 
     ## Encoder part
