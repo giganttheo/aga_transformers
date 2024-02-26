@@ -1227,7 +1227,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                     key_states, value_states, query_states
                 )
             # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
-            mask_local, mask_global = mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
+            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
             edge_bias_local, edge_bias_global = create_local_and_global_edges(senders_dependency, receivers_dependency, n_global_tokens, block_len, num_blocks, seq_length, edge_labels_dependency)
 
         if no_graph:
@@ -1268,17 +1268,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             edge_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (self.n_heads,)).astype(self.dtype))
             position_bias_global = position_bias_global + edge_bias_global.transpose((0, 3, 1, 2))
 
-        # if self.has_graph_edge_bias:
-        #     @jax.vmap #batch_size
-        #     def get_global_edge(n_slides_):
-        #         return self.compute_edge_bias_global(n_global_tokens, seq_length, n_slides_, n_document_tokens, in_window=False)
-        #     global_edge=get_global_edge(n_slides)
-        #     assert position_bias_global.shape[1:] == global_edge.shape[1:]
-        #     position_bias_global = position_bias_global + global_edge
-
-        # if graph_mask is not None:
-        #     position_bias = position_bias + graph_mask
-
         #adapt graph attention to block efficient attn
         position_bias = None #compat
 
@@ -1287,7 +1276,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             attn_weights = None
         
         else:
-
             position_bias_local = position_bias_local.swapaxes(1, 2) + mask_local
             position_bias_global = position_bias_global + mask_global
 

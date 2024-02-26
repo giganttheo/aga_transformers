@@ -21,10 +21,12 @@ python ./train_dependency_only_bias.py \
 	--dataset_name="gigant/tib_dependency" \
 	--source_prefix "summarize: " \
 	--do_eval \
+    --do_train \
+    --max_train_samples 1 \
 	--num_train_epochs 1 \
 	--learning_rate 0 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 14 \
+	--per_device_train_batch_size 1 \
 	--per_device_eval_batch_size 14 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
