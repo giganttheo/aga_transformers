@@ -1196,7 +1196,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             senders_dependency = einops.repeat(jnp.arange(20, 0, -1), 'e -> bs h e', bs=batch_size, h=self.n_heads)
             edge_labels_dependency = einops.repeat(jnp.arange(20), 'e -> bs h e', bs=batch_size, h=self.n_heads)
         
-        # jax.debug.print("edge labels: {edge_labels_dependency}", edge_labels_dependency=edge_labels_dependency)
+        
+        jax.debug.print("no graph? {no_graph}", no_graph=no_graph)
+        jax.debug.print("edge labels: {edge_labels_dependency}", edge_labels_dependency=edge_labels_dependency)
+
 
         # print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
@@ -1267,6 +1270,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 edge_bias_local = edge_bias_local[:, 0]
             # edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,), dtype=self.dtype))
             edge_bias_local = jax.lax.select(einops.repeat(edge_bias_local, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (self.n_heads,)).astype(self.dtype))
+            jax.debug.print("edge_bias_local labels: {edge_bias_local}", edge_bias_local=edge_bias_local[0, :3, :3, :3, :3])
             position_bias_local = position_bias_local + edge_bias_local.transpose((0, 4, 1, 2, 3))
             # jax.debug.print("edge_bias_global: {edge_bias_global.shape}; position_bias_global: {position_bias_global.shape}", edge_bias_global=edge_bias_global, position_bias_global=position_bias_global)
             # edge_bias_global = self.graph_edge_bias(edge_bias_global[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
