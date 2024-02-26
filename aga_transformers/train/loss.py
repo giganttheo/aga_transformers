@@ -13,17 +13,18 @@ import lorax
 def loss_fn(
     model,
     params: PyTree,
-    graph: PyTree,
     input_ids: jax.Array, 
     attention_mask: jax.Array, 
     decoder_input_ids: jax.Array, 
     decoder_attention_mask: jax.Array,
+    graph: PyTree=None,
     graph_dependency: PyTree=None,
     **model_kwargs
 ) -> Tuple[jax.Array, PyTree]:
     
-    param_dict = {"params": params, "graph": graph}
-    
+    param_dict = {"params": params}
+    if graph is not None:
+        param_dict["graph"] = graph
     if graph_dependency is not None:
         param_dict["graph_dependency"] = graph_dependency
 

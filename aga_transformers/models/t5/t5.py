@@ -8,6 +8,15 @@ from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_lay
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
 from ...attention_patterns.sparse_attention.led import create_led_attn_patterns
 
+def load_vanilla_longt5(repo_path, dtype="bfloat16"):
+    tokenizer = AutoTokenizer.from_pretrained(repo_path)
+    model = FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, dtype=dtype)
+    if dtype == "bfloat16":
+        print("adapting parameters to bfloat16...")
+        model.params = model.to_bf16(model.params)
+    return tokenizer, model
+
+
 #wrapper to load the model and preprocess the weights
 
 def load_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, **model_kwargs):
