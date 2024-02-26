@@ -358,6 +358,7 @@ class DataTrainingArguments:
 
 summarization_name_mapping = {
     "gigant/tib": ("transcript", "abstract"),
+    "gigant/tib_dependency": ("transcript", "abstract"),
 }
 
 class TrainState(train_state.TrainState):
