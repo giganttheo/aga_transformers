@@ -52,9 +52,9 @@ def test():
     # ref_module_class = ReferenceModel.module_class
     # ref_module_class = tie_relative_pos_bias(ref_module_class, repo_path)
     # ReferenceModel.module_class = ref_module_class
-    # ref_model = ReferenceModel.from_pretrained(
-    #     repo_path,
-    # )
+    ref_model = ReferenceModel.from_pretrained(
+        repo_path,
+    )
     ref_model.params = ref_model.to_bf16(ref_model.params)
 
     #tieing the graph so it is defined for first layer only
