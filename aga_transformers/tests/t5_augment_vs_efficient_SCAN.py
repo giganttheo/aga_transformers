@@ -31,7 +31,7 @@ def test():
     # Perform tests:
 
     repo_path = "gigant/longt5-global-3epoch" #"t5-small"
-    batch_size = 4
+    batch_size = 2
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
     # module_class = FlaxT5ForConditionalGeneration.module_class
@@ -70,8 +70,8 @@ def test():
     # ref_model.params = model.params
 
     attention_kwargs = {
-        "max_source_length": 512,
-        "max_target_length": 256,
+        "max_source_length": 2048,
+        "max_target_length": 512,
         "window_sizes": [16],
         "autoregressive":False,
         "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
@@ -81,8 +81,8 @@ def test():
 
 
     attention_kwargs = {
-        "max_source_length": 512,
-        "max_target_length": 256,
+        "max_source_length": 2048,
+        "max_target_length": 512,
         "window_sizes": [16],
         "autoregressive":True,
         "sentence_tokens": list(range(16))#[0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
