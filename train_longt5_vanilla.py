@@ -863,7 +863,7 @@ def main():
             # graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
             # graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
 
-            loss, _ = loss_fn_(model=state.apply_fn, params=params["params"], dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(model=state.apply_fn, params=params, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
@@ -886,7 +886,7 @@ def main():
         # graph_mask = batch.pop("graph_mask")
         # graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask}
         # graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
-        loss, _ = loss_fn(model=state.apply_fn, params=params["params"], train=False, **batch)
+        loss, _ = loss_fn(model=state.apply_fn, params=params, train=False, **batch)
 
         # # true loss = total loss / total samples
         # loss = jax.lax.psum(loss, "batch")
@@ -900,7 +900,7 @@ def main():
         # _ = batch.pop("labels") #added
         output_ids = model.generate(
                                     batch["input_ids"],
-                                    params=params["params"],
+                                    params=params,
                                     attention_mask=batch["attention_mask"],
                                     **gen_kwargs)
         return output_ids.sequences
@@ -1026,7 +1026,7 @@ def main():
             # orbax_mngr.save(state.step, FrozenDict(ckpt))
             save_state(state)
             # state.replace(**load_state())
-            model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params["params"], destructive=False))
+            model.save_pretrained(training_args.output_dir, params=lorax.merge_params(state.params, destructive=False))
             tokenizer.save_pretrained(training_args.output_dir)
             if training_args.push_to_hub:
                 repo.push_to_hub(commit_message=f"Saving weights and logs of epoch {epoch}", blocking=False)

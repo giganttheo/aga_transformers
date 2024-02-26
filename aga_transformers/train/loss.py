@@ -22,11 +22,13 @@ def loss_fn(
     **model_kwargs
 ) -> Tuple[jax.Array, PyTree]:
     
-    param_dict = {"params": params}
+    
     if graph is not None:
-        param_dict["graph"] = graph
-    if graph_dependency is not None:
-        param_dict["graph_dependency"] = graph_dependency
+        param_dict = {"params": params, "graph": graph}
+        if graph_dependency is not None:
+            param_dict["graph_dependency"] = graph_dependency
+    else:
+        param_dict=params
 
     model_output = model(
         params=param_dict,
