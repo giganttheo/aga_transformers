@@ -34,9 +34,9 @@ def test():
     batch_size = 4
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
-    module_class = FlaxT5ForConditionalGeneration.module_class
-    module_class = tie_relative_pos_bias(module_class, repo_path)
-    FlaxT5ForConditionalGeneration.module_class = module_class
+    # module_class = FlaxT5ForConditionalGeneration.module_class
+    # module_class = tie_relative_pos_bias(module_class, repo_path)
+    # FlaxT5ForConditionalGeneration.module_class = module_class
     model = FlaxT5ForConditionalGeneration.from_pretrained(
         repo_path,
     )
@@ -46,19 +46,19 @@ def test():
     model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
 
     #tieing the graph so it is defined for first layer only
-    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
+    # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
     # Closeness with ref T5 model:
-    ref_module_class = ReferenceModel.module_class
-    ref_module_class = tie_relative_pos_bias(ref_module_class, repo_path)
-    ReferenceModel.module_class = ref_module_class
-    ref_model = ReferenceModel.from_pretrained(
-        repo_path,
-    )
+    # ref_module_class = ReferenceModel.module_class
+    # ref_module_class = tie_relative_pos_bias(ref_module_class, repo_path)
+    # ReferenceModel.module_class = ref_module_class
+    # ref_model = ReferenceModel.from_pretrained(
+    #     repo_path,
+    # )
     ref_model.params = ref_model.to_bf16(ref_model.params)
 
     #tieing the graph so it is defined for first layer only
-    ref_model.module_class = tie_graph_layers(ref_module_class, repo_path, autoregressive=False)
+    # ref_model.module_class = tie_graph_layers(ref_module_class, repo_path, autoregressive=False)
 
     ref_model = ReferenceModel.from_pretrained(
         repo_path,
