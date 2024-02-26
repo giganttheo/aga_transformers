@@ -1025,6 +1025,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         if no_graph:
             attn_output = value_states
+            attn_weights = None
         else:
             position_bias_local = position_bias_local + mask_local
             position_bias_global = position_bias_global + mask_global
