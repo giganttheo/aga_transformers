@@ -16,7 +16,7 @@ wandb login
 
 python ./train_lora.py \
 	--output_dir "./8k-global-local" \
-	--dataset_name="gigant/tib" \
+	--dataset_name="gigant/tib_dependency" \
 	--model_name_or_path "gigant/longt5-global-3epoch" \
 	--tokenizer_name "gigant/longt5-global-3epoch" \
 	--source_prefix "summarize: " \
