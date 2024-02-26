@@ -1196,6 +1196,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             senders_dependency = einops.repeat(jnp.arange(20, 0, -1), 'e -> bs h e', bs=batch_size, h=self.n_heads)
             edge_labels_dependency = einops.repeat(jnp.arange(20), 'e -> bs h e', bs=batch_size, h=self.n_heads)
         
+        jax.debug.print("edge labels: {edge_labels_dependency}", edge_labels_dependency=edge_labels_dependency)
+
         # print(f"Shapes: r: {receivers.shape}, s: {senders.shape}, m: {graph_mask.shape}")
         # Split into blocks -> (batch_size, num_blocks, block_len, n_heads, head_dim)
         query_states_blocks, global_q = _split_global_then_into_blocks(query_states, n_global_tokens, block_len, axis=1)
