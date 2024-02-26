@@ -30,7 +30,7 @@ def test():
 
     # Perform tests:
 
-    repo_path = "t5-small"
+    repo_path = "gigant/longt5-global-3epoch" #"t5-small"
     batch_size = 4
 
     tokenizer = AutoTokenizer.from_pretrained(repo_path)

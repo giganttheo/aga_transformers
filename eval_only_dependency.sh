@@ -16,9 +16,9 @@ wandb login
 
 python ./train_dependency_only_bias.py \
 	--output_dir "./8k-global-dependency-bias-only" \
+	--dataset_name="gigant/tib_dependency" \
 	--model_name_or_path "gigant/longt5-global-3epoch" \
 	--tokenizer_name "gigant/longt5-global-3epoch" \
-	--dataset_name="gigant/tib_dependency" \
 	--source_prefix "summarize: " \
 	--do_eval \
     --do_train \
