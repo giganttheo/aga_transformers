@@ -100,9 +100,9 @@ def load_efficient_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
 
 def load_t5_from_pretrained(repo_path, attention_kwargs=None, layer_wise=False, **model_kwargs):
     tokenizer = AutoTokenizer.from_pretrained(repo_path)
-    module_class = FlaxT5ForConditionalGeneration_AUG.module_class
-    module_class = tie_relative_pos_bias(module_class, repo_path)
-    FlaxT5ForConditionalGeneration_AUG.module_class = module_class
+    # module_class = FlaxT5ForConditionalGeneration_AUG.module_class
+    # # module_class = tie_relative_pos_bias(module_class, repo_path)
+    # FlaxT5ForConditionalGeneration_AUG.module_class = module_class
     model = FlaxT5ForConditionalGeneration_AUG.from_pretrained(
         repo_path,
     )
@@ -112,7 +112,7 @@ def load_t5_from_pretrained(repo_path, attention_kwargs=None, layer_wise=False, 
     model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
 
     #tieing the graph so it is defined for first layer only
-    model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
+    # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=False)
 
     attention_kwargs.pop("autoregressive")
     graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
