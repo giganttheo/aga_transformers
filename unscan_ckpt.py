@@ -3,6 +3,8 @@ import pickle
 from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5
 
 from aga_transformers.models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
+from aga_transformers.models.t5.modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
+
 
 from flax.training import train_state
 from flax.traverse_util import flatten_dict, unflatten_dict
@@ -24,7 +26,9 @@ attention_kwargs = {
     "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
 }
 
-tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
+# tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
+
+tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
 tx = optax.adafactor(
     learning_rate=0,
@@ -33,10 +37,10 @@ tx = optax.adafactor(
 state = TrainState.create(apply_fn=model.__call__, params=model.params, tx=tx, dropout_rng=jax.random.PRNGKey(0))
 
 
-load_dir="8k-global-local"
+load_dir = "8k-global-dependency-bias" #"8k-global-local"
 CKPT_DIR_LOAD = f"{load_dir}/ckpts/"
 
-save_dir = "8k-global-local"
+save_dir = "8k-global-dependency-bias" #"8k-global-local"
 CKPT_DIR_SAVE = f"{save_dir}/weights/"
 
 def load_state():
@@ -58,7 +62,7 @@ model.disable_scan()
 model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
-model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE,
+model_bis = FlaxT5ForConditionalGeneration_AUG.from_pretrained(CKPT_DIR_SAVE,
                                                     dtype="bfloat16"
                                                     )
 
