@@ -1279,6 +1279,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             # edge_bias_global = jnp.where(edge_bias_global[..., None]>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (1,)).astype(self.dtype))
             edge_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (self.n_heads,)).astype(self.dtype))
             position_bias_global = position_bias_global + edge_bias_global.transpose((0, 3, 1, 2))
+        elif no_graph:
+            _ = self.graph_edge_bias(edge_bias_global[:, 0])
 
         #adapt graph attention to block efficient attn
         position_bias = None #compat
