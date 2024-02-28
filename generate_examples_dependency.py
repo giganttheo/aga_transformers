@@ -88,7 +88,7 @@ for i, rec in tqdm(enumerate(test_dataset)):
     input_ids = inputs.pop("input_ids")
     dep_graph = rec["dependency_graph"]
     params= {"params": model.params, "graph": graph, "graph_dependency": get_dependency_graph(dep_graph)}
-    preds = generate(input_ids, inputs)
+    preds = generate(input_ids, inputs, params)
     # pred_ids = generate(inputs["input_ids"], inputs["attention_mask"], params)
     predictions.append(preds)
     references.append(label)
