@@ -85,7 +85,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 i_previously_generated = sparse.bcoo_todense(sparse.sparsify(jax.vmap(lambda mat, x, y: mat[i, x, y]))(transition_tensor, latest_tokens[:, i], latest_tokens[:, i+1]))
                 # i_previously_generated = jnp.array([[b, i, latest_tokens[b, i], latest_tokens[b, i+1]] for b in range(batch_size)])
                 # jnp.greater_equal(jnp.count_nonzero(jnp.array([0, 0, 23, 4]) == bcoo_mat.indices), 1)
-                jax.debug.print("ngrams previously generated in {x} beams", x=jnp.count_nonzero(i_previously_generated))
+                # jax.debug.print("ngrams previously generated in {x} beams", x=jnp.count_nonzero(i_previously_generated))
                 previously_generated_mask *= i_previously_generated[:, None]
 
             # 2. Get a mask that tells us whether a certain token was ever generated after for the last token in
@@ -110,7 +110,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         def true_fn():
             _, vocab_size = scores.shape
             transition_tensor = self.get_transition_tensor(input_ids, vocab_size)
-            jax.debug.print("transition_tensor idces: {x}", x=transition_tensor.indices)
+            # jax.debug.print("transition_tensor idces: {x}", x=transition_tensor.indices)
             # assert cur_len > self.ngram_size + 1
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             # latest_tokens = latest_tokens.at[:, cur_len - (self.ngram_size - 1) : cur_len].set(input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
@@ -118,9 +118,9 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             latest_tokens = jax.lax.dynamic_update_slice(latest_tokens, jax.lax.dynamic_slice(input_ids, (0, cur_len - (self.ngram_size - 1)), (input_ids.shape[0], (self.ngram_size - 1))), (0, 0))
             banned_tokens_indices_mask = jnp.isclose(self.get_banned_tokens_mask(latest_tokens, transition_tensor), 1)
             
-            jax.debug.print("{x} banned 2-grams", x=jnp.count_nonzero(banned_tokens_indices_mask))
+            # jax.debug.print("{x} banned 2-grams", x=jnp.count_nonzero(banned_tokens_indices_mask))
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
-        jax.debug.print("input_ids : {x}", x=input_ids)
+        # jax.debug.print("input_ids : {x}", x=input_ids)
         output = jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
         return output
 
