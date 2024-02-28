@@ -170,7 +170,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         # process logits with processors (*e.g.* min_length, ...), and
         # add new logprobs to existing running logprobs scores.
         log_probs = jax.nn.log_softmax(logits)
-        jax.debug.print("Flatten beam dim: {x}", x=flatten_beam_dim(running_sequences))
+        # jax.debug.print("Flatten beam dim: {x}", x=flatten_beam_dim(running_sequences))
         log_probs = logits_processor(
             flatten_beam_dim(running_sequences), flatten_beam_dim(log_probs), state.cur_len
         )
