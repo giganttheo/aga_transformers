@@ -1,4 +1,4 @@
-from aga_transformers.models.t5.t5 import load_efficient_t5
+from aga_transformers.models.t5.t5 import load_efficient_t5, load_augmented_t5
 from tqdm import tqdm
 from aga_transformers.models.utils import repeat_relative_pos_bias, add_graph_to_params
 from aga_transformers.models.t5.generate import beam_search
@@ -40,11 +40,11 @@ attention_kwargs={
             "sentence_tokens": []#[0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
 
-tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
+tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
 
 predictions = []
 references = []
-params=add_graph_to_params(model.params, graph)
+params= {"params": model.params, "graph": graph}
 decoder_start_token_id = model.config.decoder_start_token_id
 
 # @partial(jax.jit)
