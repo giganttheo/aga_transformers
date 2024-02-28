@@ -10,7 +10,7 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test").select(range(30))
+test_dataset = load_dataset("gigant/tib", split="test").select(range(10))
 
 generation_config = {
     "num_beams": 3, #instead of 2?
@@ -37,7 +37,7 @@ attention_kwargs={
             "max_target_length": 512,
             "window_sizes": [254],
             "autoregressive": False,
-            "sentence_tokens": []#[0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
 
 tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)

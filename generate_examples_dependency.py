@@ -3,6 +3,9 @@ from tqdm import tqdm
 from aga_transformers.models.utils import repeat_relative_pos_bias, add_graph_to_params
 from aga_transformers.models.t5.generate import beam_search
 
+import jax.numpy as jnp
+import math
+
 import transformers
 from datasets import load_dataset
 
@@ -37,7 +40,7 @@ attention_kwargs={
             "max_target_length": 512,
             "window_sizes": [254],
             "autoregressive": False,
-            "sentence_tokens": []#[0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+            "sentence_tokens": [0, 1]#[0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
         }
 
 tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
@@ -50,6 +53,33 @@ decoder_start_token_id = model.config.decoder_start_token_id
 # @partial(jax.jit)
 # def generate(input_ids, attention_mask, params):
 #     return model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
+
+vocab_dependency = {'intj': 0, 'punct': 1, 'ccomp': 2, 'advmod': 3, 'det': 4, 'pobj': 5, 'nsubj': 6, 'dobj': 7, 'conj': 8, 'prep': 9, 'aux': 10, 'compound': 11, 'acomp': 12, 'amod': 13, 'nummod': 14, 'attr': 15, 'mark': 16, 'advcl': 17, 'cc': 18, 'relcl': 19, 'npadvmod': 20, 'acl': 21, 'prt': 22, 'auxpass': 23, 'nsubjpass': 24, 'appos': 25, 'neg': 26, 'pcomp': 27, 'preconj': 28, 'poss': 29, 'nmod': 30, 'parataxis': 31, 'dative': 32, 'predet': 33, 'xcomp': 34, 'quantmod': 35, 'oprd': 36, 'meta': 37, 'dep': 38, 'expl': 39, 'csubj': 40, 'agent': 41, 'case': 42, 'csubjpass': 43}
+
+n_global_tokens = 2 #TODO: add in config
+seq_length = attention_kwargs["max_source_length"]
+max_graph_len = (seq_length - (n_global_tokens)) * attention_kwargs["window_sizes"][0] + (n_global_tokens) * seq_length # > maximum length
+
+
+def get_dependency_graph(i):
+    #graph generation
+
+    dep_graph = test_dataset["dependency_graph"][i]
+    # graphs.append(graph)
+
+    receivers_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
+    receivers_dep = jax.lax.dynamic_update_slice(receivers_dep, jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+    senders_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
+    senders_dep = jax.lax.dynamic_update_slice(senders_dep, jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+    # graph_mask_dep = jnp.zeros((max_graph_len), dtype="bool")
+    # graph_mask_dep = jax.lax.dynamic_update_slice(graph_mask_dep, jnp.array([gm for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype="bool"), (0,))
+    # graph_mask_dep = jnp.logical_and(graph_mask_dep, model_inputs["attention_mask"][i].take(receivers_dep))
+    edge_labels = jnp.full((max_graph_len), -1, dtype=jnp.int16)
+    edge_labels = jax.lax.dynamic_update_slice(edge_labels, jnp.array([vocab_dependency[label] for label,r,s,gm in zip(dep_graph["edge_labels"], dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.int16), (0,))      
+    # print(graph_mask.shape)
+
+    graphs.append({"receivers": receivers_dep, "senders": senders_dep, "edge_labels": edge_labels})
+
 
 # @jax.jit
 def generate(input_ids, inputs):
