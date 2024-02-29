@@ -31,8 +31,8 @@ class TrainState(train_state.TrainState):
 
 # tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
-tokenizer = AutoTokenizer.from_pretrained("google/long-t5-local-base")
-model = FlaxLongT5ForConditionalGeneration.from_pretrained("google/long-t5-local-base")
+tokenizer = AutoTokenizer.from_pretrained("google/long-t5-tglobal-base")
+model = FlaxLongT5ForConditionalGeneration.from_pretrained("google/long-t5-tglobal-base")
 
 tx = optax.adafactor(
     learning_rate=0,
