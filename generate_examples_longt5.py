@@ -27,7 +27,7 @@ generation_config = {
 repo_path= "gigant/longt5-0229" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 
 tokenizer = AutoTokenizer.from_pretrained(repo_path)
-model = FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path)
+model = FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, dtype="bfloat16")
 
 predictions = []
 references = []
