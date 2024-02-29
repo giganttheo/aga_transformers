@@ -57,12 +57,12 @@ print("============================================\n\n")
 state = state.replace(**load_state())
 print("============================================\n\n")
 
-model.enable_scan()
+# model.enable_scan()
 model.params = lorax.merge_params(state.params, destructive=False)
 
 print("============================================\n\n")
 
-model.disable_scan()
+# model.disable_scan()
 model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
