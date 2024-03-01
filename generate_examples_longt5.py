@@ -35,13 +35,13 @@ params=model.params
 decoder_start_token_id = model.config.decoder_start_token_id
 
 # @partial(jax.jit)
-# def generate(input_ids, attention_mask, params):
-#     return model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
+def generate(input_ids, attention_mask, params):
+    return model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
 
 # @jax.jit
-def generate(input_ids, inputs):
-    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
-    return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
+# def generate(input_ids, inputs):
+#     pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
+#     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
 for rec in tqdm(test_dataset):
     text = "summarize: " + rec["transcript"]

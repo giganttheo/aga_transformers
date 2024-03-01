@@ -33,9 +33,10 @@ python ./train_lora_dependency.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
+	--resume_from_checkpoint \
+	--run_id "u0c4f3xc
+"
 	# --max_train_samples 64 \
 	# --max_eval_samples 64 \
-	# --resume_from_checkpoint \#8192 \
-	# --run_id "fv3mirpt"
 	# --max_train_samples 64 \
 	# --max_eval_samples 64 \
