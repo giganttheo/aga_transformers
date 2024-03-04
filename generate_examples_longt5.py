@@ -15,12 +15,11 @@ import jax
 test_dataset = load_dataset("gigant/tib", split="test").select(range(30))
 
 generation_config = {
-    "num_beams": 3, #instead of 2?
+    "num_beams": 5, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": -2,
     "early_stopping": True,
-    # "no_repeat_ngram_size": 3,
 }
 
 generation_config = transformers.GenerationConfig(**generation_config)
@@ -36,14 +35,14 @@ params=model.params
 decoder_start_token_id = model.config.decoder_start_token_id
 
 # @partial(jax.jit)
-def generate(input_ids, attention_mask, params):
-    pred_ids = model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
-    return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
+# def generate(input_ids, attention_mask, params):
+#     pred_ids = model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
+#     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
 # @jax.jit
-# def generate(input_ids, inputs):
-#     pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
-#     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
+def generate(input_ids, inputs):
+    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
+    return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
 for rec in tqdm(test_dataset):
     text = "summarize: " + rec["transcript"]
