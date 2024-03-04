@@ -70,9 +70,9 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
 
     logits_processor = FlaxLogitsProcessorList()
 
-    logits_processor.append(FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
+    # logits_processor.append(FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
 
-    _, num_beams, cur_len = input_ids.shape #_ was batch_size
+    batch_size, num_beams, cur_len = input_ids.shape #_ was batch_size
     max_length=512
     # sequences = jnp.full((batch_size, 512), pad_token_id, dtype=jnp.int32)
     sequences = jnp.full((batch_size, num_beams, max_length), pad_token_id, dtype=jnp.int32)
