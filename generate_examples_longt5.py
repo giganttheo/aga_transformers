@@ -40,7 +40,7 @@ decoder_start_token_id = model.config.decoder_start_token_id
 #     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
 # @jax.jit
-def generate(input_ids, inputs):
+def generate(input_ids, inputs, params):
     pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
@@ -50,8 +50,8 @@ for rec in tqdm(test_dataset):
     inputs = tokenizer(text, return_tensors="np", truncation=True, max_length=8192)
     # label_ids = tokenizer(label, return_tensors="pt").input_ids
     input_ids = inputs.pop("input_ids")
-    attention_mask = inputs.pop("attention_mask")
-    preds = generate(input_ids, attention_mask, model.params)
+    # attention_mask = inputs.pop("attention_mask")
+    preds = generate(input_ids, inputs, model.params)
     # pred_ids = generate(inputs["input_ids"], inputs["attention_mask"], params)
     predictions.append(preds)
     references.append(label)
