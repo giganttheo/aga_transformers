@@ -12,13 +12,13 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test").select(range(30))
+test_dataset = load_dataset("gigant/tib", split="test")
 
 generation_config = {
-    "num_beams": 5, #instead of 2?
+    "num_beams": 4, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
-    "length_penalty": -2,
+    "length_penalty": -4,
     "early_stopping": True,
     "no_repeat_ngram_size": 4,
 }
