@@ -22,7 +22,7 @@ generation_config = {
     "early_stopping": True,
 }
 
-generation_config = transformers.GenerationConfig(**generation_config)
+# generation_config = transformers.GenerationConfig(**generation_config)
 
 repo_path= "gigant/longt5-0229" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 
