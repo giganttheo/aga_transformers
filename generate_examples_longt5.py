@@ -50,7 +50,8 @@ for rec in tqdm(test_dataset):
     inputs = tokenizer(text, return_tensors="np", truncation=True, max_length=8192)
     # label_ids = tokenizer(label, return_tensors="pt").input_ids
     input_ids = inputs.pop("input_ids")
-    preds = generate(input_ids, inputs, model.params)
+    attention_mask = inputs.pop("attention_mask")
+    preds = generate(input_ids, attention_mask, model.params)
     # pred_ids = generate(inputs["input_ids"], inputs["attention_mask"], params)
     predictions.append(preds)
     references.append(label)
