@@ -23,6 +23,7 @@ generation_config = {
     # "no_repeat_ngram_size": 3,
 }
 
+generation_config = transformers.GenerationConfig(**generation_config)
 
 repo_path= "gigant/longt5-0229" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 
