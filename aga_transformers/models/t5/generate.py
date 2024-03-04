@@ -43,7 +43,7 @@ def gather_beams(nested, beam_indices, batch_size, new_num_beams):
     return jax.tree_util.tree_map(gather_fn, nested)
 
 
-def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repeat_ngram_size, early_stopping=True, batch_size=1,num_beams=3):
+def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repeat_ngram_size=3, early_stopping=True, batch_size=1,num_beams=3):
 
     model_kwargs = model._prepare_encoder_decoder_kwargs_for_generation(input_ids, params, model_kwargs)
     pad_token_id = model.config.pad_token_id
