@@ -19,20 +19,20 @@ import lorax
 class TrainState(train_state.TrainState):
     dropout_rng: jnp.ndarray
 
-# attention_kwargs = {
-#     "max_source_length": 0,
-#     "max_target_length": 0,
-#     "window_sizes": [254], #[127], # [254]*12,
-#     "autoregressive": False,
-#     "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
-# }
+attention_kwargs = {
+    "max_source_length": 0,
+    "max_target_length": 0,
+    "window_sizes": [254], #[127], # [254]*12,
+    "autoregressive": False,
+    "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+}
 
-# tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
+tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
 # tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
-tokenizer = AutoTokenizer.from_pretrained("google/long-t5-tglobal-base")
-model = FlaxLongT5ForConditionalGeneration.from_pretrained("google/long-t5-tglobal-base")
+# tokenizer = AutoTokenizer.from_pretrained("google/long-t5-tglobal-base")
+# model = FlaxLongT5ForConditionalGeneration.from_pretrained("google/long-t5-tglobal-base")
 
 tx = optax.adafactor(
     learning_rate=0,
@@ -41,10 +41,10 @@ tx = optax.adafactor(
 state = TrainState.create(apply_fn=model.__call__, params=model.params, tx=tx, dropout_rng=jax.random.PRNGKey(0))
 
 
-load_dir = "8k-longt5" #"8k-global-local" #"8k-global-local" "8k-global-dependency-bias"
+load_dir = "8k-global-local" #"8k-global-local" "8k-global-dependency-bias"
 CKPT_DIR_LOAD = f"{load_dir}/ckpts/"
 
-save_dir = "8k-longt5" #"8k-global-local" #"8k-global-local" "8k-global-dependency-bias"
+save_dir = "8k-global-local" #"8k-global-local" "8k-global-dependency-bias"
 CKPT_DIR_SAVE = f"{save_dir}/weights/"
 
 def load_state():
@@ -67,8 +67,8 @@ model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
 # model_bis = FlaxT5ForConditionalGeneration_AUG.from_pretrained(CKPT_DIR_SAVE,
-# model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE,
-model_bis = FlaxLongT5ForConditionalGeneration.from_pretrained(CKPT_DIR_SAVE,
+model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE,
+# model_bis = FlaxLongT5ForConditionalGeneration.from_pretrained(CKPT_DIR_SAVE,
                                                     dtype="bfloat16"
                                                     )
 
