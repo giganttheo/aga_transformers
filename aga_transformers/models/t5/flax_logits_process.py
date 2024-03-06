@@ -23,19 +23,16 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         self.ngram_size = ngram_size
 
 
-    def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int, cur_len: int):
+    def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int):
         """
         """
         batch_size, seq_len = input_ids.shape
         # transition_tensor = jnp.zeros((batch_size, self.ngram_size - 1, vocab_size, vocab_size), dtype="bool")
 
         # if `input_ids` is padded this will do some useless computations, but that is fine (avoids XLA recompilation)
-        all_update_indices = []
-        for i in range(cur_len - (self.ngram_size - 1)):
-            indices = jnp.array([[b,] + [input_ids[b, i + j] for j in range(self.ngram_size)] for b in range(batch_size)])
-            all_update_indices.extend(indices)
 
-        all_update_indices = jnp.stack(all_update_indices, axis=0) if len(all_update_indices) > 0 else jnp.zeros((0, 1 + self.ngram_size), dtype=jnp.uint8)
+        all_update_indices = jnp.array([[b,] + [input_ids[b, i + j] for j in range(self.ngram_size)] for b in range(batch_size) for i in range(cur_len - (self.ngram_size - 1))]) if cur_len >= self.ngram_size else jnp.zeros((0, 1 + self.ngram_size), dtype=jnp.uint8)
+
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
         return sparse.BCOO((data, all_update_indices), shape=(batch_size,) + (vocab_size,) * self.ngram_size )
 
