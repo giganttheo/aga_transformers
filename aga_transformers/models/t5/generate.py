@@ -175,7 +175,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         log_probs = logits_processor(
             flatten_beam_dim(running_sequences), flatten_beam_dim(log_probs), state.cur_len
         )
-        jax.debug.print("changed tokens: {jnp.count_nonzero(prev_log_probs - log_probs)}", log_probs=log_probs, prev_log_probs=prev_log_probs)
+        jax.debug.print("changed tokens: {x}", x=jnp.count_nonzero(prev_log_probs - log_probs))
         log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
         log_probs = log_probs + jnp.expand_dims(state.running_scores, axis=2)
         vocab_size = log_probs.shape[2]
