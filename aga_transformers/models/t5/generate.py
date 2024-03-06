@@ -172,11 +172,11 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         log_probs = jax.nn.log_softmax(logits)
         # jax.debug.print("Flatten beam dim: {x}", x=flatten_beam_dim(running_sequences))
         prev_log_probs = flatten_beam_dim(log_probs)
-        print(running_sequences.shape, log_probs.shape, state.cur_len)
-        jax.debug.print("{x}", x=flatten_beam_dim(running_sequences))
+        print(state.running_sequences.shape, log_probs.shape, state.cur_len)
+        jax.debug.print("{x}", x=flatten_beam_dim(state.running_sequences))
         jax.debug.print("{x}", x=log_probs[0, 0, :10])
         log_probs = FlaxNoRepeatNGramLogitsProcessor(3)(
-            flatten_beam_dim(running_sequences), flatten_beam_dim(log_probs), state.cur_len
+            flatten_beam_dim(state.running_sequences), flatten_beam_dim(log_probs), state.cur_len
         )
         jax.debug.print("changed tokens: {x}", x=jnp.count_nonzero(prev_log_probs - log_probs))
         log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
