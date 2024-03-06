@@ -121,8 +121,8 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             # jax.debug.print("{x} banned 2-grams", x=jnp.count_nonzero(banned_tokens_indices_mask))
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         # jax.debug.print("input_ids : {x}", x=input_ids)
-        jax.debug.print("{cur_len} / {ngram}", cur_len=cur_len, ngram=self.ngram_size)
-        output = jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
+        # jax.debug.print("{cur_len} / {ngram}", cur_len=cur_len, ngram=self.ngram_size)
+        output = jax.lax.cond((cur_len >= self.ngram_size), true_fn, lambda: scores)
         return output
 
 # import jax.numpy as jnp
