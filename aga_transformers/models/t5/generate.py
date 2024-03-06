@@ -173,7 +173,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         # jax.debug.print("Flatten beam dim: {x}", x=flatten_beam_dim(running_sequences))
         prev_log_probs = flatten_beam_dim(log_probs)
         print(running_sequences.shape, log_probs.shape, state.cur_len)
-        jax.debug.print("{x}", x=running_sequences[0, 0, :10])
+        jax.debug.print("{x}", x=flatten_beam_dim(running_sequences))
         jax.debug.print("{x}", x=log_probs[0, 0, :10])
         log_probs = FlaxNoRepeatNGramLogitsProcessor(3)(
             flatten_beam_dim(running_sequences), flatten_beam_dim(log_probs), state.cur_len
