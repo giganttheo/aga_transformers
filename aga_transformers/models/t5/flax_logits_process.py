@@ -23,7 +23,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         self.ngram_size = ngram_size
 
 
-    def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int):
+    def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int, cur_len: int):
         """
         """
         batch_size, seq_len = input_ids.shape
