@@ -23,7 +23,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         self.ngram_size = ngram_size
 
 
-    def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int):
+    def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int, cur_len: int):
         """
         """
         batch_size, seq_len = input_ids.shape
@@ -31,7 +31,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
 
         # if `input_ids` is padded this will do some useless computations, but that is fine (avoids XLA recompilation)
         all_update_indices = []
-        for i in range(seq_len - (self.ngram_size - 1)):
+        for i in range(cur_len - (self.ngram_size - 1)):
             indices = jnp.array([[b,] + [input_ids[b, i + j] for j in range(self.ngram_size)] for b in range(batch_size)])
             all_update_indices.extend(indices)
 
@@ -65,18 +65,15 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         
         def true_fn():
             _, vocab_size = scores.shape
-            transition_tensor = self.get_previous_ngrams(input_ids, vocab_size)
-            # jax.debug.print("transition_tensor idces: {x}", x=transition_tensor.indices)
-            # assert cur_len > self.ngram_size + 1
+            transition_tensor = self.get_previous_ngrams(input_ids, vocab_size, cur_len)
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
-            # latest_tokens = latest_tokens.at[:, cur_len - (self.ngram_size - 1) : cur_len].set(input_ids[:, cur_len - (self.ngram_size - 1) : cur_len])
-            
             latest_tokens = jax.lax.dynamic_update_slice(latest_tokens, jax.lax.dynamic_slice(input_ids, (0, cur_len - (self.ngram_size - 1)), (input_ids.shape[0], (self.ngram_size - 1))), (0, 0))
 
             banned_tokens_indices_mask = jnp.isclose(self.get_banned_tokens_mask(latest_tokens, transition_tensor), 1)
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         output = jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
         return output
+
 
 
 # class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
