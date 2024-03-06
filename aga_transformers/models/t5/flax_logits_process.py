@@ -35,7 +35,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
             indices = jnp.array([[b,] + [input_ids[b, i + j] for j in range(self.ngram_size)] for b in range(batch_size)])
             all_update_indices.extend(indices)
 
-        all_update_indices = jnp.stack(all_update_indices, axis=0)
+        all_update_indices = jnp.stack(all_update_indices, axis=0) if len(all_update_indices) > 0 else jnp.zeros((0, 1 + self.ngram_size), dtype=jnp.uint8)
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
         return sparse.BCOO((data, all_update_indices), shape=(batch_size,) + (vocab_size,) * self.ngram_size )
 
