@@ -11,6 +11,13 @@ from transformers.generation.flax_utils import GreedyState, BeamSearchState, Fla
 
 from aga_transformers.models.t5.flax_logits_process import FlaxNoRepeatNGramLogitsProcessor
 
+
+#TO FIX:
+## https://github.com/huggingface/transformers/blob/19fb1e22d2bdadf6611e029a6ae82606d1520c5f/src/transformers/generation/flax_utils.py#L914C1-L915C1
+# ==> should be state.running_sequences instead of running_sequences (which is always zeros)
+# so the logits processor can use the correct generated sequences (for n-gram blocking for instance)
+
+
 def flatten_beam_dim(tensor):
     """Flattens the first two dimensions of a non-scalar array."""
     # ignore scalars (e.g. cache index)
@@ -172,13 +179,13 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         log_probs = jax.nn.log_softmax(logits)
         # jax.debug.print("Flatten beam dim: {x}", x=flatten_beam_dim(running_sequences))
         prev_log_probs = flatten_beam_dim(log_probs)
-        print(state.running_sequences.shape, log_probs.shape, state.cur_len)
-        jax.debug.print("{x}", x=flatten_beam_dim(state.running_sequences))
-        jax.debug.print("{x}", x=log_probs[0, 0, :10])
+        # print(state.running_sequences.shape, log_probs.shape, state.cur_len)
+        # jax.debug.print("{x}", x=flatten_beam_dim(state.running_sequences))
+        # jax.debug.print("{x}", x=log_probs[0, 0, :10])
         log_probs = FlaxNoRepeatNGramLogitsProcessor(3)(
             flatten_beam_dim(state.running_sequences), flatten_beam_dim(log_probs), state.cur_len
         )
-        jax.debug.print("changed tokens: {x}", x=jnp.count_nonzero(prev_log_probs - log_probs))
+        # jax.debug.print("changed tokens: {x}", x=jnp.count_nonzero(prev_log_probs - log_probs))
         log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
         log_probs = log_probs + jnp.expand_dims(state.running_scores, axis=2)
         vocab_size = log_probs.shape[2]
@@ -263,9 +270,9 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         )
 
     state = partial(beam_search_body_fn, input_ids_length=input_ids.shape[-1])(state)
-    # state = lax.while_loop(beam_search_cond_fn, beam_search_body_fn, state)
-    while beam_search_cond_fn(state):
-        state = beam_search_body_fn(state)
+    state = lax.while_loop(beam_search_cond_fn, beam_search_body_fn, state)
+    # while beam_search_cond_fn(state):
+    #     state = beam_search_body_fn(state)
 
     # Account for the edge-case where there are no finished sequences for a
     # particular batch item. If so, return running sequences for that batch item.
