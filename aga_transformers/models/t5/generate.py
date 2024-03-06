@@ -171,9 +171,11 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         # add new logprobs to existing running logprobs scores.
         log_probs = jax.nn.log_softmax(logits)
         # jax.debug.print("Flatten beam dim: {x}", x=flatten_beam_dim(running_sequences))
+        prev_log_probs = log_probs
         log_probs = logits_processor(
             flatten_beam_dim(running_sequences), flatten_beam_dim(log_probs), state.cur_len
         )
+        jax.debug.print("changed tokens: {jnp.count_nonzero(prev_log_probs - log_probs)}", log_probs=log_probs, prev_log_probs=prev_log_probs)
         log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
         log_probs = log_probs + jnp.expand_dims(state.running_scores, axis=2)
         vocab_size = log_probs.shape[2]
@@ -258,7 +260,9 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         )
 
     state = partial(beam_search_body_fn, input_ids_length=input_ids.shape[-1])(state)
-    state = lax.while_loop(beam_search_cond_fn, beam_search_body_fn, state)
+    # state = lax.while_loop(beam_search_cond_fn, beam_search_body_fn, state)
+    while beam_search_cond_fn(state):
+        state = beam_search_body_fn(state)
 
     # Account for the edge-case where there are no finished sequences for a
     # particular batch item. If so, return running sequences for that batch item.
