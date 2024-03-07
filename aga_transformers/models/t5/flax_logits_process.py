@@ -25,6 +25,9 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
 
     def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int, cur_len: int):
         """
+        get a matrix of size [batch_size, vocab_size, vocab_size, vocab_size] (for 3-grams) that
+        represent the 3-grams that occured previously.
+        The BCOO representation allow to store only the few non-zero entries, instead of the full (huge) matrix
         """
         batch_size, seq_len = input_ids.shape
         
@@ -34,24 +37,28 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
         return sparse.BCOO((data, all_update_indices), shape=(batch_size,) + (vocab_size,) * self.ngram_size )
 
-    def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, transition_tensor) -> jnp.ndarray:
+    def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, previous_ngrams) -> jnp.ndarray:
         """
-        Determines which tokens must be banned given latest tokens and the transition tensor (i.e. the previously seen
-        ngrams).
-
-        First gathers a boolean mask that depicts whether the latest sequence of tokens has seen before (for each batch
-        member). Then, for each batch member, finds which tokens have been generated after the last token. Combining
-        the two, we have the forbidden ngrams.
+        Determines which tokens must be banned given latest tokens and the previously seen
+        ngrams.
         """
         @sparse.sparsify
         @jax.vmap
-        def inner_fn(latest_tokens, transition_tensor):
-          vocab_size = transition_tensor.shape[-1]
+        def inner_fn(latest_tokens, previous_ngrams):
+          vocab_size = previous_ngrams.shape[-1]
           mask = jnp.ones((vocab_size,))
-          mask *= transition_tensor[latest_tokens[0], latest_tokens[1]] #this works for 3-gram blocking
+          if self.ngram_size == 1:
+            mask *= previous_ngrams
+          elif self.ngram_size == 2:
+            mask *= previous_ngrams[latest_tokens[0]]
+          elif self.ngram_size == 3:
+            mask *= previous_ngrams[latest_tokens[0], latest_tokens[1]]
+          elif self.ngram_size == 4:
+            mask *= previous_ngrams[latest_tokens[0], latest_tokens[1], latest_tokens[2]]
+          else:
+            raise NotImplementedError(f"n-gram blocking not implemented for ngram_size={self.ngram_size}")
           return mask
-        r = sparse.bcoo_todense(inner_fn(latest_tokens, transition_tensor))
-        return r
+        return sparse.bcoo_todense(inner_fn(latest_tokens, previous_ngrams))
 
     # @jax.jit
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
@@ -60,11 +67,15 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         
         def true_fn():
             _, vocab_size = scores.shape
-            transition_tensor = self.get_previous_ngrams(input_ids, vocab_size, cur_len)
+            #store the previously seen n-grams
+            previous_ngrams = self.get_previous_ngrams(input_ids, vocab_size, cur_len)
+
+            #get the n-1 last tokens that prefix the following n-gram
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             latest_tokens = jax.lax.dynamic_update_slice(latest_tokens, jax.lax.dynamic_slice(input_ids, (0, cur_len - (self.ngram_size - 1)), (input_ids.shape[0], (self.ngram_size - 1))), (0, 0))
 
-            banned_tokens_indices_mask = jnp.isclose(self.get_banned_tokens_mask(latest_tokens, transition_tensor), 1)
+            #compute the banned tokens, ie all the tokens that when added to the latest tokens lead to a n-gram that was previously generated
+            banned_tokens_indices_mask = jnp.isclose(self.get_banned_tokens_mask(latest_tokens, previous_ngrams), 1)
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
         output = jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
         return output
