@@ -27,7 +27,6 @@ def get_slides2segments_edges(data_point):
       edges_slides_to_transcript_segments[i_keyframes] = edges_slides_to_transcript_segments[i_keyframes] + [i_transcript]
   return edges_slides_to_transcript_segments
 
-
 class StructuralAttentionPattern(AttentionPattern):
     def __init__(self, data_point, tokenizer, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(data_point)

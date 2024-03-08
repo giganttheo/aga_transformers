@@ -32,7 +32,7 @@ class StructuralAttentionPattern(AttentionPattern):
         # tokenized = tokenizer(data_point['transcript'])
         max_slides = 12 #32 #64 #maximum n of slides accepted, else they will be merge
         num_slides = len(edges_slides_to_transcript_segments)
-        merge_factor = math.ceil(num_slides / max_slides)
+        merge_factor = 1 #BYPASSED #math.ceil(num_slides / max_slides)
         # print(f"Merge factor is {merge_factor}")
         num_slides = num_slides // merge_factor
         seq_len_q = min(max_source_length - num_slides, len(tokens))
@@ -83,6 +83,7 @@ class StructuralAttentionPattern(AttentionPattern):
                         edge_labels.append(-1)
 
         offset_tokens = num_slides
+
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
             node_slide = slide_id // merge_factor
             for edge_sentence_id in edges_slide:
@@ -147,6 +148,20 @@ class StructuralAttentionPattern(AttentionPattern):
                         edge_labels.append(6) # document -> slide 
                     else:
                         edge_labels.append(7) # document -> word 
+
+
+        # TODO : get the slide_start_for_blocks
+        #1: get the number of blocks
+        #2: for each block, get the first slide
+        #3: profit
+        # slide_start_for_blocks = [] #for each block, add the first slide index
+        # block_len = 254//2 + 1 #from the model definition, should be in the config
+        # #token i is in block i//block_len
+
+        # for block_i in range(math.ceil((seq_len_kv - )/block_len)):
+        #     for slide_i in list(range(num_slides))[:,:,-1]:
+
+
         num_tokens = max_listoflists(new_tokens) + len(edges_slides_to_transcript_segments)
         # print(f"Number of edges is {len(edges)}")
         del edges
