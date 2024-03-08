@@ -84,6 +84,9 @@ class StructuralAttentionPattern(AttentionPattern):
 
         offset_tokens = num_slides
 
+        block_len = 254//2 + 1 #from the model definition, should be in the config
+        slide_start_for_blocks = [999 for block in range(math.ceil(seq_len_q / block_len))] #for each block, add the first slide index
+
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
             node_slide = slide_id // merge_factor
             for edge_sentence_id in edges_slide:
@@ -94,6 +97,8 @@ class StructuralAttentionPattern(AttentionPattern):
                         node_token = node_token + offset_tokens
                     if node_token >= offset_tokens:
                         if(node_token, node_slide) not in edges and (node_slide, node_token) not in edges and node_token < max_source_length:
+                            if (node_token - offset_tokens) % block_len == 0:
+                                slide_start_for_blocks[(node_token - offset_tokens) // block_len] = min(node_slide, slide_start_for_blocks[(node_token - offset_tokens) // block_len])
                             edges.add((node_token, node_slide))
                             edges.add((node_slide, node_token))
                             receivers.append(node_token)
@@ -150,18 +155,6 @@ class StructuralAttentionPattern(AttentionPattern):
                         edge_labels.append(7) # document -> word 
 
 
-        # TODO : get the slide_start_for_blocks
-        #1: get the number of blocks
-        #2: for each block, get the first slide
-        #3: profit
-        # slide_start_for_blocks = [] #for each block, add the first slide index
-        # block_len = 254//2 + 1 #from the model definition, should be in the config
-        # #token i is in block i//block_len
-
-        # for block_i in range(math.ceil((seq_len_kv - )/block_len)):
-        #     for slide_i in list(range(num_slides))[:,:,-1]:
-
-
         num_tokens = max_listoflists(new_tokens) + len(edges_slides_to_transcript_segments)
         # print(f"Number of edges is {len(edges)}")
         del edges
@@ -181,6 +174,7 @@ class StructuralAttentionPattern(AttentionPattern):
         self.senders = senders
         self.graph_mask = graph_mask
         self.size = (num_tokens, num_tokens)
+        self.slide_start_for_blocks = np.array(slide_start_for_blocks, dtype=np.uint16)
 
 def create_window_structural_attn_patterns(model, data_point, tokens, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], layer_wise=False, mode="structure", **kwargs):
     if len(kwargs.keys()) > 0:
@@ -263,7 +257,7 @@ def create_window_structural_attn_patterns_batch(model, transcript_segments, key
                                 sentence_tokens=sentence_tokens,
                                 mode=mode,
                                 is_padded=is_padded,
-                                ).get_attention_graph(with_num_slides=True, with_edge_labels=True) for i in range(batch_size)]
+                                ).get_attention_graph(with_num_slides=True, with_edge_labels=True, with_slide_start_for_blocks=True) for i in range(batch_size)]
     # Decoder self attention pattern
     dec_self_attn = {}
     # Encoder-Decoder cross attention pattern
