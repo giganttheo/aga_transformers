@@ -258,6 +258,7 @@ def create_window_structural_attn_patterns_batch(model, transcript_segments, key
                                 mode=mode,
                                 is_padded=is_padded,
                                 ).get_attention_graph(with_num_slides=True, with_edge_labels=True, with_slide_start_for_blocks=True) for i in range(batch_size)]
+    return batch_enc_self_attn
     # Decoder self attention pattern
     dec_self_attn = {}
     # Encoder-Decoder cross attention pattern
