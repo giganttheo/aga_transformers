@@ -86,6 +86,7 @@ class StructuralAttentionPattern(AttentionPattern):
 
         block_len = 254//2 + 1 #from the model definition, should be in the config
         #padded
+        print(f"block_len={block_len}, num blocks={math.ceil(max_source_length / block_len)}")
         slide_start_for_blocks = [num_slides - 1 for block in range(math.ceil(max_source_length / block_len))] #for each block, add the first slide index
 
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
