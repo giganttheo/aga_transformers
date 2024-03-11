@@ -196,13 +196,14 @@ def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.n
     # [..., num_blocks, block_len] -> [..., num_blocks + 2, block_len]
     x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
     
-    @partial(jax.vmap, out_axes=1)
-    def get_global(slide_start):
-        slice_slides = jax.lax.dynamic_slice(x_global, (0, slide_start, 0, 0), (x_global.shape[0], n_slides_, x_global.shape[2], x_global.shape[3]))
-        slice_docs = jax.lax.dynamic_slice(x_global, (0, doc_tokens_start, 0, 0), (x_global.shape[0], x_global.shape[1] - doc_tokens_start, x_global.shape[2], x_global.shape[3]))
-        return jnp.concatenate([slice_slides, slice_docs], axis=1)
+    @partial(jax.vmap, in_axes=(1, None), out_axes=1)
+    @partial(jax.vmap, in_axes=(0, 0), out_axes=0)
+    def get_global(slide_start, x_global):
+        slice_slides = jax.lax.dynamic_slice(x_global, (slide_start, 0, 0), (n_slides_, x_global.shape[1], x_global.shape[2]))
+        slice_docs = jax.lax.dynamic_slice(x_global, (doc_tokens_start, 0, 0), (x_global.shape[0] - doc_tokens_start, x_global.shape[1], x_global.shape[2]))
+        return jnp.concatenate([slice_slides, slice_docs], axis=0)
 
-    x_global = get_global(slide_start_for_blocks)
+    x_global = get_global(slide_start_for_blocks, x_global)
 
     blocks_list: List[np.array] = [x_global]
     for i in range(3):
@@ -1154,8 +1155,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
 
         # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-        key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
-        value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+        key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k[:, None], slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+        value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v[:, None], slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
