@@ -30,9 +30,9 @@ class StructuralAttentionPattern(AttentionPattern):
     def __init__(self, transcript_segments, keyframes, tokens, window_size, max_source_length=None, sentence_tokens=[0], mode="structure", is_padded=False, **kwargs):
         edges_slides_to_transcript_segments = get_slides2segments_edges(transcript_segments, keyframes)
         # tokenized = tokenizer(data_point['transcript'])
-        max_slides = 12 #32 #64 #maximum n of slides accepted, else they will be merge
+        max_slides = 128 #maximum n of slides accepted, else they will be merge
         num_slides = len(edges_slides_to_transcript_segments)
-        merge_factor = 1 #BYPASSED #math.ceil(num_slides / max_slides)
+        merge_factor = math.ceil(num_slides / max_slides)
         # print(f"Merge factor is {merge_factor}")
         num_slides = num_slides // merge_factor
         seq_len_q = min(max_source_length - num_slides, len(tokens))
@@ -85,7 +85,8 @@ class StructuralAttentionPattern(AttentionPattern):
         offset_tokens = num_slides
 
         block_len = 254//2 + 1 #from the model definition, should be in the config
-        slide_start_for_blocks = [999 for block in range(math.ceil(seq_len_q / block_len))] #for each block, add the first slide index
+        #padded
+        slide_start_for_blocks = [num_slides - 1 for block in range(math.ceil(max_source_length / block_len))] #for each block, add the first slide index
 
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
             node_slide = slide_id // merge_factor
