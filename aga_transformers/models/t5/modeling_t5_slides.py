@@ -1155,8 +1155,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
 
         # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-        key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k[:, None], slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
-        value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v[:, None], slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+        key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+        value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
