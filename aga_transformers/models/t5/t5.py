@@ -1,6 +1,7 @@
 from transformers import AutoTokenizer, FlaxLongT5ForConditionalGeneration
 import jax.numpy as jnp
 
+from .modeling_t5_slides import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_SLI
 from .modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
 from .modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
 from .modeling_t5 import FlaxT5ForConditionalGeneration
@@ -196,6 +197,58 @@ def load_augmented_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led
         graph = None
         graph_ar = None
     return tokenizer, model, graph, graph_ar
+
+def load_slide_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, from_longt5_local=False, **model_kwargs):
+    tokenizer = AutoTokenizer.from_pretrained(repo_path)
+
+    model = FlaxT5ForConditionalGeneration_SLI.from_pretrained(
+        repo_path,
+        **model_kwargs,
+        dtype=dtype,
+    )
+    vocab_size = 8 #8 for structural, 44 for dependency
+    # model.params = init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
+    if from_longt5_local:
+        print("adapting parameters from longt5_local")
+        long_t5=FlaxLongT5ForConditionalGeneration.from_pretrained(repo_path, **model_kwargs)
+        model.params=init_augmented_vocab(repeat_relative_pos_bias(adapt_parameters_from_longt5_local(long_t5.params), n_heads=model.config.num_heads), model.config.num_heads, vocab_size, dtype="bfloat16")
+        del long_t5
+    else:
+        model.params=init_augmented_vocab(model.params, model.config.num_heads, vocab_size, dtype="bfloat16")
+    
+    if dtype == "bfloat16":
+        print("adapting parameters to bfloat16...")
+        model.params = model.to_bf16(model.params)
+    
+    # scan=True
+    # if scan:
+    #     model.params = convert_unroll_to_scan(model, model.params)
+
+    if attention_kwargs is None:
+        attention_kwargs = {
+            "max_source_length": 2048,
+            "max_target_length": 512,
+            "window_sizes": [16, 16, 16, 32, 32, 32, 64, 64, 64, 64, 64, 64],
+            "autoregressive":False,
+            "sentence_tokens": [0, 1, 2] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        }
+
+    #tieing the graph so it is defined for first layer only
+    
+    # model.module_class = tie_graph_layers(module_class, repo_path, autoregressive=True)#attention_kwargs["autoregressive"])
+    
+    graph_ar = {}
+    if attention_mode == "led":
+        attention_kwargs.pop("autoregressive")
+        graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
+        graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
+    elif attention_mode == "vanilla":
+        graph = create_dense_attn_patterns(model, **attention_kwargs, layer_wise=layer_wise)
+    else:
+        graph = None
+        graph_ar = None
+    return tokenizer, model, graph, graph_ar
+
 
 def preprocess_function(examples, tokenizer, max_length=512, prefix="summarize: ", text_column="transcript", padding='longest'):
     inputs = examples[text_column]

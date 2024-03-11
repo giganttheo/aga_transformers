@@ -853,7 +853,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 dtype=self.dtype,
             )
         self.has_graph_edge_bias = True
-        self.vocabulary_edge_bias = 44 #8 #doc<->slide, doc/doc, slide/slide, doc<->item and slide<->item
+        self.vocabulary_edge_bias = 8 #doc<->slide, doc/doc, slide/slide, doc<->item and slide<->item
         if self.has_graph_edge_bias:
             #additional vocabulary to encode graph edges labels in the attention
             self.graph_edge_bias = nn.Embed(
@@ -993,20 +993,9 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
     @partial(jax.vmap, in_axes=[None, None, None, None, None, 0]) #batch
     def _create_block_position_bias(self, block_len: int, n_global_tokens: int, num_blocks:int, n_document_tokens=jnp.array(2), n_slides=jnp.array(0)) -> np.ndarray:
-        # position_bias shape: # (1, num_blocks, n_heads, block_len, 3 * block_len + n_global_tokens)
-        # if self.has_graph_edge_bias:
-        #     #n_global tokens include the document tokens and the slide tokens
-        #     # slide_tokens = slice(n_slides)
-        #     # document_tokens = slice(n_slides, n_global_tokens)
-        #     global_block_edge = self.compute_edge_bias_global(block_len, n_global_tokens, n_slides, n_document_tokens, in_window=True)
-        #     global_block_edge = global_block_edge[:, None] #broadcast with num_blocks
         if self.has_relative_attention_bias:
             global_block = self.compute_global_bias(block_len, n_global_tokens, num_blocks)
-            # if self.has_graph_edge_bias:
-            #     assert global_block.shape[2:] == global_block_edge.shape[2:]
-            #     global_block = global_block + global_block_edge
             blocks_block = self.compute_block_bias(block_len, num_blocks)
-            # jax.debug.print("shapes: gl:{global_block.shape}, bl: {blocks_block.shape}", global_block=global_block, blocks_block=blocks_block)
             position_bias = jnp.concatenate([global_block, blocks_block], axis=3, dtype=self.dtype) #merge on last axis 
         else:
             position_bias = jnp.zeros((self.n_heads, block_len, 3 * block_len + n_global_tokens), dtype=self.dtype)
@@ -1043,15 +1032,21 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
         block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
 
-        #"slide" tokens are added at the beginning of the document
-        if self.has_variable("graph", "n_slides"):
-            n_slides = self.variables["graph"]["n_slides"]
-            assert n_slides.shape[0] == batch_size
-        else:
-            n_slides = jnp.zeros((batch_size,), dtype=jnp.uint16)
         #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
-        n_document_tokens = 2 #TODO: add in config
-        n_global_tokens = 0 + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
+        n_document_tokens = 2
+        max_slides = 128 #maximum n of slides accepted, else they will be merge
+        #TODO: compute these values (or retrieve them from the input graph)
+        
+        if self.has_variable("graph", "receivers"):
+            slide_start_for_blocks = self.variables["graph"]["slide_start_for_blocks"] #array of slide start indices
+            n_slides_total = self.variables["graph"]["n_slides"] #int = number of slides in total
+        else:
+            slide_start_for_blocks = jnp.array([[0 for _ in range(math.ceil(8192 / block_len))]*batch_size], dtype=jnp.uint16)
+            n_slides_total = jnp.zeros((batch_size,), dtype=jnp.uint16)
+        
+        n_slides_context = 8 #static int = number of slides in the context window
+        n_global_tokens = max_slides + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
+        n_global_tokens_context = n_slides_context + n_document_tokens
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
         
         # jax.debug.print("*Using block efficient attention with graph of shape {r.shape}", r=self.variables["graph"]["receivers"])
@@ -1083,25 +1078,30 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
                 senders = einops.repeat(self.variables["graph"]["senders"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
+                edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'bs h1 e -> bs (h1 h) e', bs=batch_size, h=self.n_heads, h1=1)
             elif len(self.variables["graph"]["receivers"].shape) == 3:
                 receivers =self.variables["graph"]["receivers"]
                 senders = self.variables["graph"]["senders"]
                 graph_mask = self.variables["graph"]["graph_mask"]
+                edge_labels = self.variables["graph"]["edge_labels"]
             elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == batch_size:
                 #graph attention pattern is copied head-wise
                 receivers = einops.repeat(self.variables["graph"]["receivers"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
                 senders = einops.repeat(self.variables["graph"]["senders"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
+                edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'bs e -> bs h e', bs=batch_size, h=self.n_heads)
             elif len(self.variables["graph"]["receivers"].shape) == 2 and self.variables["graph"]["receivers"].shape[0] == self.n_heads:
                 #graph attention pattern is copied batch-wise
                 receivers = einops.repeat(self.variables["graph"]["receivers"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
                 senders = einops.repeat(self.variables["graph"]["senders"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
+                edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'h e -> bs h e', bs=batch_size, h=self.n_heads)
             else:            
                 #graph attention pattern is copied batch and head-wise
                 receivers = einops.repeat(self.variables["graph"]["receivers"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
                 senders = einops.repeat(self.variables["graph"]["senders"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
                 graph_mask = einops.repeat(self.variables["graph"]["graph_mask"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
+                edge_labels = einops.repeat(self.variables["graph"]["edge_labels"], 'e -> bs h e', bs=batch_size, h=self.n_heads)
         else:
             #for initialization
             no_graph=True
@@ -1152,11 +1152,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
         value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
 
-        #TODO: compute these values (or retrieve them from the input graph)
-        slide_start_for_blocks = None #array of slide start indices
-        n_slides_context = None #static int = number of slides in the context window
-        n_slides_total = None #int = number of slides in total
-
         # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
         key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k[:, None], slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
         value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v[:, None], slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
@@ -1189,8 +1184,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 )
             # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
             #TODO replace with create_local_and_global_masks_with_slides (same with edges)
-            mask_local, mask_global = create_local_and_global_masks(senders, receivers, graph_mask, n_global_tokens, block_len, num_blocks, seq_length, False)
-            edge_bias_local, edge_bias_global = create_local_and_global_edges(senders_dependency, receivers_dependency, n_global_tokens, block_len, num_blocks, seq_length, edge_labels_dependency)
+            mask_local, mask_global, edge_bias_local, edge_bias_global  = create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens_context, block_len, num_blocks, seq_length, False, edge_labels, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens)
 
         if no_graph:
             mask_local=None
