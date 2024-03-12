@@ -283,4 +283,4 @@ def prepare_window_structural_attn_patterns(transcript_segments, keyframes, toke
                                 sentence_tokens=sentence_tokens,
                                 mode=mode,
                                 is_padded=is_padded,
-                                ).get_attention_graph(with_num_slides=True, with_edge_labels=True)
+                                ).get_attention_graph(with_num_slides=True, with_edge_labels=True, with_slide_start_for_blocks=True)
