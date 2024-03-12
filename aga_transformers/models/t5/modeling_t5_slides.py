@@ -196,15 +196,14 @@ def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.n
     # [..., num_blocks, block_len] -> [..., num_blocks + 2, block_len]
     x = jnp.pad(x, pad_width=pad, mode="constant", constant_values=pad_value)
     
-    @partial(jax.vmap, in_axes=(1, None), out_axes=1)
-    @partial(jax.vmap, in_axes=(0, 0), out_axes=0)
-    def get_global(slide_start, x_global):
-        n_document_tokens=2
+    @partial(jax.vmap, in_axes=(1, None, None), out_axes=1) #blocks
+    @partial(jax.vmap, in_axes=(0, 0, 0), out_axes=0) #batch
+    def get_global(slide_start, x_global, doc_tokens_start):
         slice_slides = jax.lax.dynamic_slice(x_global, (slide_start, 0, 0), (n_slides_, x_global.shape[1], x_global.shape[2]))
         slice_docs = jax.lax.dynamic_slice(x_global, (doc_tokens_start, 0, 0), (n_document_tokens, x_global.shape[1], x_global.shape[2]))
         return jnp.concatenate([slice_slides, slice_docs], axis=0)
 
-    x_global = get_global(slide_start_for_blocks, x_global)
+    x_global = get_global(slide_start_for_blocks, x_global, doc_tokens_start)
 
     blocks_list: List[np.array] = [x_global]
     for i in range(3):
