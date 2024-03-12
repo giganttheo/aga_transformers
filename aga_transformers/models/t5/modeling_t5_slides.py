@@ -329,7 +329,7 @@ def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_
       edge_bias_local = jnp.full(mask_local_shape, -1)
   else:
       edge_bias_local=None
-  mask_global_shape = (n_global_tokens_context, seq_len)
+  mask_global_shape = (n_global_tokens_total, seq_len)
   mask_global = jnp.full(mask_global_shape, mask_value).astype(dtype=graph_mask.dtype)
   if edges is not None:
       edge_bias_global = jnp.full(mask_global_shape, -1)
