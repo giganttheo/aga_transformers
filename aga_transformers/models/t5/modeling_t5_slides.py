@@ -1217,7 +1217,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         # # compute position bias
 
         position_bias_local = self._create_block_position_bias(block_len, n_global_tokens_context, num_blocks, n_document_tokens, n_slides_total)
-        position_bias_global = self.compute_bias(query_length=n_global_tokens_context, key_length=seq_length)[None]
+        position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
         
         if self.has_graph_edge_bias and not no_graph:
             # jax.debug.print("edge_bias_local: {edge_bias_local.shape}; position_bias_local: {position_bias_local.shape}", edge_bias_local=edge_bias_local, position_bias_local=position_bias_local)
