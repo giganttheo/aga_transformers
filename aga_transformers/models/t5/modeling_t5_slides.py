@@ -385,6 +385,7 @@ def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_
         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
     block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+    jax.debug.print("shapes: {block_ids.shape}, {block_pos_q.shape}, {block_pos_k.shape}", block_ids=block_ids, block_pos_q=block_pos_q, block_pos_k=block_pos_k)
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
 
@@ -1163,8 +1164,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         else:
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
             num_blocks = key_states_blocks.shape[1]
-            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k[:, None], slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v[:, None], slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
@@ -1192,8 +1193,6 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 key_states, value_states = self._concatenate_to_cache(
                     key_states, value_states, query_states
                 )
-            # jax.debug.print("mask_shape = {graph_mask.shape}", graph_mask=graph_mask)
-            #TODO replace with create_local_and_global_masks_with_slides (same with edges)
             mask_local, mask_global, edge_bias_local, edge_bias_global  = create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens_context, block_len, num_blocks, seq_length, False, edge_labels, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens)
 
         if no_graph:
