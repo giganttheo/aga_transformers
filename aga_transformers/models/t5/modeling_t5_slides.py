@@ -316,9 +316,9 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
 
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
-@partial(jax.jit, static_argnums=[3, 4, 5, 6, 7, 10])
+@partial(jax.jit, static_argnums=[3, 4, 5, 6, 7, 10, 12])
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0, 0, None, 0, None]) #batch
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0, None, None, None, None ]) #heads
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0, None, None, None, None]) #heads
 def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens_context: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens_total):
   offset_doc = n_slides_context - n_slides_total #ie how many slides are not in context (and should be skipped)
 
