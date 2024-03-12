@@ -1042,7 +1042,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             n_document_tokens = 2
             max_slides = 128 #maximum n of slides accepted, else they will be merge
         else:
-            slide_start_for_blocks = jnp.array([[0 for _ in range(math.ceil(8192 / block_len))]*batch_size], dtype=jnp.int32)
+            # slide_start_for_blocks = jnp.array([[0 for _ in range(math.ceil((8192 - (128 + 2)) / block_len))]*batch_size], dtype=jnp.int32)
             n_slides_total = jnp.full((batch_size,), 0, dtype=jnp.int32)
             n_slides_context = 0 #static int = number of slides in the context window
             #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens

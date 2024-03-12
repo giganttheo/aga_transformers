@@ -86,8 +86,11 @@ class StructuralAttentionPattern(AttentionPattern):
 
         block_len = 254//2 + 1 #from the model definition, should be in the config
         #padded
-        print(f"block_len={block_len}, num blocks={math.ceil(max_source_length / block_len)}")
-        slide_start_for_blocks = [num_slides - 1 for block in range(math.ceil(max_source_length / block_len))] #for each block, add the first slide index
+       
+        n_document_tokens = len(sentence_tokens) 
+        n_global_tokens = max_slides + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
+        num_blocks=math.ceil((max_source_length - n_global_tokens) / block_len)
+        slide_start_for_blocks = [num_slides - 1 for block in range(num_blocks)] #for each block, add the first slide index
 
         for slide_id, edges_slide in enumerate(edges_slides_to_transcript_segments):
             node_slide = slide_id // merge_factor
