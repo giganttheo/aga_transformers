@@ -1044,7 +1044,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             n_slides_total = self.variables["graph"]["n_slides"].astype(jnp.int32) #int = number of slides in total
         else:
             slide_start_for_blocks = jnp.array([[0 for _ in range(math.ceil(8192 / block_len))]*batch_size], dtype=jnp.int32)
-            n_slides_total = jnp.full((batch_size,), 0, dtype=jnp.int32)
+            n_slides_total = jnp.full((batch_size,), 8, dtype=jnp.int32)
         
         n_slides_context = 8 #static int = number of slides in the context window
         n_global_tokens = max_slides + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
@@ -1154,9 +1154,14 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         key_states_blocks, global_k = _split_global_then_into_blocks(key_states, n_global_tokens, block_len, axis=1)
         value_states_blocks, global_v = _split_global_then_into_blocks(value_states, n_global_tokens, block_len, axis=1)
 
-        # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-        key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
-        value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+        if no_graph:
+            # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
+            key_states_blocks = _concatenate_3_blocks_and_global(key_states_blocks, global_k[:, None], block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v[:, None], block_axis=1, sequence_axis=2)
+        else:
+            # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
+            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks, n_slides_context, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
