@@ -396,8 +396,8 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
             "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
             "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch]).astype(np.int16),
-            "slide_start_for_blocks": np.stack([graph["slide_start_for_blocks"] for graph in graph_batch]).astype(np.int16),
             "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
+            "slide_start_for_blocks": np.stack([graph["slide_start_for_blocks"] for graph in graph_batch]).astype(np.int16),
             }
         batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
 
@@ -692,7 +692,6 @@ def main():
                 "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
             }
             graph = prepare_window_structural_attn_patterns(**attention_kwargs)
-
             graphs.append(graph)
         
         model_inputs["graph"] = graphs
