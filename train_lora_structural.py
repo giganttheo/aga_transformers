@@ -395,6 +395,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
         graph_batch = {
             "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
             "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
             "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch]).astype(np.int16),
             "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
             "slide_start_for_blocks": np.stack([graph["slide_start_for_blocks"] for graph in graph_batch]).astype(np.int16),
@@ -906,10 +907,11 @@ def main():
             labels = batch.pop("labels")
             receivers = batch.pop("receivers")
             senders = batch.pop("senders")
+            graph_mask = batch.pop("graph_mask")
             edge_labels = batch.pop("edge_labels")
             slide_start_for_blocks = batch.pop("slide_start_for_blocks")
             n_slides = batch.pop("n_slides")
-            graph = {"receivers": receivers, "senders": senders, "edge_labels": edge_labels, "slide_start_for_blocks": slide_start_for_blocks, "n_slides": n_slides}
+            graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask, "edge_labels": edge_labels, "slide_start_for_blocks": slide_start_for_blocks, "n_slides": n_slides}
             graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
 
             loss, _ = loss_fn_(model=state.apply_fn, params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
@@ -930,10 +932,11 @@ def main():
         labels = batch.pop("labels")
         receivers = batch.pop("receivers")
         senders = batch.pop("senders")
+        graph_mask = batch.pop("graph_mask")
         edge_labels = batch.pop("edge_labels")
         slide_start_for_blocks = batch.pop("slide_start_for_blocks")
         n_slides = batch.pop("n_slides")
-        graph = {"receivers": receivers, "senders": senders, "edge_labels": edge_labels, "slide_start_for_blocks": slide_start_for_blocks, "n_slides": n_slides}
+        graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask, "edge_labels": edge_labels, "slide_start_for_blocks": slide_start_for_blocks, "n_slides": n_slides}
         graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
         
         loss, _ = loss_fn(model=state.apply_fn, params=params, graph=graphs, train=False, **batch)
