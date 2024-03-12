@@ -386,6 +386,8 @@ def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_
 
     block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
     jax.debug.print("shapes: {block_ids.shape}, {block_pos_q.shape}, {block_pos_k.shape}", block_ids=block_ids, block_pos_q=block_pos_q, block_pos_k=block_pos_k)
+    print(f"shapes: {block_ids.shape}, {block_pos_q.shape}, {block_pos_k.shape}")
+    
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
 
