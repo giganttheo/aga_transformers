@@ -874,7 +874,7 @@ def main():
     # optimizer = adamw
     graph = graph_from_path(lora_params, graph, {}, {}, layer_wise=False)
 
-    loss_fn_ =  jax.jit(partial(loss_fn, graph=graph), static_argnames=["model"])
+    loss_fn_ =  jax.jit(loss_fn, static_argnames=["model"])
     # loss_fn_ = partial(loss_fn, graph=graph)
 
     # Setup train state
@@ -912,7 +912,7 @@ def main():
             graph = {"receivers": receivers, "senders": senders, "edge_labels": edge_labels, "slide_start_for_blocks": slide_start_for_blocks, "n_slides": n_slides}
             graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
 
-            loss, _ = loss_fn_(model=state.apply_fn, params=params, graph_dependency=graphs, dropout_rng=dropout_rng, **batch)
+            loss, _ = loss_fn_(model=state.apply_fn, params=params, graph=graphs, dropout_rng=dropout_rng, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
