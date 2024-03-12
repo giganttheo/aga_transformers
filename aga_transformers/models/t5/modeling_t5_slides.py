@@ -1033,20 +1033,22 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         query_states *= jnp.sqrt(query_states.shape[-1])
 
         block_len=254//2 + 1 #254+1  #TODO: add in config (radius + 1)
-
-        #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
-        n_document_tokens = 2
-        max_slides = 128 #maximum n of slides accepted, else they will be merge
-        #TODO: compute these values (or retrieve them from the input graph)
         
         if self.has_variable("graph", "receivers"):
             slide_start_for_blocks = self.variables["graph"]["slide_start_for_blocks"].astype(jnp.int32) #array of slide start indices
             n_slides_total = self.variables["graph"]["n_slides"].astype(jnp.int32) #int = number of slides in total
+            n_slides_context = 8 #static int = number of slides in the context window
+            #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
+            n_document_tokens = 2
+            max_slides = 128 #maximum n of slides accepted, else they will be merge
         else:
             slide_start_for_blocks = jnp.array([[0 for _ in range(math.ceil(8192 / block_len))]*batch_size], dtype=jnp.int32)
             n_slides_total = jnp.full((batch_size,), 0, dtype=jnp.int32)
+            n_slides_context = 0 #static int = number of slides in the context window
+            #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
+            n_document_tokens = 0
+            max_slides = 0 #maximum n of slides accepted, else they will be merge
         
-        n_slides_context = 8 #static int = number of slides in the context window
         n_global_tokens = max_slides + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
         n_global_tokens_context = n_slides_context + n_document_tokens
         num_blocks=math.ceil((seq_length - n_global_tokens) / block_len)
