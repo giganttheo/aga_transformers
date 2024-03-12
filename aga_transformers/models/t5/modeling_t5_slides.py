@@ -317,7 +317,7 @@ def create_local_and_global_masks(senders, receivers, graph_mask, n_global_token
   return setup_mask(mask_local, mask_global, senders, receivers, graph_mask)
 
 @partial(jax.jit, static_argnums=[3, 4, 5, 6, 7, 10])
-@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0, 0, None, None, None]) #batch
+@partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0, 0, None, 0, None]) #batch
 @partial(jax.vmap, in_axes=[0, 0, 0, None, None, None, None, None, 0, None, None, None, None ]) #heads
 def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens_context: int, block_len: int, num_blocks: int, seq_len: int, mask_value, edges, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens_total):
   offset_doc = n_slides_context - n_slides_total #ie how many slides are not in context (and should be skipped)
@@ -385,8 +385,8 @@ def create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_
         return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
 
     block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
-    jax.debug.print("shapes: {block_ids.shape}, {block_pos_q.shape}, {block_pos_k.shape}", block_ids=block_ids, block_pos_q=block_pos_q, block_pos_k=block_pos_k)
-    print(f"shapes: {block_ids.shape}, {block_pos_q.shape}, {block_pos_k.shape}")
+    # jax.debug.print("shapes: {block_ids.shape}, {block_pos_q.shape}, {block_pos_k.shape}", block_ids=block_ids, block_pos_q=block_pos_q, block_pos_k=block_pos_k)
+    # print(f"shapes: {block_ids.shape}, {block_pos_q.shape}, {block_pos_k.shape}")
     
     mask_local = _update_mask_local(mask_local, graph_mask, block_ids, block_pos_q, block_pos_k)
     mask_global = _update_mask_global(mask_global, graph_mask, senders, receivers)
