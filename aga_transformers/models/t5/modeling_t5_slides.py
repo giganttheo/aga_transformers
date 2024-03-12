@@ -1163,8 +1163,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         else:
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
             num_blocks = key_states_blocks.shape[1]
-            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k[:, None], slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v[:, None], slide_start_for_blocks[:, :num_blocks], n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
