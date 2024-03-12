@@ -199,6 +199,7 @@ def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.n
     @partial(jax.vmap, in_axes=(1, None), out_axes=1)
     @partial(jax.vmap, in_axes=(0, 0), out_axes=0)
     def get_global(slide_start, x_global):
+        n_document_tokens=2
         slice_slides = jax.lax.dynamic_slice(x_global, (slide_start, 0, 0), (n_slides_, x_global.shape[1], x_global.shape[2]))
         slice_docs = jax.lax.dynamic_slice(x_global, (doc_tokens_start, 0, 0), (n_document_tokens, x_global.shape[1], x_global.shape[2]))
         return jnp.concatenate([slice_slides, slice_docs], axis=0)
@@ -1162,8 +1163,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v[:, None], block_axis=1, sequence_axis=2)
         else:
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k[:, None], slide_start_for_blocks, n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v[:, None], slide_start_for_blocks, n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks, n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks, n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
