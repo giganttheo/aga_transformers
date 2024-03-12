@@ -1046,7 +1046,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             n_slides_total = jnp.full((batch_size,), 0, dtype=jnp.int32)
             n_slides_context = 0 #static int = number of slides in the context window
             #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
-            n_document_tokens = 0
+            n_document_tokens = 2
             max_slides = 0 #maximum n of slides accepted, else they will be merge
         
         n_global_tokens = max_slides + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
@@ -1162,8 +1162,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             value_states_blocks = _concatenate_3_blocks_and_global(value_states_blocks, global_v[:, None], block_axis=1, sequence_axis=2)
         else:
             # Concatenate 3 blocks for keys and values -> (batch_size, num_blocks, 3 * block_len, n_heads, dim_per_head)
-            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k, slide_start_for_blocks, n_slides_context, n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
-            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v, slide_start_for_blocks, n_slides_context, n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            key_states_blocks = _concatenate_3_blocks_and_global_with_slides(key_states_blocks, global_k[:, None], slide_start_for_blocks, n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
+            value_states_blocks = _concatenate_3_blocks_and_global_with_slides(value_states_blocks, global_v[:, None], slide_start_for_blocks, n_slides_context, n_document_tokens=n_document_tokens, doc_tokens_start=n_slides_total, block_axis=1, sequence_axis=2)
 
         if not precomputed and not no_graph:
             if attention_mask is not None:
