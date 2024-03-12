@@ -1044,7 +1044,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             n_slides_total = self.variables["graph"]["n_slides"].astype(jnp.int32) #int = number of slides in total
         else:
             slide_start_for_blocks = jnp.array([[0 for _ in range(math.ceil(8192 / block_len))]*batch_size], dtype=jnp.int32)
-            n_slides_total = jnp.full((batch_size,), 8, dtype=jnp.int32)
+            n_slides_total = jnp.full((batch_size,), 0, dtype=jnp.int32)
         
         n_slides_context = 8 #static int = number of slides in the context window
         n_global_tokens = max_slides + n_document_tokens # was 12, static value that should be >= n_document_tokens + n_slides.max()
