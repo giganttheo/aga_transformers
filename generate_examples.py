@@ -22,6 +22,18 @@ max_source_length=8192
 
 batch_size=16
 
+repo_path= "gigant/graphlongt5-globallocal-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
+attention_kwargs={
+            "max_source_length": 8192,
+            "max_target_length": 512,
+            "window_sizes": [254],
+            "autoregressive": False,
+            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
+        }
+
+tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
+
+
 def preprocess_function(examples):
     inputs = examples["transcript"]
     label = examples["abstract"]
@@ -76,18 +88,6 @@ generation_config = {
     "early_stopping": True,
     "no_repeat_ngram_size": 3,
 }
-
-
-repo_path= "gigant/graphlongt5-globallocal-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
-attention_kwargs={
-            "max_source_length": 8192,
-            "max_target_length": 512,
-            "window_sizes": [254],
-            "autoregressive": False,
-            "sentence_tokens": [0, 1] # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
-        }
-
-tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
 
 predictions = []
 references = []
