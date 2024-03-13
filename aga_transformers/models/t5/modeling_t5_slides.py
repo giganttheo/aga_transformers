@@ -1040,10 +1040,10 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         if self.has_variable("graph", "receivers"):
             slide_start_for_blocks = self.variables["graph"]["slide_start_for_blocks"].astype(jnp.int32) #array of slide start indices
             n_slides_total = self.variables["graph"]["n_slides"].astype(jnp.int32) #int = number of slides in total
-            n_slides_context = 8 #static int = number of slides in the context window
+            n_slides_context = 6 #was 8 #static int = number of slides in the context window
             #"document" tokens are the prefix of the sentence ("summarize: ") = 3 tokens
             n_document_tokens = 2
-            max_slides = 128 #maximum n of slides accepted, else they will be merge
+            max_slides = 64 #was 128 #maximum n of slides accepted, else they will be merge
         else:
             # slide_start_for_blocks = jnp.array([[0 for _ in range(math.ceil((8192 - (128 + 2)) / block_len))]*batch_size], dtype=jnp.int32)
             n_slides_total = jnp.full((batch_size,), 0, dtype=jnp.int32)

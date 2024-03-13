@@ -15,9 +15,8 @@ import jax
 test_dataset = load_dataset("gigant/tib", split="test").select(range(50))
 
 generation_config = {
-    "num_beams": 3, #instead of 2?
+    "num_beams": 2,
     "max_new_tokens": 512,
-    # "min_length": 1,
     "length_penalty": -2.,
     "early_stopping": True,
     "no_repeat_ngram_size": 3,
@@ -35,6 +34,8 @@ references = []
 params=model.params
 decoder_start_token_id = model.config.decoder_start_token_id
 
+batch_size = 16
+
 # @partial(jax.jit)
 # def generate(input_ids, attention_mask, params):
 #     pred_ids = model.generate(input_ids, generation_config=generation_config, attention_mask=attention_mask, decoder_start_token_id=decoder_start_token_id, params=params)
@@ -42,7 +43,7 @@ decoder_start_token_id = model.config.decoder_start_token_id
 
 # @jax.jit
 def generate(input_ids, inputs, params):
-    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
+    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=batch_size, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
 for rec in tqdm(test_dataset):
