@@ -270,7 +270,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         )
 
     state = partial(beam_search_body_fn, input_ids_length=input_ids.shape[-1])(state)
-    state = lax.while_loop(beam_search_cond_fn, beam_search_body_fn, state)
+    state = jax.jit(lax.while_loop)(beam_search_cond_fn, beam_search_body_fn, state)
     # while beam_search_cond_fn(state):
     #     state = beam_search_body_fn(state)
 
