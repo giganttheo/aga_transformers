@@ -24,7 +24,7 @@ batch_size=16
 
 def preprocess_function(examples):
     inputs = examples["transcript"]
-    label = rec["abstract"]
+    label = examples["abstract"]
     inputs = [prefix + inp for inp in inputs]
     model_inputs = tokenizer(
         inputs, max_length=max_source_length, padding="max_length", truncation=True, return_tensors="np"
