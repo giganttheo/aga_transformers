@@ -103,7 +103,7 @@ class StructuralAttentionPattern(AttentionPattern):
                     if node_token >= offset_tokens:
                         if(node_token, node_slide) not in edges and (node_slide, node_token) not in edges and node_token < max_source_length:
                             if (node_token - offset_tokens) % block_len == 0:
-                                slide_start_for_blocks[(node_token - offset_tokens) // block_len] = min(node_slide, slide_start_for_blocks[(node_token - offset_tokens) // block_len])
+                                slide_start_for_blocks[(node_token - n_global_tokens) // block_len] = min(node_slide, slide_start_for_blocks[(node_token - offset_tokens) // block_len])
                             edges.add((node_token, node_slide))
                             edges.add((node_slide, node_token))
                             receivers.append(node_token)
