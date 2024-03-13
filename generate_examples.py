@@ -44,7 +44,7 @@ def preprocess_function(examples):
     model_inputs["label"] = label
     return model_inputs
 
-train_dataset = test_dataset.map(
+test_dataset = test_dataset.map(
     preprocess_function,
     batched=True,
     batch_size=500,
