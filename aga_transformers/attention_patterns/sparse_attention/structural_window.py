@@ -34,7 +34,7 @@ class StructuralAttentionPattern(AttentionPattern):
         num_slides = len(edges_slides_to_transcript_segments)
         merge_factor = math.ceil(num_slides / max_slides)
         # print(f"Merge factor is {merge_factor}")
-        num_slides = num_slides // merge_factor
+        num_slides = math.ceil(num_slides / merge_factor)
         seq_len_q = min(max_source_length - num_slides, len(tokens))
         seq_len_kv = seq_len_q
         self.n_slides = np.array(num_slides)

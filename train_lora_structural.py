@@ -722,7 +722,7 @@ def main():
         return model_inputs
 
     if training_args.do_train:
-        loading_ds_from_disk=False
+        loading_ds_from_disk=True
         if loading_ds_from_disk:
             from datasets import load_from_disk
             preprocessed_datasets = load_from_disk("./preprocessed_datasets/structural")
@@ -760,13 +760,12 @@ def main():
                 load_from_cache_file=not data_args.overwrite_cache,
                 desc="Running tokenizer on validation dataset",
             )
-
-    try:
-        from datasets import DatasetDict
-        preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
-        preprocessed_datasets.save_to_disk("./preprocessed_datasets/structural", max_shard_size="100MB")
-    except Exception as e:
-        print(e)
+            try:
+                from datasets import DatasetDict
+                preprocessed_datasets = DatasetDict({"train": train_dataset, "valid": eval_dataset})
+                preprocessed_datasets.save_to_disk("./preprocessed_datasets/structural", max_shard_size="100MB")
+            except Exception as e:
+                print(e)
 
     if training_args.do_predict:
         max_target_length = data_args.val_max_target_length
