@@ -245,7 +245,7 @@ python ./train_lora.py \
 	--source_prefix "summarize: " \
 	--do_train \
 	--do_eval \
-	--num_train_epochs 4 \
+	--num_train_epochs 2 \
 	--learning_rate 1e-2 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 16 \
