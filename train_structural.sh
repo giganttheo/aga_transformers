@@ -34,7 +34,7 @@ python ./train_lora_structural.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
-	# --max_train_samples 64 \
-	# --max_eval_samples 64 \
+	--max_train_samples 64 \
+	--max_eval_samples 64 \
 	# --resume_from_checkpoint \#8192 \
 	# --run_id "fv3mirpt"
