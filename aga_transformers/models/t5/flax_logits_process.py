@@ -4,13 +4,11 @@ from jax.experimental import sparse
 
 from transformers.generation.flax_logits_process import FlaxLogitsProcessor
 
-
 class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
     r"""
-    [`TFLogitsProcessor`] that enforces no repetition of n-grams. See
+    [`FlaxLogitsProcessor`] that enforces no repetition of n-grams. See
     [Fairseq](https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345).
 
-    implementation inspired by https://github.com/huggingface/transformers/pull/18769
 
     Args:
         ngram_size (`int`):
@@ -31,10 +29,11 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         """
         batch_size, seq_len = input_ids.shape
         
-        all_update_indices = jnp.array([[b,] + [input_ids[b, i + j] for j in range(self.ngram_size)] for b in range(batch_size) for i in range(seq_len - (self.ngram_size - 1))])
-        all_update_indices = all_update_indices.at[cur_len - (self.ngram_size - 1), :].set(0)
+        all_update_indices = jnp.array([[b,] + [input_ids[b, i + j] for j in range(self.ngram_size)]for i in range(seq_len - (self.ngram_size - 1)) for b in range(batch_size) ])
 
         data=jnp.ones((all_update_indices.shape[0],) , dtype=jnp.uint16)
+        data=data.at[batch_size * (cur_len - (self.ngram_size - 1)):].set(0) #ignore the n-grams not yet generated
+
         return sparse.BCOO((data, all_update_indices), shape=(batch_size,) + (vocab_size,) * self.ngram_size )
 
     def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, previous_ngrams) -> jnp.ndarray:
@@ -47,16 +46,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         def inner_fn(latest_tokens, previous_ngrams):
           vocab_size = previous_ngrams.shape[-1]
           mask = jnp.ones((vocab_size,))
-          if self.ngram_size == 1:
-            mask *= previous_ngrams
-          elif self.ngram_size == 2:
-            mask *= previous_ngrams[latest_tokens[0]]
-          elif self.ngram_size == 3:
-            mask *= previous_ngrams[latest_tokens[0], latest_tokens[1]]
-          elif self.ngram_size == 4:
-            mask *= previous_ngrams[latest_tokens[0], latest_tokens[1], latest_tokens[2]]
-          else:
-            raise NotImplementedError(f"n-gram blocking not implemented for ngram_size={self.ngram_size}")
+          mask *= previous_ngrams[tuple(latest_tokens)]
           return mask
         return sparse.bcoo_todense(inner_fn(latest_tokens, previous_ngrams))
 
