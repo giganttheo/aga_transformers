@@ -9,7 +9,6 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
     [`FlaxLogitsProcessor`] that enforces no repetition of n-grams. See
     [Fairseq](https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345).
 
-
     Args:
         ngram_size (`int`):
             All ngrams of size `ngram_size` can only occur once.
@@ -19,7 +18,6 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         if not isinstance(ngram_size, int) or ngram_size <= 0:
             raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
         self.ngram_size = ngram_size
-
 
     def get_previous_ngrams(self, input_ids: jnp.ndarray, vocab_size: int, cur_len: int):
         """
@@ -50,17 +48,13 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
           return mask
         return sparse.bcoo_todense(inner_fn(latest_tokens, previous_ngrams))
 
-    # @jax.jit
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
-
-        #input_ids
-        
         def true_fn():
             _, vocab_size = scores.shape
             #store the previously seen n-grams
             previous_ngrams = self.get_previous_ngrams(input_ids, vocab_size, cur_len)
 
-            #get the n-1 last tokens that prefix the following n-gram
+            #get the n-1 last tokens that prefix the n-gram being generated
             latest_tokens = jnp.zeros((input_ids.shape[0], self.ngram_size - 1), dtype=input_ids.dtype)
             latest_tokens = jax.lax.dynamic_update_slice(latest_tokens, jax.lax.dynamic_slice(input_ids, (0, cur_len - (self.ngram_size - 1)), (input_ids.shape[0], (self.ngram_size - 1))), (0, 0))
 
