@@ -46,9 +46,9 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
                 data,
                 # jnp.zeros(((batch_size * (seq_len - cur_len)))),
                 jax.lax.dynamic_slice(
-                    jnp.zeros_like(data), (0,), (batch_size * (seq_len - cur_len)),
+                    jnp.zeros_like(data), (0,), (batch_size * (seq_len - cur_len),),
                 ),
-                (batch_size * (cur_len - (self.ngram_size - 1))),
+                (batch_size * (cur_len - (self.ngram_size - 1)),),
             )
 
         return sparse.BCOO((data, all_update_indices), shape=(batch_size,) + (vocab_size,) * self.ngram_size)
