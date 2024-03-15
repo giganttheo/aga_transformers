@@ -44,7 +44,10 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         # data = data.at[batch_size * (cur_len - (self.ngram_size - 1)) :].set(0)  # ignore the n-grams not yet generated
         data = jax.lax.dynamic_update_slice(
                 data,
-                jnp.zeros(((batch_size * (seq_len - cur_len)))),
+                # jnp.zeros(((batch_size * (seq_len - cur_len)))),
+                jax.lax.dynamic_slice(
+                    jnp.zeros_like(data), (0,), (batch_size * (seq_len - cur_len)),
+                ),
                 (batch_size * (cur_len - (self.ngram_size - 1))),
             )
 
