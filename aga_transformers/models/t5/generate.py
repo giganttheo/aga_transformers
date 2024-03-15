@@ -182,11 +182,10 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         # print(state.running_sequences.shape, log_probs.shape, state.cur_len)
         # jax.debug.print("{x}", x=flatten_beam_dim(state.running_sequences))
         # jax.debug.print("{x}", x=log_probs[0, 0, :10])
-        log_probs = jax.jit(FlaxNoRepeatNGramLogitsProcessor(3))(
-            flatten_beam_dim(state.running_sequences), flatten_beam_dim(log_probs), state.cur_len
-        )
-        # jax.debug.print("changed tokens: {x}", x=jnp.count_nonzero(prev_log_probs - log_probs))
-        log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
+        # log_probs = jax.jit(FlaxNoRepeatNGramLogitsProcessor(3))(
+        #     flatten_beam_dim(state.running_sequences), flatten_beam_dim(log_probs), state.cur_len
+        # )
+        # log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
         log_probs = log_probs + jnp.expand_dims(state.running_scores, axis=2)
         vocab_size = log_probs.shape[2]
         log_probs = log_probs.reshape((batch_size, num_beams * vocab_size))
