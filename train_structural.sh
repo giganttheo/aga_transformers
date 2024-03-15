@@ -28,11 +28,10 @@ python ./train_lora_structural.py \
 	--per_device_train_batch_size 16 \
 	--per_device_eval_batch_size 16 \
 	--overwrite_output_dir \
-	--overwrite_cache \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
-	# --resume_from_checkpoint \#8192 \
-	# --run_id "fv3mirpt"
+	--resume_from_checkpoint \
+	--run_id "32nkiuyy"
