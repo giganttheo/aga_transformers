@@ -21,10 +21,10 @@ python ./train_longt5_vanilla.py \
 	--do_train \
 	--do_eval \
 	--num_train_epochs 10 \
-	--learning_rate 1e-2 \
+	--learning_rate 5e-3 \
 	--warmup_steps 100 \
-	--per_device_train_batch_size 14 \
-	--per_device_eval_batch_size 14 \
+	--per_device_train_batch_size 8 \
+	--per_device_eval_batch_size 8 \
 	--overwrite_output_dir \
 	--dtype "bfloat16" \
 	--max_target_length 512 \
