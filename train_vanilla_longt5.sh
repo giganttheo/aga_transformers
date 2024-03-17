@@ -31,3 +31,5 @@ python ./train_longt5_vanilla.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
+	--resume_from_checkpoint \
+	--run_id "578h0vov"
