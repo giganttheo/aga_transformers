@@ -14,13 +14,12 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test").select(range(50))
-
+test_dataset = load_dataset("gigant/tib", split="test")
 
 prefix = "summarize: "
 max_source_length=8192
 
-batch_size=8
+batch_size=24
 
 repo_path= "gigant/graphlongt5-globallocal-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
@@ -33,6 +32,7 @@ attention_kwargs={
 
 tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
 
+model.enable_scan()
 
 def preprocess_function(examples):
     inputs = examples["transcript"]

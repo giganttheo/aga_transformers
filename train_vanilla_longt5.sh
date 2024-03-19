@@ -11,7 +11,6 @@ export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
 export TOKENIZERS_PARALLELISM=false
 wandb login
 
-
 python ./train_longt5_vanilla.py \
 	--output_dir "./8k-longt5" \
 	--model_name_or_path "google/long-t5-tglobal-base" \
