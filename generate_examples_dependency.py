@@ -2,8 +2,10 @@ from aga_transformers.models.t5.t5 import load_efficient_t5, load_augmented_t5
 from tqdm import tqdm
 from aga_transformers.models.utils import repeat_relative_pos_bias, add_graph_to_params
 from aga_transformers.models.t5.generate import beam_search
+from aga_transformers.attention_patterns.utils import graph_from_path
 
 import jax.numpy as jnp
+import numpy as np
 import math
 
 import transformers
@@ -13,10 +15,16 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib_dependency", split="test").select(range(50))
+
+batch_size=32
+
+prefix = "summarize: "
+max_source_length=8192
+
+test_dataset = load_dataset("gigant/tib_dependency", split="test")
 
 generation_config = {
-    "num_beams": 3, #instead of 2?
+    "num_beams": 2, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": -2.,
@@ -45,6 +53,8 @@ attention_kwargs={
 
 tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
 
+model.enable_scan()
+
 predictions = []
 references = []
 decoder_start_token_id = model.config.decoder_start_token_id
@@ -61,10 +71,6 @@ max_graph_len = (seq_length - (n_global_tokens)) * attention_kwargs["window_size
 
 
 def get_dependency_graph(dep_graph):
-    #graph generation
-
-    # dep_graph = test_dataset["dependency_graph"][i]
-    # graphs.append(graph)
 
     receivers_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
     receivers_dep = jax.lax.dynamic_update_slice(receivers_dep, jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
@@ -75,31 +81,85 @@ def get_dependency_graph(dep_graph):
     return {"receivers": receivers_dep, "senders": senders_dep, "edge_labels": edge_labels}
 
 
-# @jax.jit
+def preprocess_function(examples):
+    inputs = examples["transcript"]
+    label = examples["abstract"]
+    inputs = [prefix + inp for inp in inputs]
+    model_inputs = tokenizer(
+        inputs, max_length=max_source_length, padding="max_length", truncation=True, return_tensors="np"
+    )
+    model_inputs["graph"] = [get_dependency_graph(dep_graph) for dep_graph in examples["dependency_graph"]]
+    model_inputs["label"] = label
+    return model_inputs
+
+test_dataset = test_dataset.map(
+    preprocess_function,
+    batched=True,
+    batch_size=500,
+    num_proc=1,
+    remove_columns=test_dataset.column_names,
+    desc="Running tokenizer on test dataset",
+)
+
+
+def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=True):
+    """
+    Returns batches of size `batch_size` from `dataset`. If `drop_last` is set to `False`, the final batch may be incomplete,
+    and range in size from 1 to `batch_size`. Shuffle batches if `shuffle` is `True`.
+    """
+    if shuffle:
+        batch_idx = jax.random.permutation(rng, len(dataset))
+        batch_idx = np.asarray(batch_idx)
+    else:
+        batch_idx = np.arange(len(dataset))
+
+    if drop_last:
+        steps_per_epoch = len(dataset) // batch_size
+        batch_idx = batch_idx[: steps_per_epoch * batch_size]  # Skip incomplete batch.
+        batch_idx = batch_idx.reshape((steps_per_epoch, batch_size))
+    else:
+        steps_per_epoch = math.ceil(len(dataset) / batch_size)
+        batch_idx = np.array_split(batch_idx, steps_per_epoch)
+
+    for idx in batch_idx:
+        batch = dataset[idx]
+        label = batch.pop("label")
+        graph_batch = batch.pop("graph")
+        graph_batch = {
+            "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
+            "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
+            "edge_labels": np.stack([graph["edge_labels"] for graph in graph_batch]).astype(np.int16)
+            }
+        batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
+
+        yield batch, label
+
+test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=True)
+
 def generate(input_ids, inputs, params):
-    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=1, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
+    pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=batch_size, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
-for i, rec in tqdm(enumerate(test_dataset)):
-    text = "summarize: " + rec["transcript"]
-    label = rec["abstract"]
-    inputs = tokenizer(text, return_tensors="np", truncation=True, max_length=attention_kwargs["max_source_length"])
-    # label_ids = tokenizer(label, return_tensors="pt").input_ids
-    input_ids = inputs.pop("input_ids")
-    dep_graph = rec["dependency_graph"]
-    params= {"params": model.params, "graph": graph, "graph_dependency": get_dependency_graph(dep_graph)}
-    preds = generate(input_ids, inputs, params)
-    # pred_ids = generate(inputs["input_ids"], inputs["attention_mask"], params)
-    predictions.append(preds)
-    references.append(label)
+for batch, label in tqdm(test_loader):
+    input_ids = batch.pop("input_ids")
+    receivers = batch.pop("receivers")
+    senders = batch.pop("senders")
+    edge_labels = batch.pop("edge_labels")
+    graph_dependency = {"receivers": receivers, "senders": senders, "edge_labels": edge_labels}
+    graph_dependency = graph_from_path(model.params, graph_dependency, {}, {}, layer_wise=False)
+    params= {"params": model.params, "graph": graph, "graph_dependency": graph_dependency}
+
+    preds = generate(input_ids, batch, params)
+    predictions.extend(preds)
+    references.extend(label)
 
 # open file in write mode
-with open('predictions.txt', 'w') as fp:
+with open('predictions_dep.txt', 'w') as fp:
     for line in predictions:
         # write each item on a new line
         fp.write(line[0] + "\n")
 # open file in write mode
-with open('references.txt', 'w') as fp:
+with open('references_dep.txt', 'w') as fp:
     for line in references:
         # write each item on a new line
         fp.write(line + "\n")
