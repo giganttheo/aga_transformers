@@ -106,6 +106,7 @@ def generate(input_ids, inputs):
 for batch, label in tqdm(test_loader):
     input_ids = batch.pop("input_ids")
     preds = generate(input_ids, batch)
+    print(preds)
     predictions.extend(preds)
     references.extend(label)
     # text = "summarize: " + rec["transcript"]
