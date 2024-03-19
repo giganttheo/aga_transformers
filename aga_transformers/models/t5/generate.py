@@ -165,9 +165,9 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         model_outputs = jax.jit(partial(model.decode,  return_dict=True))(input_token, params=params, **state.model_kwargs)
 
         logits = unflatten_beam_dim(model_outputs.logits[:, -1], batch_size, num_beams)
-        cache = jax.tree_util.tree_map(
-            lambda tensor: unflatten_beam_dim(tensor, batch_size, num_beams), model_outputs.past_key_values
-        )
+        # cache = jax.tree_util.tree_map(
+        #     lambda tensor: unflatten_beam_dim(tensor, batch_size, num_beams), model_outputs.past_key_values
+        # )
 
         # adapt logits for FlaxMarianMTModel
         logits = model._adapt_logits_for_beam_search(logits)
@@ -254,8 +254,8 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         # Determine the top k beam indices from the original set of all beams.
         # With these, gather the top k beam-associated caches.
         next_running_indices = gather_beams(topk_beam_indices, next_topk_indices, batch_size, num_beams)
-        next_cache = gather_beams(cache, next_running_indices, batch_size, num_beams)
-        model_outputs["past_key_values"] = jax.tree_util.tree_map(lambda x: flatten_beam_dim(x), next_cache)
+        # next_cache = gather_beams(cache, next_running_indices, batch_size, num_beams)
+        # model_outputs["past_key_values"] = jax.tree_util.tree_map(lambda x: flatten_beam_dim(x), next_cache)
         next_model_kwargs = model.update_inputs_for_generation(model_outputs, state.model_kwargs)
 
         return BeamSearchState(
