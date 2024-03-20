@@ -1637,7 +1637,7 @@ class FlaxT5BlockCollection(nn.Module):
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
                             variable_axes={"params": 0, "graph": 0, "graph_dependency": 0, "cache": 0}, #==> instead of using the variables, we passe the input in the model
                             split_rngs={"params": True, "dropout": True},
-                            variable_broadcast=["graph", "graph_dependency"],
+                            variable_broadcast=["graph"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
                             )(
                                         carry_,
