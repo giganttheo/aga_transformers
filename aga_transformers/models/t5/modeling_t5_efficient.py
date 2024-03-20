@@ -1931,7 +1931,7 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
             init_cache=True,
             method=_decoder_forward,  # we only need to call the decoder to init the cache
         )
-        if self.scan:
+        if self._module.scan:
             return self.convert_unroll_to_scan(init_variables["cache"])
         return unfreeze(init_variables["cache"])
 
