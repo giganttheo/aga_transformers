@@ -185,7 +185,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         log_probs = jax.jit(logits_processor)(
             flatten_beam_dim(state.running_sequences), flatten_beam_dim(log_probs), state.cur_len
         )
-        # log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
+        log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
         log_probs = log_probs + jnp.expand_dims(state.running_scores, axis=2)
         vocab_size = log_probs.shape[2]
         log_probs = log_probs.reshape((batch_size, num_beams * vocab_size))
