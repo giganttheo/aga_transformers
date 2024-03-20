@@ -19,7 +19,7 @@ test_dataset = load_dataset("gigant/tib", split="test")
 prefix = "summarize: "
 max_source_length=8192
 
-batch_size=24
+batch_size=2
 
 repo_path= "gigant/graphlongt5-globallocal-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
@@ -106,6 +106,7 @@ def generate(input_ids, inputs):
 for batch, label in test_loader:
     input_ids = batch.pop("input_ids")
     preds = generate(input_ids, batch)
+    print("================ Predictions: ================")
     print(preds)
     predictions.extend(preds)
     references.extend(label)
@@ -123,7 +124,7 @@ for batch, label in test_loader:
 with open('predictions.txt', 'w') as fp:
     for line in predictions:
         # write each item on a new line
-        fp.write(line[0] + "\n")
+        fp.write(line + "\n")
 # open file in write mode
 with open('references.txt', 'w') as fp:
     for line in references:
