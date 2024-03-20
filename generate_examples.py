@@ -14,7 +14,7 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test")
+test_dataset = load_dataset("gigant/tib", split="test").select(range(5))
 
 prefix = "summarize: "
 max_source_length=8192
