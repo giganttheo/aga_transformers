@@ -32,16 +32,6 @@ generation_config = {
     "no_repeat_ngram_size": 3,
 }
 
-# generation_config = transformers.GenerationConfig(**generation_config)
-
-# generation_config = transformers.GenerationConfig(
-#     num_beams = 2,
-#     max_new_tokens = 512,
-#     min_length = 100,
-#     length_penalty = 2.0,
-#     early_stopping = True,
-#     no_repeat_ngram_size = 3)
-
 repo_path= "gigant/graphlongt5-dependency-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
             "max_source_length": 8192,

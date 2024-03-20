@@ -15,12 +15,12 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test").select(range(5))
+test_dataset = load_dataset("gigant/tib", split="test")
 
 prefix = "summarize: "
 max_source_length=8192
 
-batch_size=2
+batch_size=32
 
 repo_path= "gigant/graphlongt5-globallocal-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
@@ -108,11 +108,9 @@ def generate(input_ids, inputs):
     pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=batch_size, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])
     return tokenizer.batch_decode(pred_ids.sequences, skip_special_tokens=True)
 
-for batch, label in test_loader:
+for batch, label in tqdm(test_loader):
     input_ids = batch.pop("input_ids")
     preds = generate(input_ids, batch)
-    print("================ Predictions: ================")
-    print(preds)
     predictions.extend(preds)
     references.extend(label)
     # text = "summarize: " + rec["transcript"]
