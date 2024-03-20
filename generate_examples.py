@@ -2,6 +2,7 @@ from aga_transformers.models.t5.t5 import load_efficient_t5
 from tqdm import tqdm
 from aga_transformers.models.utils import repeat_relative_pos_bias, add_graph_to_params
 from aga_transformers.models.t5.generate import beam_search
+from aga_transformers.attention_patterns.utils import graph_from_path
 
 import numpy as np
 
@@ -31,8 +32,12 @@ attention_kwargs={
         }
 
 tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
+graph = graph["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]
 
 model.enable_scan()
+
+graph = graph_from_path(model.params, graph, {}, {}, layer_wise=False)
+
 
 def preprocess_function(examples):
     inputs = examples["transcript"]
