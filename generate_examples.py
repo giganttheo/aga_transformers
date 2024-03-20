@@ -32,7 +32,7 @@ attention_kwargs={
 
 tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
 
-# model.enable_scan()
+model.enable_scan()
 
 def preprocess_function(examples):
     inputs = examples["transcript"]
