@@ -1374,7 +1374,7 @@ class FlaxT5BlockCollection(nn.Module):
 
             layer_outputs, _ = nn.scan(remat(ScannableFlaxT5LayerCollection, static_argnums=(4, 5, 6)), #remat(FlaxT5LayerCollection, static_argnums=(6, 7, 8)),
                             in_axes=(nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast, nn.broadcast), # 0, 0, 0, 0, 0, 0, 0),
-                            variable_axes={"params": 0, "graph": 0},
+                            variable_axes={"params": 0, "graph": 0, "cache": 0},
                             split_rngs={"params": True, "dropout": True},
                             variable_broadcast=["graph"],
                             length=self.config.num_layers)(name="FlaxScanLayers", config=self.config, has_relative_attention_bias=True, dtype=self.dtype,
@@ -1931,6 +1931,8 @@ class FlaxT5PreTrainedModel(FlaxPreTrainedModel):
             init_cache=True,
             method=_decoder_forward,  # we only need to call the decoder to init the cache
         )
+        if self.scan:
+            return self.convert_unroll_to_scan(init_variables["cache"])
         return unfreeze(init_variables["cache"])
 
     @add_start_docstrings(T5_ENCODE_INPUTS_DOCSTRING)
