@@ -20,7 +20,7 @@ test_dataset = load_dataset("gigant/tib", split="test").select(range(5))
 prefix = "summarize: "
 max_source_length=8192
 
-batch_size=2
+batch_size=32
 
 repo_path= "gigant/graphlongt5-globallocal-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={

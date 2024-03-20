@@ -52,8 +52,12 @@ attention_kwargs={
         }
 
 tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
+graph = graph["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]
 
 model.enable_scan()
+
+graph = graph_from_path(model.params, graph, {}, {}, layer_wise=False)
+
 
 predictions = []
 references = []
@@ -157,7 +161,7 @@ for batch, label in tqdm(test_loader):
 with open('predictions_dep.txt', 'w') as fp:
     for line in predictions:
         # write each item on a new line
-        fp.write(line[0] + "\n")
+        fp.write(line + "\n")
 # open file in write mode
 with open('references_dep.txt', 'w') as fp:
     for line in references:
