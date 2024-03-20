@@ -77,7 +77,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
 
     # logits_processor = FlaxLogitsProcessorList()
 
-    logits_processor = FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size)
+    logits_processor = jax.jit(FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
 
     batch_size, num_beams, cur_len = input_ids.shape #_ was batch_size
     max_length=512
@@ -162,7 +162,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
                 (batch_size, num_beams, input_ids_length),
             )
         )
-        model_outputs = jax.jit(partial(model.decode,  return_dict=True))(input_token, params=params, **state.model_kwargs)
+        model_outputs = jax.jit(partial(model.decode, return_dict=True))(input_token, params=params, **state.model_kwargs)
 
         logits = unflatten_beam_dim(model_outputs.logits[:, -1], batch_size, num_beams)
         # cache = jax.tree_util.tree_map(
@@ -182,7 +182,7 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
         # print(state.running_sequences.shape, log_probs.shape, state.cur_len)
         # jax.debug.print("{x}", x=flatten_beam_dim(state.running_sequences))
         # jax.debug.print("{x}", x=log_probs[0, 0, :10])
-        log_probs = jax.jit(logits_processor)(
+        log_probs = logits_processor(
             flatten_beam_dim(state.running_sequences), flatten_beam_dim(log_probs), state.cur_len
         )
         log_probs = unflatten_beam_dim(log_probs, batch_size, num_beams)
