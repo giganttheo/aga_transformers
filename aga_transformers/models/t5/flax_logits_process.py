@@ -29,23 +29,19 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         """
         batch_size, seq_len = input_ids.shape
 
-        all_update_indices = jnp.array(
-            [
-                [
-                    b,
-                ]
-                + [input_ids[b, i + j] for j in range(self.ngram_size)]
-                for i in range(seq_len - (self.ngram_size - 1))
-                for b in range(batch_size)
-            ]
-        )
+        def body_fun(i, val):
+          b = i%batch_size
+          pos = i//batch_size
+          val = val.at[i].set(jnp.array([b,] + [input_ids[b, pos + j] for j in range(self.ngram_size)]))
+          return val
 
-        data = jnp.ones((all_update_indices.shape[0],), dtype=jnp.uint16)
-        data = data * (
-            jnp.arange(data.shape[0]) < batch_size * (cur_len - (self.ngram_size - 1))
-        )  # ignore the n-grams not yet generated
+        shape = (batch_size * (seq_len - (self.ngram_size - 1)), self.ngram_size + 1)
+        all_update_indices = jax.lax.fori_loop(0, batch_size * (cur_len - (self.ngram_size - 1)), body_fun, jnp.zeros(shape, dtype=input_ids.dtype))
+        
+        # ignore the n-grams not yet generated
+        data = jnp.arange(batch_size * (seq_len - (self.ngram_size - 1))) < batch_size * (cur_len - (self.ngram_size - 1))
 
-        return sparse.BCOO((data, all_update_indices), shape=(batch_size,) + (vocab_size,) * self.ngram_size)
+        return sparse.BCOO((data.astype("bfloat16"), all_update_indices), shape=(batch_size,) + (vocab_size,) * self.ngram_size)
 
     def get_banned_tokens_mask(self, latest_tokens: jnp.ndarray, previous_ngrams) -> jnp.ndarray:
         """
@@ -56,17 +52,15 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
         @sparse.sparsify
         @jax.vmap
         def inner_fn(latest_tokens, previous_ngrams):
-            vocab_size = previous_ngrams.shape[-1]
-            mask = jnp.ones((vocab_size,))
-            mask *= previous_ngrams[tuple(latest_tokens)]
-            return mask
+            return previous_ngrams[tuple(latest_tokens)]
 
         return sparse.bcoo_todense(inner_fn(latest_tokens, previous_ngrams))
 
-    def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int) -> jnp.ndarray:
+    def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray, cur_len: int, v=False) -> jnp.ndarray:
         def true_fn():
             _, vocab_size = scores.shape
             # store the previously seen n-grams
+
             previous_ngrams = self.get_previous_ngrams(input_ids, vocab_size, cur_len)
 
             # get the n-1 last tokens that prefix the n-gram being generated
@@ -81,6 +75,7 @@ class FlaxNoRepeatNGramLogitsProcessor(FlaxLogitsProcessor):
 
             # compute the banned tokens, ie all the tokens that when added to the latest tokens lead to a n-gram that was previously generated
             banned_tokens_indices_mask = self.get_banned_tokens_mask(latest_tokens, previous_ngrams).astype("bool")
+
             return jnp.where(banned_tokens_indices_mask, -float("inf"), scores)
 
         output = jax.lax.cond((cur_len >= self.ngram_size - 1), true_fn, lambda: scores)
