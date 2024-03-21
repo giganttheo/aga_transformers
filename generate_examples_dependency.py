@@ -44,7 +44,7 @@ attention_kwargs={
 tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path=repo_path, dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=False, layer_wise=False)
 graph = graph["encoder"]["block"]["0"]["layer"]["0"]["SelfAttention"]
 
-model.enable_scan()
+# model.enable_scan()
 
 graph = graph_from_path(model.params, graph, {}, {}, layer_wise=False)
 
