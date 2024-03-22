@@ -31,9 +31,9 @@ attention_kwargs = {
 
 # tokenizer, model, graph, graph_ar = load_efficient_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
-tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
+# tokenizer, model, graph, graph_ar = load_augmented_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
-# tokenizer, model, graph, graph_ar = load_slide_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
+tokenizer, model, graph, graph_ar = load_slide_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
 # tokenizer = AutoTokenizer.from_pretrained("google/long-t5-tglobal-base")
 # model = FlaxLongT5ForConditionalGeneration.from_pretrained("google/long-t5-tglobal-base")
@@ -70,8 +70,8 @@ model.disable_scan()
 model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
-# model_bis = FlaxT5ForConditionalGeneration_SLI.from_pretrained(CKPT_DIR_SAVE,
-model_bis = FlaxT5ForConditionalGeneration_AUG.from_pretrained(CKPT_DIR_SAVE,
+model_bis = FlaxT5ForConditionalGeneration_SLI.from_pretrained(CKPT_DIR_SAVE,
+# model_bis = FlaxT5ForConditionalGeneration_AUG.from_pretrained(CKPT_DIR_SAVE,
 # model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE,
 # model_bis = FlaxLongT5ForConditionalGeneration.from_pretrained(CKPT_DIR_SAVE,
                                                     dtype="bfloat16"

@@ -32,7 +32,7 @@ generation_config = {
     "no_repeat_ngram_size": 3,
 }
 
-repo_path= "gigant/graphlongt5-dependency-0308" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
+repo_path= "gigant/graphlongt5-dependency-0322" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
             "max_source_length": 8192,
             "max_target_length": 512,
