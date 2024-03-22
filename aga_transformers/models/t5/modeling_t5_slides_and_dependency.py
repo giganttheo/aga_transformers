@@ -216,6 +216,80 @@ def _concatenate_3_blocks_and_global_with_slides(x: jnp.ndarray, x_global: jnp.n
     return jnp.concatenate(blocks_list, axis=sequence_axis)  # [batch_size, num_blocks, 3 * block_len + num_global_tokens, ...]
 
 
+@partial(jax.jit, static_argnums=[2, 3, 4, 5, 8, 10])
+@partial(jax.vmap, in_axes=[0, 0, None, None, None, None, 0, 0, None, 0, None]) #batch
+@partial(jax.vmap, in_axes=[0, 0, None, None, None, None, 0, None, None, None, None]) #heads
+def create_local_and_global_edges_with_slides(senders, receivers, n_global_tokens_context: int, block_len: int, num_blocks: int, seq_len: int, edges, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens_total):
+  offset_doc = n_slides_context - n_slides_total #ie how many slides are not in context (and should be skipped)
+
+  mask_local_shape = (num_blocks, block_len, 3 * block_len + n_global_tokens_context)
+  #jax.debug.print("{mask_local_shape}", mask_local_shape=mask_local_shape)
+  if edges is not None:
+      edge_bias_local = jnp.full(mask_local_shape, -1)
+  else:
+      edge_bias_local=None
+  mask_global_shape = (n_global_tokens_total, seq_len)
+  if edges is not None:
+      edge_bias_global = jnp.full(mask_global_shape, -1)
+  else:
+      edge_bias_global=None
+
+  def setup_mask(senders, receivers, edge_bias_global=None, edge_bias_local=None, edges=None):
+
+    @jax.vmap #num_edges
+    def _get_ids_in_blocks(senders, receivers):
+      #block id
+      block_id = (senders - n_global_tokens_total) // block_len
+      block_id = jnp.where(block_id >= 0, block_id, 1_000_000).astype("int32")
+
+      block_id_k = (receivers - n_global_tokens_total) // block_len
+      block_id_k = jnp.where(block_id_k >= 0, block_id_k, 1_000_000).astype("int32")
+
+      #position within the block q
+      block_pos_q = jnp.where(senders >= n_global_tokens_total, (senders - n_global_tokens_total) % block_len, 1_000_000).astype("int32")
+
+      offset_k = block_id_k - block_id
+      # jax.debug.print("r:{r}, s:{s}, offset: {offset_k}, block_q: {block_id}, block_k: {block_id_k}", r=receivers, s=senders, offset_k=offset_k, block_id_k=block_id_k, block_id=block_id)
+
+      #position within the block k: offset to the right because of the global tokens, and because of the 3 blocks
+      block_pos_k = n_global_tokens_context + ((receivers - n_global_tokens_total) % block_len) + (1 + offset_k) * block_len
+
+      #if the offset between blocks is not within +-1, the tokens are not in the same attention window
+      block_pos_k = jnp.where(jnp.abs(offset_k) <= 1, block_pos_k, 1_000_000).astype("int16")
+
+      #if pos_k is in the document tokens (ie global, but not slides), within n_slides and n_global_tokens_total
+      #offset_slides is negative, and is equal to minus the number of slides not in the context
+      block_pos_k = jnp.where((receivers >= n_global_tokens_total), block_pos_k, receivers + offset_doc)
+
+      #position for the receiver tokens that are inside the context slides tokens (in [slide_start_for_blocks, slide_start_for_blocks+n_slides_context])
+      block_pos_k = jnp.where((receivers >= slide_start_for_blocks[block_id] + n_slides_context), block_pos_k, receivers - slide_start_for_blocks[block_id])
+
+      #filter out receiver tokens that are after the context slides tokens
+      block_pos_k = jnp.where(jnp.logical_or((receivers < slide_start_for_blocks[block_id] + n_slides_context),
+                                             (receivers >= n_slides_total)),
+                              block_pos_k,
+                              1_000_000
+                              ).astype("int16")
+
+      #filter out receiver tokens that are before the context slides tokens
+      block_pos_k = jnp.where((receivers >= slide_start_for_blocks[block_id]), block_pos_k, 1_000_000).astype("int16")
+
+      return block_id, block_pos_q, block_pos_k
+
+    def _update_mask_local(mask, graph_mask, block_ids, block_pos_q, block_pos_k):
+        return mask.at[block_ids, block_pos_q, block_pos_k].set(graph_mask, mode="drop", unique_indices=True)
+
+    def _update_mask_global(mask, graph_mask, senders, receivers):
+        return mask.at[senders, receivers].set(graph_mask, mode="drop", unique_indices=True)
+
+    block_ids, block_pos_q, block_pos_k = _get_ids_in_blocks(senders, receivers)
+
+    edge_bias_local = _update_mask_local(edge_bias_local, edges, block_ids, block_pos_q, block_pos_k)
+    edge_bias_global = _update_mask_global(edge_bias_global, edges, senders, receivers)
+    return edge_bias_local, edge_bias_global
+
+  return setup_mask(senders, receivers, edge_bias_global, edge_bias_local, edges)
+
 
 @partial(jax.jit, static_argnums=[2, 3, 4, 5])
 @partial(jax.vmap, in_axes=[0, 0, None, None, None, None, 0]) #batch
@@ -858,17 +932,18 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 dtype=self.dtype,
             )
         self.has_graph_edge_bias = True
-        self.vocabulary_edge_bias = 8 #doc<->slide, doc/doc, slide/slide, doc<->item and slide<->item
+        self.vocabulary_edge_bias_structural = 8 #doc<->slide, doc/doc, slide/slide, doc<->item and slide<->item
+        self.vocabulary_edge_bias_dependency = 44
         if self.has_graph_edge_bias:
             #additional vocabulary to encode graph edges labels in the attention
             self.graph_edge_bias_structural = nn.Embed( #TODO
-                self.vocabulary_edge_bias,
+                self.vocabulary_edge_bias_structural,
                 self.n_heads,
                 embedding_init=jax.nn.initializers.zeros,
                 dtype=self.dtype,
             )
             self.graph_edge_bias_dependency = nn.Embed(
-                self.vocabulary_edge_bias,
+                self.vocabulary_edge_bias_dependency,
                 self.n_heads,
                 embedding_init=jax.nn.initializers.zeros,
                 dtype=self.dtype,
@@ -1201,7 +1276,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 key_states, value_states = self._concatenate_to_cache(
                     key_states, value_states, query_states
                 )
-            mask_local, mask_global, edge_bias_local, edge_bias_global  = create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens_context, block_len, num_blocks, seq_length, False, edge_labels, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens)
+            mask_local, mask_global, edge_bias_local_structural, edge_bias_global_structural = create_local_and_global_masks_with_slides(senders, receivers, graph_mask, n_global_tokens_context, block_len, num_blocks, seq_length, False, edge_labels, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens)
+            edge_bias_local_dependency, edge_bias_global_dependency = create_local_and_global_edges_with_slides(senders_dependency, receivers_dependency, n_global_tokens_context, block_len, num_blocks, seq_length, edge_labels_dependency, slide_start_for_blocks, n_slides_context, n_slides_total, n_global_tokens)
 
         if no_graph:
             mask_local=None
@@ -1226,23 +1302,36 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         position_bias_global = self.compute_bias(query_length=n_global_tokens, key_length=seq_length)[None]
         
         if self.has_graph_edge_bias and not no_graph:
-            # jax.debug.print("edge_bias_local: {edge_bias_local.shape}; position_bias_local: {position_bias_local.shape}", edge_bias_local=edge_bias_local, position_bias_local=position_bias_local)
-            # edge_bias_local = self.graph_edge_bias(edge_bias_local[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
+
+            #Dependency bias
             if not precomputed:
-                edge_bias_local = edge_bias_local[:, 0]
+                edge_bias_local_dependency = edge_bias_local_dependency[:, 0]
+            edge_bias_local_dependency = jax.lax.select(einops.repeat(edge_bias_local_dependency, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias_dependency(edge_bias_local_dependency), jnp.zeros(tuple(edge_bias_local_dependency.shape) + (self.n_heads,)).astype(self.dtype))
+            position_bias_local = position_bias_local + edge_bias_local_dependency.transpose((0, 4, 1, 2, 3))
+            if not precomputed:
+                edge_bias_global_dependency = edge_bias_global_dependency[:, 0]
+            # edge_bias_global = jnp.where(edge_bias_global[..., None]>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (1,)).astype(self.dtype))
+            edge_bias_global_dependency = jax.lax.select(einops.repeat(edge_bias_global_dependency, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias_dependency(edge_bias_global_dependency), jnp.zeros(tuple(edge_bias_global_dependency.shape) + (self.n_heads,)).astype(self.dtype))
+            position_bias_global = position_bias_global + edge_bias_global_dependency.transpose((0, 3, 1, 2))
+            
+            #Structural bias
+            if not precomputed:
+                edge_bias_local_structural = edge_bias_local_structural[:, 0]
             # edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,), dtype=self.dtype))
-            edge_bias_local = jax.lax.select(einops.repeat(edge_bias_local, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (self.n_heads,)).astype(self.dtype))
+            edge_bias_local_structural = jax.lax.select(einops.repeat(edge_bias_local_structural, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias_structural(edge_bias_local_structural), jnp.zeros(tuple(edge_bias_local_structural.shape) + (self.n_heads,)).astype(self.dtype))
             # jax.debug.print("edge_bias_local labels: {edge_bias_local}", edge_bias_local=edge_bias_local[0, :3, :3, :3, :3])
-            position_bias_local = position_bias_local + edge_bias_local.transpose((0, 4, 1, 2, 3))
+            position_bias_local = position_bias_local + edge_bias_local_structural.transpose((0, 4, 1, 2, 3))
             # jax.debug.print("edge_bias_global: {edge_bias_global.shape}; position_bias_global: {position_bias_global.shape}", edge_bias_global=edge_bias_global, position_bias_global=position_bias_global)
             # edge_bias_global = self.graph_edge_bias(edge_bias_global[:, :1].swapaxes(1, -1)[..., 0]).swapaxes(1, -1)
             if not precomputed:
-                edge_bias_global = edge_bias_global[:, 0]
+                edge_bias_global_structural = edge_bias_global_structural[:, 0]
             # edge_bias_global = jnp.where(edge_bias_global[..., None]>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (1,)).astype(self.dtype))
-            edge_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (self.n_heads,)).astype(self.dtype))
-            position_bias_global = position_bias_global + edge_bias_global.transpose((0, 3, 1, 2))
+            edge_bias_global_structural = jax.lax.select(einops.repeat(edge_bias_global_structural, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias_structural(edge_bias_global_structural), jnp.zeros(tuple(edge_bias_global_structural.shape) + (self.n_heads,)).astype(self.dtype))
+            position_bias_global = position_bias_global + edge_bias_global_structural.transpose((0, 3, 1, 2))
+          
         elif no_graph:
-            _ = self.graph_edge_bias(jnp.zeros(position_bias_local.shape, dtype=jnp.uint16))
+            _ = self.graph_edge_bias_dependency(jnp.zeros(position_bias_local.shape, dtype=jnp.uint16))
+            _ = self.graph_edge_bias_structural(jnp.zeros(position_bias_local.shape, dtype=jnp.uint16))
 
         #adapt graph attention to block efficient attn
         position_bias = None #compat

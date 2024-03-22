@@ -141,6 +141,13 @@ def init_augmented_vocab(params, n_heads, vocab_size, dtype="bfloat16"):
     params['encoder']['block'][block]['layer']['0']['SelfAttention']['graph_edge_bias'] = {'embedding': jnp.zeros((vocab_size, n_heads), dtype=dtype)}
   return params
 
+def init_augmented_vocabs(params, n_heads, vocab_size_structural, vocab_size_dependency, dtype="bfloat16"):
+  for block in params['encoder']['block'].keys():
+    print(f'init augmented vocab for block: {block}')
+    params['encoder']['block'][block]['layer']['0']['SelfAttention']['graph_edge_bias_structural'] = {'embedding': jnp.zeros((vocab_size_structural, n_heads), dtype=dtype)}
+    params['encoder']['block'][block]['layer']['0']['SelfAttention']['graph_edge_bias_dependency'] = {'embedding': jnp.zeros((vocab_size_dependency, n_heads), dtype=dtype)}
+  return params
+
 def adapt_parameters_from_longt5_local(params):
   if isinstance(params, FrozenDict):
     params = unfreeze(params)
