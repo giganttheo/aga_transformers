@@ -688,9 +688,9 @@ def main():
             # graphs.append(graph)
 
             receivers_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
-            receivers_dep = jax.lax.dynamic_update_slice(receivers_dep, jnp.array([r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+            receivers_dep = jax.lax.dynamic_update_slice(receivers_dep, jnp.array([num_slides + r for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
             senders_dep = jnp.zeros((max_graph_len), dtype=jnp.uint16)
-            senders_dep = jax.lax.dynamic_update_slice(senders_dep, jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
+            senders_dep = jax.lax.dynamic_update_slice(senders_dep, jnp.array([num_slides + s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
             # graph_mask_dep = jnp.zeros((max_graph_len), dtype="bool")
             # graph_mask_dep = jax.lax.dynamic_update_slice(graph_mask_dep, jnp.array([gm for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype="bool"), (0,))
             # graph_mask_dep = jnp.logical_and(graph_mask_dep, model_inputs["attention_mask"][i].take(receivers_dep))
