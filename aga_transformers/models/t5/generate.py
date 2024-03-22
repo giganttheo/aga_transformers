@@ -75,9 +75,10 @@ def beam_search(model, params, input_ids, model_kwargs, length_penalty, no_repea
                 model_kwargs[kwarg], num_beams=num_beams
             )
 
-    # logits_processor = FlaxLogitsProcessorList()
+    logits_processor = FlaxLogitsProcessorList()
 
-    logits_processor = FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size) #jax.jit(FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
+    if no_repeat_ngram_size > 0:
+        logits_processor.append(FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size)) #jax.jit(FlaxNoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
 
     batch_size, num_beams, cur_len = input_ids.shape #_ was batch_size
     max_length=512
