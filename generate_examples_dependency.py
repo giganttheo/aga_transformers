@@ -29,7 +29,7 @@ generation_config = {
     # "min_length": 1,
     "length_penalty": -2.,
     "early_stopping": True,
-    "no_repeat_ngram_size": 3,
+    "no_repeat_ngram_size": 0,
 }
 
 repo_path= "gigant/graphlongt5-dependency-0322" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint

@@ -91,7 +91,7 @@ generation_config = {
     # "min_length": 1,
     "length_penalty": -2.,
     "early_stopping": True,
-    "no_repeat_ngram_size": 3,
+    "no_repeat_ngram_size": 0,
 }
 
 predictions = []
