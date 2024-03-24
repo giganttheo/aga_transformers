@@ -45,10 +45,10 @@ tx = optax.adafactor(
 state = TrainState.create(apply_fn=model.__call__, params=model.params, tx=tx, dropout_rng=jax.random.PRNGKey(0))
 
 
-load_dir = "8k-global-dependency-bias" #"8k-global-local" "8k-global-dependency-bias" "8k-structure-window"
+load_dir = "8k-structure-window" #"8k-global-local" "8k-global-dependency-bias" "8k-structure-window"
 CKPT_DIR_LOAD = f"{load_dir}/ckpts/"
 
-save_dir = "8k-global-dependency-bias" #"8k-global-local" "8k-global-dependency-bias"
+save_dir = "8k-structure-window" #"8k-global-local" "8k-global-dependency-bias"
 CKPT_DIR_SAVE = f"{save_dir}/weights/"
 
 def load_state():
@@ -85,4 +85,3 @@ for k in params_model.keys():
     assert params_model[k].shape == params_loaded[k].shape
     assert jnp.allclose(params_model[k], params_loaded[k])
     print(f"OK: {k}")
-
