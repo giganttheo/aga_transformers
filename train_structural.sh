@@ -15,7 +15,7 @@ wandb login
 # export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 python ./train_lora_structural.py \
-	--output_dir "./8k-structure-window" \
+	--output_dir "./8k-structure-window-bis" \
 	--model_name_or_path "google/long-t5-local-base" \
 	--tokenizer_name "google/long-t5-local-base" \
 	--dataset_name="gigant/tib" \
@@ -23,7 +23,7 @@ python ./train_lora_structural.py \
 	--do_train \
 	--do_eval \
 	--num_train_epochs 1 \
-	--learning_rate 1e-2 \
+	--learning_rate 1e-1 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 12 \
 	--per_device_eval_batch_size 12 \
@@ -33,5 +33,5 @@ python ./train_lora_structural.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
-	--resume_from_checkpoint \
-	--run_id "32nkiuyy"
+	# --resume_from_checkpoint \
+	# --run_id "32nkiuyy"
