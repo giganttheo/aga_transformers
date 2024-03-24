@@ -33,5 +33,5 @@ python ./train_lora_structural_and_dependency.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
-	# --resume_from_checkpoint \
-	# --run_id "u0c4f3xc"
+	--resume_from_checkpoint \
+	--run_id "ykkkkn2t"
