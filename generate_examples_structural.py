@@ -113,7 +113,7 @@ test_dataset = test_dataset.map(
 )
 
 
-def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=True):
+def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=False):
     """
     Returns batches of size `batch_size` from `dataset`. If `drop_last` is set to `False`, the final batch may be incomplete,
     and range in size from 1 to `batch_size`. Shuffle batches if `shuffle` is `True`.
