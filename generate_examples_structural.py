@@ -18,7 +18,7 @@ from functools import partial
 import jax
 
 
-batch_size=8
+batch_size=32
 
 prefix = "summarize: "
 max_source_length=8192
@@ -26,7 +26,7 @@ max_source_length=8192
 test_dataset = load_dataset("gigant/tib", split="test")
 
 generation_config = {
-    "num_beams": 3, #instead of 2?
+    "num_beams": 1, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": -2.,
