@@ -16,7 +16,7 @@ from functools import partial
 import jax
 
 
-batch_size=12
+batch_size=8
 
 prefix = "summarize: "
 max_source_length=8192
@@ -24,12 +24,12 @@ max_source_length=8192
 test_dataset = load_dataset("gigant/tib_dependency", split="test")
 
 generation_config = {
-    "num_beams": 2, #instead of 2?
+    "num_beams": 3, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": -2.,
     "early_stopping": True,
-    "no_repeat_ngram_size": 0,
+    "no_repeat_ngram_size": 3,
 }
 
 repo_path= "gigant/graphlongt5-dependency-0322" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint

@@ -34,7 +34,7 @@ references = []
 params=model.params
 decoder_start_token_id = model.config.decoder_start_token_id
 
-batch_size = 16
+batch_size = 12
 
 # @partial(jax.jit)
 # def generate(input_ids, attention_mask, params):

@@ -20,7 +20,7 @@ test_dataset = load_dataset("gigant/tib", split="test")
 prefix = "summarize: "
 max_source_length=8192
 
-batch_size=12
+batch_size=8
 
 repo_path= "gigant/graphlongt5-globallocal-0322" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
@@ -86,12 +86,12 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=True)
 test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=True)
 
 generation_config = {
-    "num_beams": 2, #instead of 2?
+    "num_beams": 3, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": -2.,
     "early_stopping": True,
-    "no_repeat_ngram_size": 0,
+    "no_repeat_ngram_size": 3,
 }
 
 predictions = []
