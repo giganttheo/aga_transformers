@@ -16,7 +16,7 @@ from functools import partial
 import jax
 
 
-batch_size=32
+batch_size=16
 
 prefix = "summarize: "
 max_source_length=8192
