@@ -23,7 +23,7 @@ python ./train_lora_structural.py \
 	--do_train \
 	--do_eval \
 	--num_train_epochs 1 \
-	--learning_rate 1e-1 \
+	--learning_rate 1e-2 \
 	--warmup_steps 100 \
 	--per_device_train_batch_size 12 \
 	--per_device_eval_batch_size 12 \
@@ -33,5 +33,5 @@ python ./train_lora_structural.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
-	--resume_from_checkpoint \
-	--run_id "jfpclga9"
+	# --resume_from_checkpoint \
+	# --run_id "jfpclga9"
