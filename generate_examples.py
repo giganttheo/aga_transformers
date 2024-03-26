@@ -83,7 +83,7 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=True)
         batch = {k: np.array(v) for k, v in batch.items()}
         yield batch, label
 
-test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=False)
+test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=True)
 
 generation_config = {
     "num_beams": 1, #instead of 2?
