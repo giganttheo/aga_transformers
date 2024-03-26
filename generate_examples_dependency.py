@@ -17,9 +17,13 @@ import jax
 
 
 selection = np.array([0, 1, 5, 8, 17, 21, 24, 27, 30, 37, 40, 46, 50, 53, 54, 57, 58,
-                60, 61, 62, 69, 71, 83, 85, 87, 90, ] + [3, 6, 7, 9, 10, 11, 15, 16, 18, 20, 23, 26, 29, 31, 32, 33, 34, 36,
-            38, 41, 45, 47, 64, 73, 74, 77, 78, 80, 81, 86, 91, 92, ])
-
+                60, 61, 62, 69, 71, 83, 85, 87, 90, 93, 97, 104, 106, 109, 115,
+                116, 131, 133, 134, 143, 144, 145, 148, 
+                ] + [3, 6, 7, 9, 10, 11, 15, 16, 18, 20, 23, 26, 29, 31, 32, 33, 34, 36,
+            38, 41, 45, 47, 64, 73, 74, 77, 78, 80, 81, 86, 91, 92, 94, 95, 98,
+            99, 100, 102, 103, 105, 107, 108, 110, 114, 118, 122, 123, 124, 125,
+            126, 127, 128, 129, 132, 135, 139, 140, 141, 142, 146, 
+            ])
 batch_size=8
 
 prefix = "summarize: "
@@ -28,10 +32,10 @@ max_source_length=8192
 test_dataset = load_dataset("gigant/tib_dependency", split="test").select(selection)
 
 generation_config = {
-    "num_beams": 1, #instead of 2?
+    "num_beams": 2, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
-    "length_penalty": -2.,
+    "length_penalty": 2.,
     "early_stopping": True,
     "no_repeat_ngram_size": 3,
 }
