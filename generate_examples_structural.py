@@ -18,7 +18,7 @@ from functools import partial
 import jax
 
 
-batch_size=32
+batch_size=8
 
 prefix = "summarize: "
 max_source_length=8192
@@ -150,7 +150,7 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=False
 
         yield batch, label
 
-test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=False)
+test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = False, drop_last=True)
 
 def generate(input_ids, inputs, params):
     pred_ids = beam_search(model, params, input_ids, inputs, length_penalty=generation_config["length_penalty"], batch_size=batch_size, num_beams=generation_config["num_beams"], no_repeat_ngram_size=generation_config["no_repeat_ngram_size"])

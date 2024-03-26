@@ -24,7 +24,7 @@ test_dataset = load_dataset("gigant/tib", split="test").select(selection)
 prefix = "summarize: "
 max_source_length=8192
 
-batch_size=12
+batch_size=8
 
 repo_path= "gigant/graphlongt5-globallocal-0322" #"gigant/longt5-global-3epoch" #"gigant/graph-t5-global-window-8k-longt5local" # ==> my checkpoint
 attention_kwargs={
@@ -87,7 +87,7 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=True)
         batch = {k: np.array(v) for k, v in batch.items()}
         yield batch, label
 
-test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=False)
+test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = False, drop_last=True)
 
 generation_config = {
     "num_beams": 1, #instead of 2?
