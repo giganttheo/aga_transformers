@@ -15,7 +15,11 @@ from functools import partial
 
 import jax
 
-test_dataset = load_dataset("gigant/tib", split="test")
+selection = np.array([0, 1, 5, 8, 17, 21, 24, 27, 30, 37, 40, 46, 50, 53, 54, 57, 58,
+                60, 61, 62, 69, 71, 83, 85, 87, 90, ] + [3, 6, 7, 9, 10, 11, 15, 16, 18, 20, 23, 26, 29, 31, 32, 33, 34, 36,
+            38, 41, 45, 47, 64, 73, 74, 77, 78, 80, 81, 86, 91, 92, ])
+
+test_dataset = load_dataset("gigant/tib", split="test").select(selection)
 
 prefix = "summarize: "
 max_source_length=8192
@@ -83,7 +87,7 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=True)
         batch = {k: np.array(v) for k, v in batch.items()}
         yield batch, label
 
-test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=True)
+test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = True, drop_last=False)
 
 generation_config = {
     "num_beams": 1, #instead of 2?
