@@ -32,7 +32,7 @@ max_source_length=8192
 test_dataset = load_dataset("gigant/tib_dependency", split="test").select(selection)
 
 generation_config = {
-    "num_beams": 2, #instead of 2?
+    "num_beams": 1, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": 2.,

@@ -33,7 +33,7 @@ selection = np.array([0, 1, 5, 8, 17, 21, 24, 27, 30, 37, 40, 46, 50, 53, 54, 57
 test_dataset = load_dataset("gigant/tib", split="test").select(selection)
 
 generation_config = {
-    "num_beams": 2, #instead of 2?
+    "num_beams": 1, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": 2.,

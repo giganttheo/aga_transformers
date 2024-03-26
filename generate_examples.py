@@ -95,7 +95,7 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=True)
 test_loader = data_loader(jax.random.PRNGKey(0), test_dataset, batch_size, shuffle = False, drop_last=True)
 
 generation_config = {
-    "num_beams": 2, #instead of 2?
+    "num_beams": 1, #instead of 2?
     "max_new_tokens": 512,
     # "min_length": 1,
     "length_penalty": 2.,
