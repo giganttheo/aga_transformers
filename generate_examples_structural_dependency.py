@@ -166,7 +166,7 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=False
             "n_slides": np.stack([graph["n_slides"] for graph in graph_batch]).astype(np.int16),
             "slide_start_for_blocks": np.stack([graph["slide_start_for_blocks"] for graph in graph_batch]).astype(np.int16),
             }
-        batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
+        batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch, **graph_batch_dependency}
 
         yield batch, label
 
