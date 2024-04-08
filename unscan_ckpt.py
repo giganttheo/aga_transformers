@@ -5,6 +5,7 @@ from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augme
 from aga_transformers.models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
 from aga_transformers.models.t5.modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
 from aga_transformers.models.t5.modeling_t5_slides import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_SLI
+from aga_transformers.models.t5.modeling_t5_slides_and_dependency import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_SLI_DEP
 
 
 from transformers import FlaxLongT5ForConditionalGeneration, AutoTokenizer
@@ -45,10 +46,10 @@ tx = optax.adafactor(
 state = TrainState.create(apply_fn=model.__call__, params=model.params, tx=tx, dropout_rng=jax.random.PRNGKey(0))
 
 
-load_dir = "8k-longt5" #"8k-global-local" "8k-global-dependency-bias" "8k-structure-window"
+load_dir = "8k-global-structural-and-dependency-bias" #"8k-longt5" "8k-global-local" "8k-global-dependency-bias" "8k-structure-window"
 CKPT_DIR_LOAD = f"{load_dir}/ckpts/"
 
-save_dir = "8k-longt5" #"8k-global-local" "8k-global-dependency-bias"
+save_dir = "8k-global-structural-and-dependency-bias" #"8k-global-local" "8k-global-dependency-bias"
 CKPT_DIR_SAVE = f"{save_dir}/weights/"
 
 def load_state():
@@ -61,19 +62,20 @@ print("============================================\n\n")
 state = state.replace(**load_state())
 print("============================================\n\n")
 
-# model.enable_scan()
+model.enable_scan()
 model.params = lorax.merge_params(state.params, destructive=False)
 
 print("============================================\n\n")
 
-# model.disable_scan()
+model.disable_scan()
 model.save_pretrained(CKPT_DIR_SAVE, params=model.params)
 tokenizer.save_pretrained(CKPT_DIR_SAVE)
 
+model_bis = FlaxT5ForConditionalGeneration_SLI_DEP.from_pretrained(CKPT_DIR_SAVE,
 # model_bis = FlaxT5ForConditionalGeneration_SLI.from_pretrained(CKPT_DIR_SAVE,
 # model_bis = FlaxT5ForConditionalGeneration_AUG.from_pretrained(CKPT_DIR_SAVE,
 # model_bis = FlaxT5ForConditionalGeneration_EFF.from_pretrained(CKPT_DIR_SAVE,
-model_bis = FlaxLongT5ForConditionalGeneration.from_pretrained(CKPT_DIR_SAVE,
+# model_bis = FlaxLongT5ForConditionalGeneration.from_pretrained(CKPT_DIR_SAVE,
                                                     dtype="bfloat16"
                                                     )
 
