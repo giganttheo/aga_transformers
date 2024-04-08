@@ -30,7 +30,7 @@ selection = np.array([0, 1, 5, 8, 17, 21, 24, 27, 30, 37, 40, 46, 50, 53, 54, 57
             99, 100, 102, 103, 105, 107, 108, 110, 114, 118, 122, 123, 124, 125,
             126, 127, 128, 129, 132, 135, 139, 140, 141, 142, 146, 
             ])
-test_dataset = load_dataset("gigant/tib", split="test").select(selection)
+test_dataset = load_dataset("gigant/tib_dependency", split="test").select(selection)
 
 generation_config = {
     "num_beams": 1, #instead of 2?
