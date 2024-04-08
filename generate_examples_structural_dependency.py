@@ -153,9 +153,9 @@ def data_loader(rng, dataset, batch_size, shuffle: bool = False, drop_last=False
         label = batch.pop("label")
         graph_batch_dependency = batch.pop("graph_dependency")
         graph_batch_dependency = {
-            "receivers_dependency": np.stack([graph["receivers"] for graph in graph_batch_dependency]).astype(np.int16),
-            "senders_dependency": np.stack([graph["senders"] for graph in graph_batch_dependency]).astype(np.int16),
-            "edge_labels_dependency": np.stack([graph["edge_labels"] for graph in graph_batch_dependency]).astype(np.int16)
+            "receivers_dependency": np.stack([graph["receivers_dependency"] for graph in graph_batch_dependency]).astype(np.int16),
+            "senders_dependency": np.stack([graph["senders_dependency"] for graph in graph_batch_dependency]).astype(np.int16),
+            "edge_labels_dependency": np.stack([graph["edge_labels_dependency"] for graph in graph_batch_dependency]).astype(np.int16)
             }
         graph_batch = batch.pop("graph")
         graph_batch = {
