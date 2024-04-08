@@ -1,6 +1,6 @@
 import pickle
 
-from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5, load_slide_t5
+from aga_transformers.models.t5.t5 import load_t5, load_efficient_t5, load_augmented_t5, load_slide_t5, load_slide_and_dependency_t5
 
 from aga_transformers.models.t5.modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
 from aga_transformers.models.t5.modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
@@ -36,8 +36,10 @@ attention_kwargs = {
 
 # tokenizer, model, graph, graph_ar = load_slide_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
 
-tokenizer = AutoTokenizer.from_pretrained("google/long-t5-tglobal-base")
-model = FlaxLongT5ForConditionalGeneration.from_pretrained("google/long-t5-tglobal-base")
+tokenizer, model, graph, graph_ar = load_slide_and_dependency_t5(repo_path="google/long-t5-local-base", dtype="bfloat16", attention_kwargs=attention_kwargs, from_longt5_local=True, layer_wise=False)
+
+# tokenizer = AutoTokenizer.from_pretrained("google/long-t5-tglobal-base")
+# model = FlaxLongT5ForConditionalGeneration.from_pretrained("google/long-t5-tglobal-base")
 
 tx = optax.adafactor(
     learning_rate=0,
