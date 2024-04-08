@@ -79,7 +79,7 @@ def get_dependency_graph(dep_graph):
     senders_dep = jax.lax.dynamic_update_slice(senders_dep, jnp.array([s for r,s,gm in zip(dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.uint16), (0,))
     edge_labels = jnp.full((max_graph_len), -1, dtype=jnp.int16)
     edge_labels = jax.lax.dynamic_update_slice(edge_labels, jnp.array([vocab_dependency[label] for label,r,s,gm in zip(dep_graph["edge_labels"], dep_graph["receivers"], dep_graph["senders"], dep_graph["graph_mask"]) if r < seq_length and s < seq_length and gm], dtype=jnp.int16), (0,))      
-    return {"receivers": receivers_dep, "senders": senders_dep, "edge_labels": edge_labels}
+    return {"receivers_dependency": receivers_dep, "senders_dependency": senders_dep, "edge_labels_dependency": edge_labels}
 
 
 def preprocess_function(examples):
