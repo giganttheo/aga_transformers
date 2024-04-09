@@ -810,6 +810,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
     config: T5Config
     has_relative_attention_bias: bool = False
     causal: bool = False
+    graph_bias: bool = False
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
@@ -857,7 +858,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 embedding_init=jax.nn.initializers.normal(kv_init_std),
                 dtype=self.dtype,
             )
-        self.has_graph_edge_bias = True
+        self.has_graph_edge_bias = self.graph_bias
         self.vocabulary_edge_bias = 8 #doc<->slide, doc/doc, slide/slide, doc<->item and slide<->item
         if self.has_graph_edge_bias:
             #additional vocabulary to encode graph edges labels in the attention
@@ -1225,6 +1226,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             if not precomputed:
                 edge_bias_local = edge_bias_local[:, 0]
             # edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,), dtype=self.dtype))
+            # no position bias if there is an edge bias
+            position_bias_local = jax.lax.select(einops.repeat(edge_bias_local, "...->... h", h=self.n_heads)<0, position_bias_local, jnp.zeros(position_bias_local.shape).astype(self.dtype))
             edge_bias_local = jax.lax.select(einops.repeat(edge_bias_local, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (self.n_heads,)).astype(self.dtype))
             # jax.debug.print("edge_bias_local labels: {edge_bias_local}", edge_bias_local=edge_bias_local[0, :3, :3, :3, :3])
             position_bias_local = position_bias_local + edge_bias_local.transpose((0, 4, 1, 2, 3))
@@ -1233,6 +1236,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
             if not precomputed:
                 edge_bias_global = edge_bias_global[:, 0]
             # edge_bias_global = jnp.where(edge_bias_global[..., None]>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (1,)).astype(self.dtype))
+            # no position bias if there is an edge bias
+            position_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "...->... h", h=self.n_heads)<0, position_bias_global, jnp.zeros(position_bias_global.shape).astype(self.dtype))
             edge_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (self.n_heads,)).astype(self.dtype))
             position_bias_global = position_bias_global + edge_bias_global.transpose((0, 3, 1, 2))
         elif no_graph:
