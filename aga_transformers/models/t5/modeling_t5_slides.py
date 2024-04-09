@@ -1227,7 +1227,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 edge_bias_local = edge_bias_local[:, 0]
             # edge_bias_local = jnp.where(edge_bias_local[..., None]>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (1,), dtype=self.dtype))
             # no position bias if there is an edge bias
-            position_bias_local = jax.lax.select(einops.repeat(edge_bias_local, "b ...-> bh ...", h=self.n_heads)<0, position_bias_local, jnp.zeros(position_bias_local.shape).astype(self.dtype))
+            position_bias_local = jax.lax.select(einops.repeat(edge_bias_local, "bnkd-> bhnkd", h=self.n_heads)<0, position_bias_local, jnp.zeros(position_bias_local.shape).astype(self.dtype))
             edge_bias_local = jax.lax.select(einops.repeat(edge_bias_local, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_local), jnp.zeros(tuple(edge_bias_local.shape) + (self.n_heads,)).astype(self.dtype))
             # jax.debug.print("edge_bias_local labels: {edge_bias_local}", edge_bias_local=edge_bias_local[0, :3, :3, :3, :3])
             position_bias_local = position_bias_local + edge_bias_local.transpose((0, 4, 1, 2, 3))
@@ -1237,7 +1237,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
                 edge_bias_global = edge_bias_global[:, 0]
             # edge_bias_global = jnp.where(edge_bias_global[..., None]>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (1,)).astype(self.dtype))
             # no position bias if there is an edge bias
-            position_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "b ...-> bh ...", h=self.n_heads)<0, position_bias_global, jnp.zeros(position_bias_global.shape).astype(self.dtype))
+            position_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "bnd-> bhnd", h=self.n_heads)<0, position_bias_global, jnp.zeros(position_bias_global.shape).astype(self.dtype))
             edge_bias_global = jax.lax.select(einops.repeat(edge_bias_global, "...->... h", h=self.n_heads)>=0, self.graph_edge_bias(edge_bias_global), jnp.zeros(tuple(edge_bias_global.shape) + (self.n_heads,)).astype(self.dtype))
             position_bias_global = position_bias_global + edge_bias_global.transpose((0, 3, 1, 2))
         elif no_graph:
