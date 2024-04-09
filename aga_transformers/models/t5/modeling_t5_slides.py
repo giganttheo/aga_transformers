@@ -1319,11 +1319,13 @@ class FlaxT5LayerSelfAttention(nn.Module):
                 dtype=self.dtype,
             )
         else:
+            print(self.name)
             #Encoder Self-Attention, with Efficient Block Graph attn, inspired by LongT5
             self.SelfAttention = FlaxT5EfficientBlockGraphSelfAttention( #FlaxT5EfficientBlockGraphSelfAttention(
                 self.config,
                 has_relative_attention_bias=self.has_relative_attention_bias,
                 causal=self.config.causal,
+                graph_bias=(self.name==str(0)),
                 dtype=self.dtype,
             )
         self.layer_norm = FlaxT5LayerNorm(self.config.d_model, eps=self.config.layer_norm_epsilon, dtype=self.dtype)
