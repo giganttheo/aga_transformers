@@ -15,7 +15,7 @@ wandb login
 # export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 python ./train_lora_structural.py \
-	--output_dir "./8k-structure-window-v2" \
+	--output_dir "./4k-structure-window-v2" \
 	--model_name_or_path "google/long-t5-local-base" \
 	--tokenizer_name "google/long-t5-local-base" \
 	--dataset_name="gigant/tib" \
