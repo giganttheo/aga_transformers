@@ -87,6 +87,8 @@ logger = logging.getLogger(__name__)
 
 # flax.config.update('flax_use_orbax_checkpointing', True)
 
+wandb.login(os.environ['WANDB_API_KEY'])
+
 try:
     nltk.data.find("tokenizers/punkt")
 except (LookupError, OSError):

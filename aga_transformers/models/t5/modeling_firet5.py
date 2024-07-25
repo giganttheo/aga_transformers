@@ -333,9 +333,9 @@ class FIRE(nn.Module):
         ]
         self.act = ACT2FN[self.config.dense_act_fn]
 
-    @partial(jax.vmap, in_axes=(None, 0, 0))
+    # @partial(jax.vmap, in_axes=(None, 0, 0)) #batch vmap is not used
     def _compute_bias(self, memory_position, context_position):
-        relative_position = (memory_position[:, None] - context_position[None, :])
+        relative_position = (memory_position - context_position)
         sign = jnp.sign(relative_position)
         threshold = jnp.abs(self.L)
         pos_normalizer = jnp.maximum(memory_position[:, None], threshold)
@@ -922,8 +922,8 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
 
     def compute_block_bias(self, block_length: int, num_blocks: int):
         """Compute binned relative position bias"""
-        memory_position = jnp.arange(3 * block_length, dtype="i4")
-        context_position = memory_position[block_length:-block_length]
+        memory_position = jnp.arange(3 * block_length, dtype="i4")[None, :]
+        context_position = memory_position[block_length:-block_length][:, None]
 
         # relative_position = memory_position[None, :] - context_position[:, None]
         # relative_position_bucket = self._relative_position_bucket(
