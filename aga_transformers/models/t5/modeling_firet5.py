@@ -343,7 +343,7 @@ class FIRE(nn.Module):
         pos_normalizer = jnp.log(jnp.abs(self.c * pos_normalizer) + 1) + self.eps
         normalized_distance = relative_position / pos_normalizer
         x = sign * normalized_distance
-        print(x.shape)
+        # print(x.shape)
         hidden_gelu = self.act(self.mlp[0](x[..., None]))
         bias = self.mlp[1](hidden_gelu)
         return bias
@@ -926,7 +926,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
     def compute_block_bias(self, block_length: int, num_blocks: int):
         """Compute binned relative position bias"""
         memory_position = jnp.arange(3 * block_length, dtype="i4")[None, :]
-        context_position = memory_position[block_length:-block_length][:, None]
+        context_position = memory_position[0, block_length:-block_length][:, None]
 
         # relative_position = memory_position[None, :] - context_position[:, None]
         # relative_position_bucket = self._relative_position_bucket(
