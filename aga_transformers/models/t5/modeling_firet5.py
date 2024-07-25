@@ -336,6 +336,7 @@ class FIRE(nn.Module):
     # @partial(jax.vmap, in_axes=(None, 0, 0)) #batch vmap is not used
     def _compute_bias(self, memory_position, context_position):
         relative_position = (memory_position - context_position)
+        print(relative_position.shape)
         sign = jnp.sign(relative_position)
         threshold = jnp.abs(self.L)
         pos_normalizer = jnp.maximum(memory_position[:, None], threshold)
