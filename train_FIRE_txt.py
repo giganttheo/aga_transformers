@@ -449,9 +449,9 @@ def main():
     # wandb.tensorboard.patch(root_logdir=Path(training_args.output_dir))
     # wandb.init(project=training_args.output_dir.split("/")[-1])
     if training_args.resume_from_checkpoint:
-        wandb.init(project=training_args.output_dir.split("/")[-1], id=training_args.run_id, resume="must", sync_tensorboard=True)
+        wandb.init(project=training_args.output_dir.split("/")[-1], id=training_args.run_id, resume="must", sync_tensorboard=False)
     else:
-        wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=True)
+        wandb.init(project=training_args.output_dir.split("/")[-1], sync_tensorboard=False)
         print("\n\n\n")
         print(f"==================== Run id: {wandb.run.id} ==========================")
         print(f"==================== Run name: {wandb.run.name} ==========================")
