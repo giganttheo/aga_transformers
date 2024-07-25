@@ -339,7 +339,7 @@ class FIRE(nn.Module):
         print(relative_position.shape)
         sign = jnp.sign(relative_position)
         threshold = jnp.abs(self.L)
-        pos_normalizer = jnp.maximum(memory_position[:, None], threshold)
+        pos_normalizer = jnp.maximum(memory_position, threshold)
         relative_position = jnp.log(jnp.abs(self.c * relative_position) + 1)
         pos_normalizer = jnp.log(jnp.abs(self.c * pos_normalizer) + 1) + self.eps
         normalized_distance = relative_position / pos_normalizer
