@@ -935,7 +935,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #     num_buckets=self.relative_attention_num_buckets,
         #     max_distance=self.relative_attention_max_distance,
         # )
-        values = self.relative_attention_bias(memory_position, context_position).transpose((2, 0, 1))
+        values = self.relative_attention_bias(memory_position, context_position)
         # values = self.relative_attention_bias(relative_position_bucket)
         # values = values.transpose((2, 0, 1))
         return einops.repeat(values, 'm c h -> h n m c', n=num_blocks)
