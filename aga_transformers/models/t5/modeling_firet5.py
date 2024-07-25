@@ -343,6 +343,7 @@ class FIRE(nn.Module):
         pos_normalizer = jnp.log(jnp.abs(self.c * pos_normalizer) + 1) + self.eps
         normalized_distance = relative_position / pos_normalizer
         x = sign * normalized_distance
+        print(x.shape)
         hidden_gelu = self.act(self.mlp[0](x[..., None]))
         bias = self.mlp[1](hidden_gelu)
         return bias
