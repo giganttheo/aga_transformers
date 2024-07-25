@@ -345,7 +345,7 @@ class FIRE(nn.Module):
         x = sign[:,:,None] * normalized_distance[:,:, None]
         hidden_gelu = self.act(self.mlp[0](x))
         bias = self.mlp[1](hidden_gelu)
-        return bias.transpose((2, 0, 1))
+        return bias
 
     def __call__(self, pos_q, pos_k):
         """
@@ -566,12 +566,13 @@ class FlaxT5Attention(nn.Module):
         )
 
         if self.has_relative_attention_bias:
-            self.relative_attention_bias = nn.Embed(
-                self.relative_attention_num_buckets,
-                self.n_heads,
-                embedding_init=jax.nn.initializers.normal(kv_init_std, self.dtype),
-                dtype=self.dtype,
-            )
+            self.relative_attention_bias = FIRE(self.config, 32, dtype=self.dtype)
+            # nn.Embed(
+            #     self.relative_attention_num_buckets,
+            #     self.n_heads,
+            #     embedding_init=jax.nn.initializers.normal(kv_init_std, self.dtype),
+            #     dtype=self.dtype,
+            # )
 
     @staticmethod
     def _relative_position_bucket(relative_position, bidirectional=True, num_buckets=32, max_distance=128):
@@ -614,14 +615,15 @@ class FlaxT5Attention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")[:, None]
         memory_position = jnp.arange(key_length, dtype="i4")[None, :]
 
-        relative_position = memory_position - context_position
-        relative_position_bucket = self._relative_position_bucket(
-            relative_position,
-            bidirectional=(not self.causal),
-            num_buckets=self.relative_attention_num_buckets,
-        )
+        # relative_position = memory_position - context_position
+        # relative_position_bucket = self._relative_position_bucket(
+        #     relative_position,
+        #     bidirectional=(not self.causal),
+        #     num_buckets=self.relative_attention_num_buckets,
+        # )
 
-        values = self.relative_attention_bias(relative_position_bucket)
+        # values = self.relative_attention_bias(relative_position_bucket)
+        values = self.relative_attention_bias(memory_position, context_position)
         values = values.transpose((2, 0, 1))[None, :, :, :]
         return values
 
@@ -899,7 +901,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         context_position = jnp.arange(query_length, dtype="i4")[:, None] + offset.astype("i4")
         memory_position = jnp.arange(key_length, dtype="i4")[None, :]
 
-        return self.relative_attention_bias(memory_position, context_position)
+        return self.relative_attention_bias(memory_position, context_position).transpose((2, 0, 1))
 
         # relative_position = memory_position - context_position
         # jax.debug.print("relative pos: {relative_position}", relative_position=relative_position)
@@ -932,7 +934,7 @@ class FlaxT5EfficientBlockGraphSelfAttention(nn.Module):
         #     num_buckets=self.relative_attention_num_buckets,
         #     max_distance=self.relative_attention_max_distance,
         # )
-        values = self.relative_attention_bias(memory_position, context_position)
+        values = self.relative_attention_bias(memory_position, context_position).transpose((2, 0, 1))
         # values = self.relative_attention_bias(relative_position_bucket)
         # values = values.transpose((2, 0, 1))
         return einops.repeat(values, 'm c h -> h n m c', n=num_blocks)
