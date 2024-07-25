@@ -6,6 +6,8 @@ from .modeling_t5_slides_and_dependency import FlaxT5ForConditionalGeneration as
 from .modeling_t5_slides import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_SLI
 from .modeling_t5_augmented_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_AUG
 from .modeling_t5_efficient import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_EFF
+from .modeling_firet5 import FlaxT5ForConditionalGeneration as FlaxT5ForConditionalGeneration_FIRE
+
 from .modeling_t5 import FlaxT5ForConditionalGeneration
 from ..utils import repeat_relative_pos_bias, add_graph_to_params, tie_graph_layers, tie_relative_pos_bias, init_augmented_vocab, init_augmented_vocabs, adapt_parameters_from_longt5_local, convert_unroll_to_scan
 from ...attention_patterns.vanilla_attention.vanilla import create_dense_attn_patterns
@@ -302,6 +304,27 @@ def load_slide_and_dependency_t5(repo_path="t5-base", dtype="bfloat16", attentio
     else:
         graph = None
         graph_ar = None
+    return tokenizer, model, graph, graph_ar
+
+
+
+def load_fire_t5(repo_path="t5-base", dtype="bfloat16", attention_mode="led", attention_kwargs=None, layer_wise=False, from_longt5_local=False, **model_kwargs):
+    tokenizer = AutoTokenizer.from_pretrained(repo_path)
+    model = FlaxT5ForConditionalGeneration_FIRE.from_pretrained(
+        repo_path,
+        **model_kwargs,
+        dtype=dtype,
+    )
+    if dtype == "bfloat16":
+        print("adapting parameters to bfloat16...")
+        model.params = model.to_bf16(model.params)
+
+    # graph_ar = {}
+    if attention_mode == "led":
+        attention_kwargs.pop("autoregressive")
+        graph = create_led_attn_patterns(model, autoregressive=False, **attention_kwargs, layer_wise=layer_wise)
+        graph_ar = create_led_attn_patterns(model, autoregressive=True, **attention_kwargs, layer_wise=layer_wise)
+
     return tokenizer, model, graph, graph_ar
 
 

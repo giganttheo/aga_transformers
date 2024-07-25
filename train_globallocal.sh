@@ -22,6 +22,7 @@
 # # export PATH=~/miniconda3/envs/train-jax/bin:$PATH.
 
 # CONDA_OVERRIDE_CUDA="10.2" conda install jaxlib=*=*cuda* cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
+# CONDA_OVERRIDE_CUDA="10.2" conda install torch cuda-nvcc cudnn cudatoolkit -c conda-forge -c nvidia
 
 
 # pip install --proxy=http://webproxy.lab-ia.fr:8080 --upgrade "jax[cuda102]" jaxlib -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html

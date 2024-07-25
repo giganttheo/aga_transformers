@@ -98,12 +98,12 @@ def create_lora(model, params, optimizer, dtype="bfloat16", bypass=False):
 
     # This function defines a spec which tells lorax how each parameter should be handled
     def decision_fn(path, param):
-        dim = 8 # 64 > 256 (test 128?)
+        dim = 64 # 64 > 256 (test 128?)
         if 'shared' in [p.key for p in path] :
             #word embeddings
             # print(f"freeze {[p.key for p in path]}")
             return LORA_FREEZE
-        elif 'embedding' in [p.key for p in path]:
+        elif 'embedding' in [p.key for p in path] or 'relative_attention_bias' in [p.key for p in path]:
             #relative positional embedding /
             # print(f"finetune {[p.key for p in path]}")
             return LORA_FULL
