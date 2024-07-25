@@ -9,7 +9,8 @@ cd ~/graph-transformer/aga_transformers
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
 export TOKENIZERS_PARALLELISM=false
-bash ./connect_wandb.sh
+
+bash connect_wandb.sh
 
 python ./train_FIRE_txt.py \
 	--output_dir "./8k-firet5" \
@@ -30,6 +31,7 @@ python ./train_FIRE_txt.py \
 	--max_source_length 8192 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
+    # --wandb_api_key $WANDB_API_KEY \
 	# --max_train_samples 50 \
 	# --max_eval_samples 50 \
 	# --seed 43 \
