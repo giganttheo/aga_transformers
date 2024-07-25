@@ -9,7 +9,7 @@ cd ~/graph-transformer/aga_transformers
 export PATH=/usr/local/cuda-11.2/bin:$PATH.
 export PATH=/usr/local/cuda-10.2/targets/x86_64-linux/include:$PATH.
 export TOKENIZERS_PARALLELISM=false
-bash ./connect_wand.sh
+bash ./connect_wandb.sh
 
 python ./train_FIRE_txt.py \
 	--output_dir "./8k-firet5" \
