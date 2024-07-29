@@ -97,6 +97,9 @@ except (LookupError, OSError):
     with FileLock(".lock") as lock:
         nltk.download("punkt", quiet=True)
 
+#fix for pickle bfloat16 incompatibilities https://github.com/google/jax/issues/8505
+import builtins
+builtins.bfloat16 = jnp.dtype('bfloat16').type
 
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
