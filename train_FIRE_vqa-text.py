@@ -695,7 +695,8 @@ def main():
         graphs=[]
         # mask_local_l, mask_global_l, edge_bias_local_l, edge_bias_global_l = [], [], [], []
 
-        inputs = [f"question:\n{questions[i][0]},\n context:{'\n'.join([t if (t is not None) else slide_token for t in inputs[i]])}" for i in range(len(inputs)) ]
+        newline = "\n"
+        inputs = [f"question:{newline}{questions[i][0]},{newline} context:{newline.join([t if (t is not None) else slide_token for t in inputs[i]])}" for i in range(len(inputs)) ]
 
         model_inputs = tokenizer(
             inputs,
