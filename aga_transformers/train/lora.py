@@ -126,7 +126,7 @@ def create_lora(model, params, optimizer, dtype="bfloat16", bypass=False):
 
     # Split the parameters up into tunable and frozen ones, and initialize a pair of LoRA matrices for each parameter
     # which had a spec value other than LORA_FULL or LORA_FREEZE
-    lora_params = init_lora(params, lora_spec, jax.random.PRNGKey(0), alpha=32, dtype=dtype)
+    lora_params = init_lora(params, lora_spec, jax.random.PRNGKey(0), alpha=64, dtype=dtype) #64 was 32
 
     # `wrap_optimizer` uses the spec to freeze the appropriate subset
     # of parameters.
