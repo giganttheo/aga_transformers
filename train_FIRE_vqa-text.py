@@ -71,7 +71,7 @@ from aga_transformers.train.lora import create_lora
 from aga_transformers.train.loss import loss_fn
 from aga_transformers.attention_patterns.utils import graph_from_path
 # from aga_transformers.attention_patterns.sparse_attention.structural_window import create_window_structural_attn_patterns_batch, prepare_window_structural_attn_patterns
-from aga_transformers.attention_patterns.sparse_attention.led import create_led_attn_patterns
+from aga_transformers.attention_patterns.sparse_attention.led import create_led_attn_patterns, prepare_led_attn_patterns
 
 
 #NCCL flags recommended by https://jax.readthedocs.io/en/latest/gpu_performance_tips.html#nccl-flags
@@ -720,8 +720,9 @@ def main():
                 "max_source_length": data_args.max_source_length,
                 "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
             }
-            graph = create_led_attn_patterns(model, **attention_kwargs)
+            graph = prepare_led_attn_patterns(**attention_kwargs)
         
+            print(graph.keys())
             #setup the distances
             # example = examples[i]
 

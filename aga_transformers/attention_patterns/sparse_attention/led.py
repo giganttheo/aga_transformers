@@ -128,3 +128,15 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
         encdec_attn = {}
     graph = graph_from_path(model.params, enc_self_attn, dec_self_attn, encdec_attn, layer_wise=layer_wise)
     return graph
+
+
+def prepare_led_attn_patterns(max_source_length, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], is_padded=False, **kwargs):
+    if len(kwargs.keys()) > 0:
+      print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
+    #Encoder self attention pattern
+    return LongformerAttentionPattern(
+                                seq_len_q=max_source_length,
+                                seq_len_kv=max_source_length,
+                                window_size=window_sizes[0],
+                                sentence_tokens=sentence_tokens,
+                                ).get_attention_graph()
