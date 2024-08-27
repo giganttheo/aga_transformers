@@ -773,7 +773,7 @@ def main():
                 #token distance
                 tok_dist = j - i
 
-                if len(box_ids_) >= max(i,j) and box_ids_[i] is not None and box_ids_[j] is not None:
+                if len(box_ids_) > max(i,j) and box_ids_[i] is not None and box_ids_[j] is not None:
                     #horizontal and vertical distances
                     box_id1 = box_ids_[i]
                     box_id2 = box_ids_[j]
