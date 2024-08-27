@@ -31,7 +31,7 @@ python ./train_FIRE_vqa-text.py \
 	--max_source_length 1024 \
 	--val_max_target_length 512 \
 	--gradient_checkpointing \
+	--max_train_samples 512 \
+	--max_eval_samples 512 \
     # --wandb_api_key $WANDB_API_KEY \
-	# --max_train_samples 50 \
-	# --max_eval_samples 50 \
 	# --seed 43 \
