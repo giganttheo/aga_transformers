@@ -723,14 +723,14 @@ def main():
             graph = create_led_attn_patterns(model, **attention_kwargs)
         
             #setup the distances
-            example = examples[i]
+            # example = examples[i]
 
-            hdist = np.zeros((len(example['bboxes']), len(example['bboxes'])))
-            vdist = np.zeros((len(example['bboxes']), len(example['bboxes'])))
+            hdist = np.zeros((len(examples['bboxes'][i]), len(examples['bboxes'][i])))
+            vdist = np.zeros((len(examples['bboxes'][i]), len(examples['bboxes'][i])))
 
-            width, height = example['page'].size
-            for i1, box1 in enumerate(example['bboxes']):
-                for i2, box2 in enumerate(example['bboxes']):
+            width, height = examples['page'][i].size
+            for i1, box1 in enumerate(examples['bboxes'][i]):
+                for i2, box2 in enumerate(examples['bboxes'][i]):
                     hdist[i1, i2], vdist[i1, i2] = relative_center_distances(box1, box2, width, height)
 
             offset_tokens_context = len(tokenizer(
@@ -752,7 +752,7 @@ def main():
             total_nodes = offset_tokens_context
             box_ids_ = [None for _ in range(total_nodes)]
 
-            for group_id, t in enumerate(example['texts']):
+            for group_id, t in enumerate(examples['texts'][i]):
                 if not t is None:
                     tok_t = tokenizer(
                             t, max_length=data_args.max_source_length, padding="do_not_pad", truncation=True, return_tensors="np"
