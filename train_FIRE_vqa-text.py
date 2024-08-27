@@ -720,7 +720,7 @@ def main():
                 "max_source_length": data_args.max_source_length,
                 "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
             }
-            graph = create_led_attn_patterns(**attention_kwargs)
+            graph = create_led_attn_patterns(model, **attention_kwargs)
         
             #setup the distances
             example = examples[i]
