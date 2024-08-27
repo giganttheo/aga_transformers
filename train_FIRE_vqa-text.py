@@ -751,7 +751,7 @@ def main():
                         ).tokens())
             
             total_nodes = offset_tokens_context
-            box_ids_ = [None for _ in range(total_nodes)]
+            box_ids_ = [None for _ in range(offset_tokens_context)]
 
             for group_id, t in enumerate(examples['texts'][i]):
                 if not t is None:
@@ -764,7 +764,7 @@ def main():
                     box_ids_.append(group_id)
                     total_nodes += 1 # one node per img
 
-                box_ids_.append(None)
+                box_ids_.extend([None for _ in range(offset_tokens_between_blocks)])
                 total_nodes += offset_tokens_between_blocks # one node in between blocks (\n)
 
             def edge_info(i, j):
