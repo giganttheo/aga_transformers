@@ -1017,7 +1017,7 @@ def main():
             graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask, "edge_label": edge_label}
             graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
 
-            loss, _ = loss_fn_(model=state.apply_fn, params=params, dropout_rng=dropout_rng, graphs=graphs, **batch)
+            loss, _ = loss_fn_(model=state.apply_fn, params=params, dropout_rng=dropout_rng, graph=graphs, **batch)
             return loss, None
         
         grad_fn = jax.value_and_grad(compute_loss, has_aux=True)
