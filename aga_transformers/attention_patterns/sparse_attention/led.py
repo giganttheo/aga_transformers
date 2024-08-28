@@ -5,7 +5,7 @@ from ..vanilla_attention.vanilla import VanillaAttentionPattern
 from ..utils import graph_from_path
 
 class LongformerAttentionPattern(AttentionPattern):
-  def __init__(self, seq_len_q, seq_len_kv, window_size, sentence_tokens=[0], **kwargs):
+  def __init__(self, seq_len_q, seq_len_kv, window_size, sentence_tokens=[0], num_tokens=None, **kwargs):
     super().__init__()
 
     #global attn
@@ -46,6 +46,8 @@ class LongformerAttentionPattern(AttentionPattern):
     receivers=receivers[idces]
 
     receivers, senders, graph_mask = self._padding_graphs(receivers, senders)
+    if num_tokens is not None:
+      graph_mask = [g and r<num_tokens and s<num_tokens for g,r,s in zip(graph_mask, receivers, senders)]
     receivers = np.array(receivers, dtype=np.uint16)
     senders = np.array(senders, dtype=np.uint16)
     graph_mask = np.array(graph_mask, dtype=bool)
@@ -130,7 +132,7 @@ def create_led_attn_patterns(model, max_source_length, max_target_length, window
     return graph
 
 
-def prepare_led_attn_patterns(max_source_length, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], is_padded=False, **kwargs):
+def prepare_led_attn_patterns(max_source_length, window_sizes=[32, 32, 32, 32, 32, 32, 64, 64, 64, 64, 64, 64], sentence_tokens=[0, 1, 2], is_padded=False, num_tokens=None, **kwargs):
     if len(kwargs.keys()) > 0:
       print(f'keyword arguments {kwargs.keys()} are not used by create_dependency_attn_patterns')
     #Encoder self attention pattern
@@ -139,4 +141,5 @@ def prepare_led_attn_patterns(max_source_length, window_sizes=[32, 32, 32, 32, 3
                                 seq_len_kv=max_source_length,
                                 window_size=window_sizes[0],
                                 sentence_tokens=sentence_tokens,
+                                num_tokens=num_tokens,
                                 ).get_attention_graph()

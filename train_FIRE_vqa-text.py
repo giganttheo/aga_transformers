@@ -706,23 +706,22 @@ def main():
         for i in range(len(inputs)):
             #graph generation
             attention_kwargs = {
-                "mode": "window",
+                # "mode": "window",
                 "is_padded": True,
                 "max_source_length": data_args.max_source_length,
-                "max_target_length": data_args.max_target_length,
+                # "max_target_length": data_args.max_target_length,
                 "window_sizes": [254],
                 # "keyframes": examples["keyframes"][i],
                 # "transcript_segments": examples["transcript_segments"][i],
-                "tokens": tokenizer(
+                "num_tokens": len(tokenizer(
                                     inputs[i],
                                     max_length=data_args.max_source_length, padding="do_not_pad", truncation=True
-                                    ).tokens(),
-                "max_source_length": data_args.max_source_length,
+                                    ).tokens()),
                 "sentence_tokens": [0, 1], # the prefix ['▁summarize', ':', '▁',] is 3 tokens, so we are using those as global tokens
             }
             graph = prepare_led_attn_patterns(**attention_kwargs)
         
-            print(graph.keys())
+            # print(graph.keys())
             #setup the distances
             # example = examples[i]
 
