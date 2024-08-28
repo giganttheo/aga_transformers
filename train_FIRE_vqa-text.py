@@ -533,7 +533,7 @@ def main():
             data_files["train"] = data_args.train_file
             extension = data_args.train_file.split(".")[-1]
         if data_args.validation_file is not None:
-            data_files["valid"] = data_args.validation_file
+            data_files["validation"] = data_args.validation_file
             extension = data_args.validation_file.split(".")[-1]
         if data_args.test_file is not None:
             data_files["test"] = data_args.test_file
@@ -617,9 +617,9 @@ def main():
             raise ValueError("--do_train requires a train dataset")
         column_names = dataset["train"].column_names
     elif training_args.do_eval:
-        if "valid" not in dataset:
+        if "validation" not in dataset:
             raise ValueError("--do_eval requires a validation dataset")
-        column_names = dataset["valid"].column_names
+        column_names = dataset["validation"].column_names
     elif training_args.do_predict:
         if "test" not in dataset:
             raise ValueError("--do_predict requires a test dataset")
@@ -834,10 +834,10 @@ def main():
 
     if training_args.do_eval:
         if loading_ds_from_disk:
-            eval_dataset = preprocessed_datasets["valid"]
+            eval_dataset = preprocessed_datasets["validation"]
         else:
             max_target_length = data_args.val_max_target_length
-            eval_dataset = dataset["valid"]
+            eval_dataset = dataset["validation"]
             if data_args.max_eval_samples is not None:
                 max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
                 eval_dataset = eval_dataset.select(range(max_eval_samples))
