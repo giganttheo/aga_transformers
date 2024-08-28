@@ -405,7 +405,7 @@ def data_loader(rng: jax.random.PRNGKey, dataset: Dataset, batch_size: int, shuf
             "receivers": np.stack([graph["receivers"] for graph in graph_batch]).astype(np.int16),
             "senders": np.stack([graph["senders"] for graph in graph_batch]).astype(np.int16),
             "graph_mask": np.stack([graph["graph_mask"] for graph in graph_batch]).astype("bool"),
-            "edge_label": np.stack([graph["edge_label"] for graph in graph_batch]).astype("np.int16)"),
+            "edge_label": np.stack([graph["edge_label"] for graph in graph_batch]).astype(np.int16),
             }
         batch = {**{k: np.array(v) for k, v in batch.items()}, **graph_batch}
 
