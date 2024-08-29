@@ -1014,8 +1014,8 @@ def main():
             senders = batch.pop("senders")
             graph_mask = batch.pop("graph_mask")
             edge_label = batch.pop("edge_label")
-            graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask, "edge_label": edge_label}
-            graphs = graph_from_path(state.params, graph, {}, {}, layer_wise=False)
+            graph = {"receivers": receivers, "senders": senders, "graph_mask": graph_mask} #, "edge_label": edge_label
+            graphs = graph_from_path(params, graph, {}, {}, layer_wise=False)
 
             loss, _ = loss_fn_(model=state.apply_fn, params=params, dropout_rng=dropout_rng, graph=graphs, **batch)
             return loss, None
