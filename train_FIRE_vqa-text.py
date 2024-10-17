@@ -696,7 +696,7 @@ def main():
         # mask_local_l, mask_global_l, edge_bias_local_l, edge_bias_global_l = [], [], [], []
 
         newline = "\n"
-        inputs = [f"question:{newline}{questions[i][0]},{newline} context:{newline.join([t if (t is not None) else slide_token for t in inputs[i]])}" for i in range(len(inputs)) ]
+        inputs = [f"context:{newline.join([t if (t is not None) else slide_token for t in inputs[i]])}{newline}{newline}question:{newline}{questions[i][0]}" for i in range(len(inputs)) ]
 
         model_inputs = tokenizer(
             inputs,
@@ -788,6 +788,8 @@ def main():
             graph["edge_label"] = [edge_info(sender, receiver) for sender, receiver in zip(graph["senders"], graph["receivers"])]
             graphs.append(graph)
 
+
+        print(graphs)
         model_inputs["graph"] = graphs
 
         # Setup the tokenizer for targets
